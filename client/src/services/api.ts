@@ -86,6 +86,14 @@ export const usersService = {
   getAll: (params?: any) => api.get('/users', { params }),
   create: (data: any) => api.post('/users', data),
   update: (id: number, data: any) => api.put(`/users/${id}`, data),
+  delete: (id: number) => api.delete(`/users/${id}`),
+}
+
+export const berthsService = {
+  getByClub: (clubId: number) => api.get(`/berths/club/${clubId}`),
+  create: (data: any) => api.post('/berths', data),
+  update: (id: number, data: any) => api.put(`/berths/${id}`, data),
+  delete: (id: number) => api.delete(`/berths/${id}`),
 }
 
 export default api

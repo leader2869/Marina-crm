@@ -28,6 +28,9 @@ export class Vessel {
   @Column({ type: 'decimal', precision: 8, scale: 2, nullable: true })
   width: number; // ширина в метрах
 
+  @Column({ type: 'decimal', precision: 8, scale: 2, nullable: true })
+  heightAboveWaterline: number; // высота над ватерлинией в метрах
+
   @Column({ nullable: true })
   registrationNumber: string;
 

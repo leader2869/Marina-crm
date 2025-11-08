@@ -59,6 +59,9 @@ export class Club {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   basePrice: number; // базовая цена за день
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  minPricePerMonth: number | null; // минимальная цена за месяц
+
   @Column({ default: true })
   isActive: boolean;
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { clubsService, bookingsService, financesService } from '../services/api'
+import { clubsService, bookingsService, financesService, vesselsService } from '../services/api'
+import { UserRole } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 
 export default function Dashboard() {
@@ -22,9 +23,18 @@ export default function Dashboard() {
           bookingsService.getAll({ limit: 1 }),
         ])
 
+        // Для супер-администратора загружаем все судна, для остальных - только свои
+        let vesselsCount = 0
+        if (user?.role === UserRole.SUPER_ADMIN) {
+          const vesselsRes = await vesselsService.getAll({ limit: 1 })
+          vesselsCount = vesselsRes.total || 0
+        } else {
+          vesselsCount = user?.vessels?.length || 0
+        }
+
         setStats({
           clubs: clubsRes.total || 0,
-          vessels: user?.vessels?.length || 0,
+          vessels: vesselsCount,
           bookings: bookingsRes.total || 0,
           totalIncome: 0,
           totalExpense: 0,

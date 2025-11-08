@@ -30,6 +30,7 @@ export class UsersController {
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.ownedClubs', 'ownedClubs')
         .leftJoinAndSelect('user.managedClub', 'managedClub')
+        .leftJoinAndSelect('user.vessels', 'vessels')
         .skip((page - 1) * limit)
         .take(limit)
         .orderBy('user.createdAt', 'DESC')
@@ -266,6 +267,48 @@ export class UsersController {
           managedClub: updatedUser!.managedClub,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      // Только супер-администратор может удалять пользователей
+      if (req.userRole !== 'super_admin') {
+        throw new AppError('Недостаточно прав доступа', 403);
+      }
+
+      const userId = parseInt(req.params.id);
+
+      if (!userId || isNaN(userId)) {
+        throw new AppError('Неверный ID пользователя', 400);
+      }
+
+      // Нельзя удалить самого себя
+      if (userId === req.userId) {
+        throw new AppError('Нельзя удалить самого себя', 400);
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+
+      // Находим пользователя
+      const user = await userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new AppError('Пользователь не найден', 404);
+      }
+
+      // Нельзя удалить другого супер-администратора
+      if (user.role === UserRole.SUPER_ADMIN) {
+        throw new AppError('Нельзя удалить супер-администратора', 400);
+      }
+
+      await userRepository.remove(user);
+
+      res.json({ message: 'Пользователь успешно удален' });
     } catch (error) {
       next(error);
     }

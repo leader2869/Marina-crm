@@ -30,5 +30,13 @@ router.put(
   usersController.update.bind(usersController)
 );
 
+// Только супер-администратор может удалять пользователей
+router.delete(
+  '/:id',
+  authenticate,
+  authorize(UserRole.SUPER_ADMIN),
+  usersController.delete.bind(usersController)
+);
+
 export default router;
 

@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { clubsService } from '../services/api'
-import { Club } from '../types'
-import { Anchor, MapPin, Phone, Mail, Globe, Plus } from 'lucide-react'
+import { Club, UserRole } from '../types'
+import { Anchor, MapPin, Phone, Mail, Globe, Plus, Trash2 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Clubs() {
+  const { user } = useAuth()
   const [clubs, setClubs] = useState<Club[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     loadClubs()
@@ -28,6 +31,30 @@ export default function Clubs() {
     club.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     club.address.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const handleDelete = async (clubId: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Первое подтверждение
+    if (!confirm('Вы уверены, что хотите удалить этот яхт-клуб?')) return
+
+    // Второе подтверждение
+    if (!confirm('ВНИМАНИЕ! Это действие необратимо. Данные будут удалены из базы данных. Продолжить?')) return
+
+    setDeleting(true)
+
+    try {
+      await clubsService.delete(clubId)
+      await loadClubs()
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка удаления яхт-клуба')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
 
   if (loading) {
     return <div className="text-center py-12">Загрузка...</div>
@@ -68,6 +95,16 @@ export default function Clubs() {
                 <Anchor className="h-8 w-8 text-primary-600 mr-3" />
                 <h3 className="text-xl font-semibold text-gray-900">{club.name}</h3>
               </div>
+              {isSuperAdmin && (
+                <button
+                  onClick={(e) => handleDelete(club.id, e)}
+                  disabled={deleting}
+                  className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                  title="Удалить"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              )}
             </div>
             {club.description && (
               <p className="text-gray-600 text-sm mb-4 line-clamp-2">{club.description}</p>
@@ -98,7 +135,7 @@ export default function Clubs() {
             </div>
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Причалов:</span>
+                <span className="text-gray-600">Мест:</span>
                 <span className="font-semibold">{club.totalBerths}</span>
               </div>
               <div className="flex justify-between text-sm mt-2">

@@ -23,16 +23,16 @@ export class Berth {
   length: number; // максимальная длина судна в метрах
 
   @Column({ type: 'decimal', precision: 8, scale: 2 })
-  width: number; // ширина причала в метрах
+  width: number; // ширина места в метрах
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  pricePerDay: number; // цена за день (если отличается от базовой)
+  pricePerDay: number | null; // цена за день (если отличается от базовой)
 
   @Column({ default: true })
   isAvailable: boolean;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

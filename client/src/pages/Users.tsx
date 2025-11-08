@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { usersService, clubsService } from '../services/api'
-import { UserRole, Club } from '../types'
-import { Users, Edit2, X, Plus } from 'lucide-react'
+import { UserRole, Club, Vessel } from '../types'
+import { Users, Edit2, X, Plus, Trash2, Search } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -15,10 +15,11 @@ interface UserData {
   clubName: string
   debt: number
   createdAt: string
+  vessels?: Vessel[]
 }
 
 export default function UsersPage() {
-  const { user } = useAuth()
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<UserData[]>([])
   const [loading, setLoading] = useState(true)
   const [clubs, setClubs] = useState<Club[]>([])
@@ -42,6 +43,8 @@ export default function UsersPage() {
     managedClubId: '',
   })
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     loadUsers()
@@ -160,6 +163,26 @@ export default function UsersPage() {
     setError('')
   }
 
+  const handleDelete = async (userId: number) => {
+    // Первое подтверждение
+    if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return
+
+    // Второе подтверждение
+    if (!confirm('ВНИМАНИЕ! Это действие необратимо. Данные будут удалены из базы данных. Продолжить?')) return
+
+    setDeleting(true)
+    setError('')
+
+    try {
+      await usersService.delete(userId)
+      await loadUsers()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка удаления пользователя')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const handleCreate = async () => {
     setError('')
     setCreating(true)
@@ -208,7 +231,7 @@ export default function UsersPage() {
   }
 
   // Проверка роли (дополнительная защита)
-  if (user && user.role !== UserRole.SUPER_ADMIN) {
+  if (currentUser && currentUser.role !== UserRole.SUPER_ADMIN) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -237,6 +260,19 @@ export default function UsersPage() {
           <Plus className="h-5 w-5 mr-2" />
           Добавить пользователя
         </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Поиск по фамилии, телефону или названию катера..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -271,7 +307,43 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
+              {(() => {
+                const filteredUsers = users.filter((user) => {
+                  if (!searchTerm) return true
+                  
+                  const searchLower = searchTerm.toLowerCase().trim()
+                  
+                  // Поиск по фамилии
+                  const lastName = user.lastName?.toLowerCase() || ''
+                  if (lastName.includes(searchLower)) return true
+                  
+                  // Поиск по телефону
+                  const phone = user.phone?.toLowerCase() || ''
+                  if (phone !== '-' && phone.includes(searchLower)) return true
+                  
+                  // Поиск по названию катера (судна)
+                  if (user.vessels && user.vessels.length > 0) {
+                    const vesselNames = user.vessels
+                      .map((vessel) => vessel.name?.toLowerCase() || '')
+                      .join(' ')
+                    if (vesselNames.includes(searchLower)) return true
+                  }
+                  
+                  return false
+                })
+                
+                if (filteredUsers.length === 0 && users.length > 0) {
+                  return (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center">
+                        <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600">Пользователи по запросу "{searchTerm}" не найдены</p>
+                      </td>
+                    </tr>
+                  )
+                }
+                
+                return filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">#{user.id}</div>
@@ -310,16 +382,27 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleEdit(user)}
-                      className="text-primary-600 hover:text-primary-900"
-                      title="Редактировать"
-                    >
-                      <Edit2 className="h-5 w-5" />
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleEdit(user)}
+                        className="text-primary-600 hover:text-primary-900"
+                        title="Редактировать"
+                      >
+                        <Edit2 className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(user.id)}
+                        disabled={deleting || user.role === UserRole.SUPER_ADMIN || user.id === currentUser?.id}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Удалить"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ))}
+                ))
+              })()}
             </tbody>
           </table>
         </div>

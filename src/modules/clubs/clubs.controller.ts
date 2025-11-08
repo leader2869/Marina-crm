@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
 import { Club } from '../../entities/Club';
 import { Berth } from '../../entities/Berth';
+import { Booking } from '../../entities/Booking';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -64,12 +65,32 @@ export class ClubsController {
       const clubRepository = AppDataSource.getRepository(Club);
       const club = await clubRepository.findOne({
         where: { id: parseInt(id) },
-        relations: ['owner', 'berths', 'managers'],
+        relations: ['owner', 'managers'],
       });
 
       if (!club) {
         throw new AppError('Яхт-клуб не найден', 404);
       }
+
+      // Загружаем места с сортировкой по номеру места
+      // Сначала места, начинающиеся с текста (алфавитно), потом с числа (по возрастанию)
+      const berthRepository = AppDataSource.getRepository(Berth);
+      const berths = await berthRepository
+        .createQueryBuilder('berth')
+        .where('berth.clubId = :clubId', { clubId: club.id })
+        .orderBy(
+          `CASE WHEN berth.number ~ '^[^0-9]' THEN 0 ELSE 1 END`,
+          'ASC'
+        )
+        .addOrderBy(
+          `CASE WHEN berth.number ~ '^[0-9]' THEN CAST(SUBSTRING(berth.number FROM '^([0-9]+)') AS INTEGER) ELSE 0 END`,
+          'ASC'
+        )
+        .addOrderBy('berth.number', 'ASC')
+        .getMany();
+
+      // Добавляем отсортированные места к клубу
+      club.berths = berths;
 
       res.json(club);
     } catch (error) {
@@ -96,6 +117,7 @@ export class ClubsController {
         minRentalPeriod,
         maxRentalPeriod,
         basePrice,
+        minPricePerMonth,
       } = req.body;
 
       if (!name || !address || !latitude || !longitude) {
@@ -116,19 +138,20 @@ export class ClubsController {
         minRentalPeriod: minRentalPeriod || 1,
         maxRentalPeriod: maxRentalPeriod || 365,
         basePrice: basePrice || 0,
+        minPricePerMonth: minPricePerMonth ? parseFloat(minPricePerMonth) : null,
         ownerId: req.userId,
       });
 
       await clubRepository.save(club);
 
-      // Создаем причалы
+      // Создаем места
       if (totalBerths > 0) {
         const berthRepository = AppDataSource.getRepository(Berth);
         const berths = [];
 
         for (let i = 1; i <= totalBerths; i++) {
           const berth = berthRepository.create({
-            number: `${i}`,
+            number: `Место ${i}`,
             length: 20, // значение по умолчанию
             width: 5,
             pricePerDay: basePrice,
@@ -142,8 +165,32 @@ export class ClubsController {
 
       const savedClub = await clubRepository.findOne({
         where: { id: club.id },
-        relations: ['owner', 'berths'],
+        relations: ['owner'],
       });
+
+      if (!savedClub) {
+        throw new AppError('Ошибка при создании клуба', 500);
+      }
+
+      // Загружаем места с сортировкой по номеру места
+      // Сначала места, начинающиеся с текста (алфавитно), потом с числа (по возрастанию)
+      const berthRepository = AppDataSource.getRepository(Berth);
+      const berths = await berthRepository
+        .createQueryBuilder('berth')
+        .where('berth.clubId = :clubId', { clubId: club.id })
+        .orderBy(
+          `CASE WHEN berth.number ~ '^[^0-9]' THEN 0 ELSE 1 END`,
+          'ASC'
+        )
+        .addOrderBy(
+          `CASE WHEN berth.number ~ '^[0-9]' THEN CAST(SUBSTRING(berth.number FROM '^([0-9]+)') AS INTEGER) ELSE 0 END`,
+          'ASC'
+        )
+        .addOrderBy('berth.number', 'ASC')
+        .getMany();
+
+      // Добавляем отсортированные места к клубу
+      savedClub.berths = berths;
 
       res.status(201).json(savedClub);
     } catch (error) {
@@ -153,19 +200,38 @@ export class ClubsController {
 
   async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
       const { id } = req.params;
+      const {
+        name,
+        description,
+        address,
+        latitude,
+        longitude,
+        phone,
+        email,
+        website,
+        totalBerths,
+        minRentalPeriod,
+        maxRentalPeriod,
+        basePrice,
+        minPricePerMonth,
+      } = req.body;
 
       const clubRepository = AppDataSource.getRepository(Club);
       const club = await clubRepository.findOne({
         where: { id: parseInt(id) },
-        relations: ['owner'],
+        relations: ['owner', 'berths'],
       });
 
       if (!club) {
         throw new AppError('Яхт-клуб не найден', 404);
       }
 
-      // Проверка прав доступа
+      // Проверка прав доступа - владелец клуба может редактировать свой клуб
       if (
         club.ownerId !== req.userId &&
         req.userRole !== UserRole.SUPER_ADMIN &&
@@ -174,13 +240,54 @@ export class ClubsController {
         throw new AppError('Недостаточно прав для редактирования', 403);
       }
 
-      Object.assign(club, req.body);
+      // Обновляем поля клуба
+      if (name !== undefined) club.name = name;
+      if (description !== undefined) club.description = description;
+      if (address !== undefined) club.address = address;
+      if (latitude !== undefined) club.latitude = parseFloat(latitude as string);
+      if (longitude !== undefined) club.longitude = parseFloat(longitude as string);
+      if (phone !== undefined) club.phone = phone;
+      if (email !== undefined) club.email = email;
+      if (website !== undefined) club.website = website;
+      if (minRentalPeriod !== undefined) club.minRentalPeriod = parseInt(minRentalPeriod as string);
+      if (maxRentalPeriod !== undefined) club.maxRentalPeriod = parseInt(maxRentalPeriod as string);
+      if (basePrice !== undefined) club.basePrice = parseFloat(basePrice as string);
+      if (minPricePerMonth !== undefined) club.minPricePerMonth = minPricePerMonth ? parseFloat(minPricePerMonth as string) : null;
+
+      // totalBerths теперь автоматически подсчитывается на основе добавленных мест
+      // Не обрабатываем изменение totalBerths при редактировании клуба
+
       await clubRepository.save(club);
 
+      // Получаем обновленный клуб с связями
       const updatedClub = await clubRepository.findOne({
         where: { id: club.id },
-        relations: ['owner', 'berths'],
+        relations: ['owner'],
       });
+
+      if (!updatedClub) {
+        throw new AppError('Ошибка при обновлении клуба', 500);
+      }
+
+      // Загружаем места с сортировкой по номеру места
+      // Сначала места, начинающиеся с текста (алфавитно), потом с числа (по возрастанию)
+      const berthRepository = AppDataSource.getRepository(Berth);
+      const berths = await berthRepository
+        .createQueryBuilder('berth')
+        .where('berth.clubId = :clubId', { clubId: club.id })
+        .orderBy(
+          `CASE WHEN berth.number ~ '^[^0-9]' THEN 0 ELSE 1 END`,
+          'ASC'
+        )
+        .addOrderBy(
+          `CASE WHEN berth.number ~ '^[0-9]' THEN CAST(SUBSTRING(berth.number FROM '^([0-9]+)') AS INTEGER) ELSE 0 END`,
+          'ASC'
+        )
+        .addOrderBy('berth.number', 'ASC')
+        .getMany();
+
+      // Добавляем отсортированные места к клубу
+      updatedClub.berths = berths;
 
       res.json(updatedClub);
     } catch (error) {
@@ -209,10 +316,16 @@ export class ClubsController {
         throw new AppError('Недостаточно прав для удаления', 403);
       }
 
-      club.isActive = false;
-      await clubRepository.save(club);
-
-      res.json({ message: 'Яхт-клуб деактивирован' });
+      // Супер-администратор может полностью удалить клуб
+      if (req.userRole === UserRole.SUPER_ADMIN) {
+        await clubRepository.remove(club);
+        res.json({ message: 'Яхт-клуб успешно удален' });
+      } else {
+        // Владелец клуба может только деактивировать
+        club.isActive = false;
+        await clubRepository.save(club);
+        res.json({ message: 'Яхт-клуб деактивирован' });
+      }
     } catch (error) {
       next(error);
     }

@@ -50,6 +50,7 @@ export interface Club {
   minRentalPeriod: number
   maxRentalPeriod: number
   basePrice: number
+  minPricePerMonth?: number
   isActive: boolean
   ownerId: number
   owner?: User
@@ -78,6 +79,7 @@ export interface Vessel {
   type: string
   length: number
   width?: number
+  heightAboveWaterline?: number
   registrationNumber?: string
   documentPath?: string
   technicalSpecs?: string

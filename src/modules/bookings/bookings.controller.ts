@@ -84,7 +84,7 @@ export class BookingsController {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
       }
 
-      // Проверка доступности причала
+      // Проверка доступности места
       const berthRepository = AppDataSource.getRepository(Berth);
       const berth = await berthRepository.findOne({
         where: { id: berthId },
@@ -92,11 +92,11 @@ export class BookingsController {
       });
 
       if (!berth) {
-        throw new AppError('Причал не найден', 404);
+        throw new AppError('Место не найдено', 404);
       }
 
       if (!berth.isAvailable) {
-        throw new AppError('Причал недоступен', 400);
+        throw new AppError('Место недоступно', 400);
       }
 
       // Проверка пересечений с другими бронированиями
@@ -114,7 +114,7 @@ export class BookingsController {
         .getMany();
 
       if (conflictingBookings.length > 0) {
-        throw new AppError('Причал уже забронирован на этот период', 400);
+        throw new AppError('Место уже забронировано на этот период', 400);
       }
 
       // Расчет стоимости

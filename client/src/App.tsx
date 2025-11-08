@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Clubs from './pages/Clubs'
 import ClubDetails from './pages/ClubDetails'
 import Vessels from './pages/Vessels'
+import VesselDetails from './pages/VesselDetails'
 import Bookings from './pages/Bookings'
 import Finances from './pages/Finances'
 import Payments from './pages/Payments'
@@ -35,6 +36,7 @@ function App() {
             <Route path="clubs" element={<Clubs />} />
             <Route path="clubs/:id" element={<ClubDetails />} />
             <Route path="vessels" element={<Vessels />} />
+            <Route path="vessels/:id" element={<VesselDetails />} />
             <Route path="bookings" element={<Bookings />} />
             <Route path="finances" element={<Finances />} />
             <Route path="payments" element={<Payments />} />

@@ -75,17 +75,18 @@ const seed = async (): Promise<void> => {
       minRentalPeriod: 7,
       maxRentalPeriod: 365,
       basePrice: 5000,
+      minPricePerMonth: 120000, // 120000 рублей за месяц (примерно 4000 рублей в день * 30 дней)
       ownerId: clubOwner.id,
       isActive: true,
     });
     await clubRepository.save(club);
     console.log('✅ Создан яхт-клуб');
 
-    // Создание причалов
+    // Создание мест
     const berths = [];
     for (let i = 1; i <= 50; i++) {
       const berth = berthRepository.create({
-        number: `${i}`,
+        number: `Место ${i}`,
         length: 15 + Math.random() * 10, // 15-25 метров
         width: 5,
         pricePerDay: 5000 + Math.random() * 2000, // 5000-7000 рублей
@@ -95,7 +96,7 @@ const seed = async (): Promise<void> => {
       berths.push(berth);
     }
     await berthRepository.save(berths);
-    console.log('✅ Создано 50 причалов');
+    console.log('✅ Создано 50 мест');
 
     // Создание судна
     const vessel = vesselRepository.create({

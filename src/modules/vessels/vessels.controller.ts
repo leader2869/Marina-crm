@@ -74,6 +74,7 @@ export class VesselsController {
         type,
         length,
         width,
+        heightAboveWaterline,
         registrationNumber,
         documentPath,
         technicalSpecs,
@@ -94,6 +95,7 @@ export class VesselsController {
         type: type as string,
         length: parseFloat(length as string),
         width: width ? parseFloat(width as string) : undefined,
+        heightAboveWaterline: heightAboveWaterline ? parseFloat(heightAboveWaterline as string) : undefined,
         registrationNumber: registrationNumber as string | undefined,
         documentPath: documentPath as string | undefined,
         technicalSpecs: technicalSpecs ? JSON.stringify(technicalSpecs) : undefined,
@@ -166,7 +168,7 @@ export class VesselsController {
         throw new AppError('Судно не найдено', 404);
       }
 
-      // Проверка прав доступа
+      // Проверка прав доступа - только владелец или супер-администратор
       if (
         vessel.ownerId !== req.userId &&
         req.userRole !== 'super_admin'

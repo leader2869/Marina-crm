@@ -12,6 +12,7 @@ import bookingsRoutes from './modules/bookings/bookings.routes';
 import financesRoutes from './modules/finances/finances.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
 import usersRoutes from './modules/users/users.routes';
+import berthsRoutes from './modules/berths/berths.routes';
 
 const app: Express = express();
 
@@ -36,6 +37,7 @@ app.use('/api/bookings', bookingsRoutes);
 app.use('/api/finances', financesRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/berths', berthsRoutes);
 
 // Error handler
 app.use(errorHandler);
