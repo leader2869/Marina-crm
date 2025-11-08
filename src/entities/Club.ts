@@ -14,6 +14,7 @@ import { Booking } from './Booking';
 import { Income } from './Income';
 import { Expense } from './Expense';
 import { Budget } from './Budget';
+import { UserClub } from './UserClub';
 
 @Entity('clubs')
 export class Club {
@@ -81,6 +82,10 @@ export class Club {
 
   @OneToMany(() => User, (user) => user.managedClub)
   managers: User[];
+
+  // Связь многие-ко-многим через промежуточную таблицу
+  @OneToMany(() => UserClub, (userClub) => userClub.club)
+  userClubs: UserClub[];
 
   @OneToMany(() => Berth, (berth) => berth.club)
   berths: Berth[];

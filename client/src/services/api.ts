@@ -26,6 +26,13 @@ api.interceptors.response.use(
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
+    // Если ошибка 404, возвращаем объект с error
+    if (error.response?.status === 404) {
+      return Promise.reject({
+        error: error.response?.data?.error || 'Маршрут не найден',
+        message: error.response?.data?.error || 'Маршрут не найден',
+      })
+    }
     return Promise.reject(error.response?.data || error.message)
   }
 )
@@ -42,6 +49,8 @@ export const clubsService = {
   getById: (id: number) => api.get(`/clubs/${id}`),
   create: (data: any) => api.post('/clubs', data),
   update: (id: number, data: any) => api.put(`/clubs/${id}`, data),
+  hide: (id: number) => api.post(`/clubs/${id}/hide`),
+  restore: (id: number) => api.post(`/clubs/${id}/restore`),
   delete: (id: number) => api.delete(`/clubs/${id}`),
 }
 
@@ -84,6 +93,7 @@ export const paymentsService = {
 
 export const usersService = {
   getAll: (params?: any) => api.get('/users', { params }),
+  getById: (id: number) => api.get(`/users/${id}`),
   create: (data: any) => api.post('/users', data),
   update: (id: number, data: any) => api.put(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),

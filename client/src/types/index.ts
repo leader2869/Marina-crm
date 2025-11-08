@@ -21,6 +21,14 @@ export enum PaymentStatus {
   REFUNDED = 'refunded',
 }
 
+export interface UserClub {
+  id: number
+  userId: number
+  clubId: number
+  club?: Club
+  createdAt: string
+}
+
 export interface User {
   id: number
   email: string
@@ -32,6 +40,7 @@ export interface User {
   ownedClubs?: Club[]
   vessels?: Vessel[]
   managedClub?: Club
+  managedClubs?: UserClub[]
   createdAt: string
 }
 

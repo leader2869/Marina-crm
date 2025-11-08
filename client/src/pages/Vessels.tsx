@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { vesselsService } from '../services/api'
 import { Vessel, UserRole } from '../types'
-import { Ship, Plus, Trash2, Search } from 'lucide-react'
+import { Ship, Plus, Trash2, Search, Download } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { format } from 'date-fns'
+import * as XLSX from 'xlsx'
 
 export default function Vessels() {
   const { user } = useAuth()
@@ -47,6 +49,65 @@ export default function Vessels() {
   }
 
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
+
+  const exportToExcel = async () => {
+    try {
+      // Загружаем все суда для экспорта
+      const response = await vesselsService.getAll({ limit: 10000 })
+      const allVessels = response.data || []
+
+      // Подготавливаем данные для Excel
+      const excelData = allVessels.map((vessel: Vessel) => {
+        return {
+          'ID': vessel.id,
+          'Название': vessel.name || '',
+          'Тип': vessel.type || '',
+          'Длина (м)': vessel.length || 0,
+          'Ширина (м)': vessel.width || '-',
+          'Высота над ватерлинией (м)': vessel.heightAboveWaterline || '-',
+          'Регистрационный номер': vessel.registrationNumber || '-',
+          'Владелец (Имя)': vessel.owner?.firstName || '-',
+          'Владелец (Фамилия)': vessel.owner?.lastName || '-',
+          'Email владельца': vessel.owner?.email || '-',
+          'Телефон владельца': vessel.owner?.phone || '-',
+          'Дата создания': vessel.createdAt ? format(new Date(vessel.createdAt), 'dd.MM.yyyy HH:mm') : '-',
+          'Дата обновления': vessel.updatedAt ? format(new Date(vessel.updatedAt), 'dd.MM.yyyy HH:mm') : '-',
+        }
+      })
+
+      // Создаем рабочую книгу Excel
+      const worksheet = XLSX.utils.json_to_sheet(excelData)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Судна')
+
+      // Настраиваем ширину столбцов
+      const columnWidths = [
+        { wch: 8 },  // ID
+        { wch: 25 }, // Название
+        { wch: 20 }, // Тип
+        { wch: 12 }, // Длина
+        { wch: 12 }, // Ширина
+        { wch: 25 }, // Высота над ватерлинией
+        { wch: 20 }, // Регистрационный номер
+        { wch: 15 }, // Владелец (Имя)
+        { wch: 15 }, // Владелец (Фамилия)
+        { wch: 25 }, // Email владельца
+        { wch: 18 }, // Телефон владельца
+        { wch: 20 }, // Дата создания
+        { wch: 20 }, // Дата обновления
+      ]
+      worksheet['!cols'] = columnWidths
+
+      // Генерируем имя файла с текущей датой
+      const fileName = `Судна_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.xlsx`
+
+      // Сохраняем файл
+      XLSX.writeFile(workbook, fileName)
+    } catch (error: any) {
+      console.error('Ошибка экспорта в Excel:', error)
+      alert('Ошибка экспорта данных в Excel')
+    }
+  }
 
   // Фильтрация судов по поисковому запросу
   const filteredVessels = vessels.filter((vessel) => {
@@ -95,10 +156,28 @@ export default function Vessels() {
           <h1 className="text-3xl font-bold text-gray-900">Судна</h1>
           <p className="mt-2 text-gray-600">Управление судами</p>
         </div>
-        <button className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-          <Plus className="h-5 w-5 mr-2" />
-          Добавить судно
-        </button>
+        {isSuperAdmin && (
+          <div className="flex gap-3">
+            <button
+              onClick={exportToExcel}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              title="Экспортировать в Excel"
+            >
+              <Download className="h-5 w-5 mr-2" />
+              Экспорт в Excel
+            </button>
+            <button className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+              <Plus className="h-5 w-5 mr-2" />
+              Добавить судно
+            </button>
+          </div>
+        )}
+        {!isSuperAdmin && (
+          <button className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+            <Plus className="h-5 w-5 mr-2" />
+            Добавить судно
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-4">

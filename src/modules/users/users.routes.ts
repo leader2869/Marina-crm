@@ -14,6 +14,14 @@ router.get(
   usersController.getAll.bind(usersController)
 );
 
+// Только супер-администратор может получить детали пользователя
+router.get(
+  '/:id',
+  authenticate,
+  authorize(UserRole.SUPER_ADMIN),
+  usersController.getById.bind(usersController)
+);
+
 // Только супер-администратор может создавать пользователей
 router.post(
   '/',

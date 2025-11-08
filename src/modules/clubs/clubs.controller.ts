@@ -1,8 +1,15 @@
 import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
+import { In } from 'typeorm';
 import { Club } from '../../entities/Club';
 import { Berth } from '../../entities/Berth';
 import { Booking } from '../../entities/Booking';
+import { Income } from '../../entities/Income';
+import { Expense } from '../../entities/Expense';
+import { Budget } from '../../entities/Budget';
+import { UserClub } from '../../entities/UserClub';
+import { User } from '../../entities/User';
+import { Payment } from '../../entities/Payment';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -15,13 +22,26 @@ export class ClubsController {
         parseInt(req.query.page as string),
         parseInt(req.query.limit as string)
       );
-      const { location, minPrice, maxPrice, available } = req.query;
+      const { location, minPrice, maxPrice, available, showHidden } = req.query;
 
       const clubRepository = AppDataSource.getRepository(Club);
       const queryBuilder = clubRepository
         .createQueryBuilder('club')
         .leftJoinAndSelect('club.owner', 'owner')
-        .where('club.isActive = :isActive', { isActive: true });
+        .leftJoinAndSelect('club.berths', 'berths');
+      
+      // Если суперадмин запрашивает скрытые клубы, показываем все, иначе только активные
+      // Проверяем userRole (может быть undefined, если запрос без аутентификации)
+      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
+      
+      if (showHidden === 'true' && isSuperAdmin) {
+        // Суперадмин может видеть все клубы, включая скрытые
+        console.log('Суперадмин запросил скрытые клубы, userRole:', req.userRole);
+      } else {
+        // Показываем только активные клубы
+        queryBuilder.where('club.isActive = :isActive', { isActive: true });
+        console.log('Фильтр по активным клубам применен, showHidden:', showHidden, 'isSuperAdmin:', isSuperAdmin);
+      }
 
       // Фильтры
       if (location) {
@@ -52,7 +72,24 @@ export class ClubsController {
         .take(limit)
         .getManyAndCount();
 
-      res.json(createPaginatedResponse(clubs, total, page, limit));
+      // Если суперадмин запросил скрытые клубы, возвращаем все, иначе фильтруем только активные
+      let filteredClubs = clubs;
+      
+      if (showHidden !== 'true' || !isSuperAdmin) {
+        // Дополнительная фильтрация на случай, если фильтр не сработал
+        filteredClubs = clubs.filter((club) => club.isActive === true);
+      }
+      
+      // Отладочная информация
+      console.log('Клубы загружены из БД:', clubs.length, 'После фильтрации:', filteredClubs.length);
+      console.log('Параметры запроса - showHidden:', showHidden, 'isSuperAdmin:', isSuperAdmin, 'userRole:', req.userRole);
+      
+      if (showHidden === 'true' && isSuperAdmin) {
+        const hiddenCount = clubs.filter((club) => !club.isActive).length;
+        console.log('Скрытых клубов:', hiddenCount);
+      }
+
+      res.json(createPaginatedResponse(filteredClubs, filteredClubs.length, page, limit));
     } catch (error) {
       next(error);
     }
@@ -295,20 +332,146 @@ export class ClubsController {
     }
   }
 
-  async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  async hide(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      console.log('Hide route called, params:', req.params);
+      console.log('Hide route called, body:', req.body);
       const { id } = req.params;
+      const clubId = parseInt(id);
+      
+      if (isNaN(clubId)) {
+        throw new AppError('Неверный ID клуба', 400);
+      }
+      
+      console.log('Hiding club with ID:', clubId);
 
       const clubRepository = AppDataSource.getRepository(Club);
       const club = await clubRepository.findOne({
-        where: { id: parseInt(id) },
+        where: { id: clubId },
       });
 
       if (!club) {
         throw new AppError('Яхт-клуб не найден', 404);
       }
 
+      // Проверка прав доступа - только супер-администратор может скрывать клубы
+      if (req.userRole !== UserRole.SUPER_ADMIN) {
+        throw new AppError('Недостаточно прав для скрытия клуба', 403);
+      }
+
+      // Используем транзакцию для атомарности операций
+      const queryRunner = AppDataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        const userClubRepository = queryRunner.manager.getRepository(UserClub);
+        const userRepository = queryRunner.manager.getRepository(User);
+        const clubRepositoryTransaction = queryRunner.manager.getRepository(Club);
+
+        // Загружаем клуб в транзакции
+        const clubInTransaction = await clubRepositoryTransaction.findOne({
+          where: { id: clubId },
+        });
+
+        if (!clubInTransaction) {
+          throw new AppError('Яхт-клуб не найден в транзакции', 404);
+        }
+
+        // Удаляем все связи многие-ко-многим (user_clubs)
+        await userClubRepository.delete({ clubId: clubId });
+        console.log('Удалены связи user_clubs для клуба:', clubId);
+
+        // Обновляем пользователей, у которых этот клуб был установлен как managedClub
+        const updateResult = await userRepository.update(
+          { managedClubId: clubId },
+          { managedClubId: null }
+        );
+        console.log('Обновлено пользователей с managedClubId:', updateResult.affected || 0);
+
+        // Устанавливаем клуб как неактивный
+        clubInTransaction.isActive = false;
+        const savedClub = await clubRepositoryTransaction.save(clubInTransaction);
+        console.log('Клуб скрыт (isActive = false), ID:', savedClub.id, 'isActive:', savedClub.isActive);
+        
+        // Проверяем, что клуб действительно сохранен как неактивный
+        const verifyClub = await clubRepositoryTransaction.findOne({
+          where: { id: clubId },
+          select: ['id', 'name', 'isActive'],
+        });
+        console.log('Проверка сохранения клуба:', verifyClub);
+
+        // Коммитим транзакцию
+        await queryRunner.commitTransaction();
+        res.json({ message: 'Яхт-клуб успешно скрыт. Все связи оборваны.' });
+      } catch (error: any) {
+        // Откатываем транзакцию в случае ошибки
+        try {
+          await queryRunner.rollbackTransaction();
+        } catch (rollbackError) {
+          console.error('Ошибка при откате транзакции:', rollbackError);
+        }
+
+        console.error('Ошибка при скрытии клуба:', error);
+        next(error);
+      } finally {
+        // Освобождаем соединение
+        try {
+          await queryRunner.release();
+        } catch (releaseError) {
+          console.error('Ошибка при освобождении соединения:', releaseError);
+        }
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restore(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const clubId = parseInt(id);
+
+      const clubRepository = AppDataSource.getRepository(Club);
+      const club = await clubRepository.findOne({
+        where: { id: clubId },
+      });
+
+      if (!club) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
+
+      // Проверка прав доступа - только супер-администратор может восстанавливать клубы
+      if (req.userRole !== UserRole.SUPER_ADMIN) {
+        throw new AppError('Недостаточно прав для восстановления клуба', 403);
+      }
+
+      // Восстанавливаем клуб (делаем активным)
+      club.isActive = true;
+      await clubRepository.save(club);
+      console.log('Клуб восстановлен (isActive = true), ID:', club.id);
+
+      res.json({ message: 'Яхт-клуб успешно восстановлен' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const clubId = parseInt(id);
+
       // Проверка прав доступа
+      const clubRepository = AppDataSource.getRepository(Club);
+      const club = await clubRepository.findOne({
+        where: { id: clubId },
+      });
+
+      if (!club) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
+
       if (
         club.ownerId !== req.userId &&
         req.userRole !== UserRole.SUPER_ADMIN
@@ -318,8 +481,163 @@ export class ClubsController {
 
       // Супер-администратор может полностью удалить клуб
       if (req.userRole === UserRole.SUPER_ADMIN) {
-        await clubRepository.remove(club);
-        res.json({ message: 'Яхт-клуб успешно удален' });
+        console.log(`Начало удаления клуба ID: ${clubId}`);
+        
+        // Используем транзакцию для атомарности операций
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
+        try {
+          console.log('Транзакция начата');
+          const berthRepository = queryRunner.manager.getRepository(Berth);
+          const bookingRepository = queryRunner.manager.getRepository(Booking);
+          const incomeRepository = queryRunner.manager.getRepository(Income);
+          const expenseRepository = queryRunner.manager.getRepository(Expense);
+          const budgetRepository = queryRunner.manager.getRepository(Budget);
+          const userClubRepository = queryRunner.manager.getRepository(UserClub);
+          const userRepository = queryRunner.manager.getRepository(User);
+          const paymentRepository = queryRunner.manager.getRepository(Payment);
+          const clubRepositoryTransaction = queryRunner.manager.getRepository(Club);
+          
+          // Загружаем клуб в транзакции
+          const clubInTransaction = await clubRepositoryTransaction.findOne({
+            where: { id: clubId },
+          });
+          
+          if (!clubInTransaction) {
+            throw new AppError('Яхт-клуб не найден в транзакции', 404);
+          }
+
+          // Получаем все бронирования клуба для удаления связанных платежей и доходов
+          const bookings = await bookingRepository.find({
+            where: { clubId: clubId },
+            select: ['id'],
+          });
+          const bookingIds = bookings.map((b) => b.id);
+
+          // Удаляем платежи (payments), связанные с бронированиями клуба
+          if (bookingIds.length > 0) {
+            await paymentRepository.delete({ bookingId: In(bookingIds) });
+          }
+
+          // Удаляем доходы (incomes), связанные с бронированиями клуба
+          if (bookingIds.length > 0) {
+            await incomeRepository.delete({ bookingId: In(bookingIds) });
+          }
+
+          // Сначала удаляем все бронирования, которые ссылаются на места клуба
+          // Это важно, так как бронирования имеют внешний ключ на места
+          const berths = await berthRepository.find({
+            where: { clubId: clubId },
+            select: ['id'],
+          });
+          const berthIds = berths.map((b) => b.id);
+
+          // Удаляем бронирования, связанные с местами клуба
+          if (berthIds.length > 0) {
+            await bookingRepository.delete({ berthId: In(berthIds) });
+          }
+
+          // Удаляем бронирования, напрямую связанные с клубом
+          await bookingRepository.delete({ clubId: clubId });
+
+          // Теперь можно безопасно удалить места (berths)
+          // Проверяем, что все бронирования удалены перед удалением мест
+          const remainingBookings = await bookingRepository.count({
+            where: { clubId: clubId },
+          });
+          
+          if (remainingBookings > 0) {
+            throw new AppError('Не удалось удалить все бронирования клуба', 500);
+          }
+
+          // Удаляем все места через репозиторий в транзакции
+          // Сначала получаем все места
+          const allBerths = await berthRepository.find({
+            where: { clubId: clubId },
+          });
+          
+          // Удаляем все места
+          if (allBerths.length > 0) {
+            await berthRepository.remove(allBerths);
+            console.log(`Удалено мест через репозиторий: ${allBerths.length}`);
+          }
+          
+          // Дополнительная проверка и удаление через raw SQL, если нужно
+          const berthsCheck = await queryRunner.manager.query(
+            'SELECT COUNT(*)::int as count FROM berths WHERE "clubId" = $1',
+            [clubId]
+          );
+          
+          const remainingCount = berthsCheck[0]?.count || 0;
+          if (remainingCount > 0) {
+            console.log(`Осталось мест после удаления через репозиторий: ${remainingCount}, удаляем через SQL...`);
+            await queryRunner.manager.query(
+              'DELETE FROM berths WHERE "clubId" = $1',
+              [clubId]
+            );
+          }
+
+          // Удаляем доходы (incomes), напрямую связанные с клубом
+          await incomeRepository.delete({ clubId: clubId });
+
+          // Удаляем расходы (expenses)
+          await expenseRepository.delete({ clubId: clubId });
+
+          // Удаляем бюджеты (budgets)
+          await budgetRepository.delete({ clubId: clubId });
+
+          // Удаляем связи многие-ко-многим (user_clubs)
+          await userClubRepository.delete({ clubId: clubId });
+
+          // Обновляем пользователей, у которых этот клуб был установлен как managedClub
+          await userRepository.update(
+            { managedClubId: clubId },
+            { managedClubId: null }
+          );
+
+          // Финальная проверка, что все места удалены
+          const finalBerthsCount = await berthRepository.count({
+            where: { clubId: clubId },
+          });
+          
+          console.log('Оставшихся мест перед удалением клуба:', finalBerthsCount);
+          
+          if (finalBerthsCount > 0) {
+            throw new AppError(`Не удалось удалить все места клуба. Осталось: ${finalBerthsCount}`, 500);
+          }
+
+          // Удаляем клуб через репозиторий в транзакции
+          await clubRepositoryTransaction.remove(clubInTransaction);
+          console.log('Клуб успешно удален');
+
+          // Коммитим транзакцию
+          await queryRunner.commitTransaction();
+          res.json({ message: 'Яхт-клуб успешно удален' });
+        } catch (error: any) {
+          // Откатываем транзакцию в случае ошибки
+          try {
+            await queryRunner.rollbackTransaction();
+          } catch (rollbackError) {
+            console.error('Ошибка при откате транзакции:', rollbackError);
+          }
+          
+          // Логируем ошибку для отладки
+          console.error('Ошибка при удалении клуба:', error);
+          console.error('Сообщение об ошибке:', error?.message);
+          console.error('Стек ошибки:', error?.stack);
+          
+          // Пробрасываем ошибку дальше
+          next(error);
+        } finally {
+          // Освобождаем соединение
+          try {
+            await queryRunner.release();
+          } catch (releaseError) {
+            console.error('Ошибка при освобождении соединения:', releaseError);
+          }
+        }
       } else {
         // Владелец клуба может только деактивировать
         club.isActive = false;

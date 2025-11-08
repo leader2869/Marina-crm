@@ -14,6 +14,7 @@ import Bookings from './pages/Bookings'
 import Finances from './pages/Finances'
 import Payments from './pages/Payments'
 import Users from './pages/Users'
+import UserDetails from './pages/UserDetails'
 import { UserRole } from './types'
 
 function App() {
@@ -45,6 +46,14 @@ function App() {
               element={
                 <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
                   <Users />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="users/:id" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+                  <UserDetails />
                 </RoleProtectedRoute>
               } 
             />

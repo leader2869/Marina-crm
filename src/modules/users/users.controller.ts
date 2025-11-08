@@ -3,6 +3,7 @@ import { AppDataSource } from '../../config/database';
 import { User } from '../../entities/User';
 import { Payment } from '../../entities/Payment';
 import { Club } from '../../entities/Club';
+import { UserClub } from '../../entities/UserClub';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -30,6 +31,8 @@ export class UsersController {
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.ownedClubs', 'ownedClubs')
         .leftJoinAndSelect('user.managedClub', 'managedClub')
+        .leftJoinAndSelect('user.managedClubs', 'managedClubs')
+        .leftJoinAndSelect('managedClubs.club', 'managedClubDetails')
         .leftJoinAndSelect('user.vessels', 'vessels')
         .skip((page - 1) * limit)
         .take(limit)
@@ -62,12 +65,30 @@ export class UsersController {
             return sum + paymentAmount + penaltyAmount;
           }, 0);
 
-          // Определяем к какому клубу привязан пользователь
-          let clubName = null;
-          if (user.managedClub) {
-            clubName = user.managedClub.name;
-          } else if (user.ownedClubs && user.ownedClubs.length > 0) {
-            clubName = user.ownedClubs[0].name;
+          // Определяем к каким клубам привязан пользователь
+          const clubNames: string[] = [];
+          
+          // Добавляем клубы из managedClubs (новая связь многие-ко-многим)
+          if (user.managedClubs && user.managedClubs.length > 0) {
+            user.managedClubs.forEach((uc) => {
+              if (uc.club && !clubNames.includes(uc.club.name)) {
+                clubNames.push(uc.club.name);
+              }
+            });
+          }
+          
+          // Добавляем клуб из старой связи managedClub (для обратной совместимости)
+          if (user.managedClub && !clubNames.includes(user.managedClub.name)) {
+            clubNames.push(user.managedClub.name);
+          }
+          
+          // Добавляем клубы из ownedClubs
+          if (user.ownedClubs && user.ownedClubs.length > 0) {
+            user.ownedClubs.forEach((club) => {
+              if (!clubNames.includes(club.name)) {
+                clubNames.push(club.name);
+              }
+            });
           }
 
           return {
@@ -77,14 +98,44 @@ export class UsersController {
             email: user.email,
             phone: user.phone || '-',
             role: user.role,
-            clubName: clubName || '-',
+            clubName: clubNames.length > 0 ? clubNames.join(', ') : '-',
             debt: totalDebt,
             createdAt: user.createdAt,
+            vessels: user.vessels || [],
           };
         })
       );
 
       res.json(createPaginatedResponse(usersWithDebt, total, page, limit));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      // Только супер-администратор может видеть детали пользователя
+      if (req.userRole !== 'super_admin') {
+        throw new AppError('Недостаточно прав доступа', 403);
+      }
+
+      const { id } = req.params;
+      
+      if (!id || isNaN(parseInt(id))) {
+        throw new AppError('Неверный ID пользователя', 400);
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: parseInt(id) },
+        relations: ['ownedClubs', 'managedClub', 'managedClubs', 'managedClubs.club', 'vessels'],
+      });
+
+      if (!user) {
+        throw new AppError('Пользователь не найден', 404);
+      }
+
+      res.json(user);
     } catch (error) {
       next(error);
     }
@@ -97,7 +148,7 @@ export class UsersController {
         throw new AppError('Недостаточно прав доступа', 403);
       }
 
-      const { email, password, firstName, lastName, phone, role, managedClubId } = req.body;
+      const { email, password, firstName, lastName, phone, role, managedClubId, clubIds } = req.body;
 
       if (!email || !password || !firstName || !lastName) {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
@@ -105,6 +156,7 @@ export class UsersController {
 
       const userRepository = AppDataSource.getRepository(User);
       const clubRepository = AppDataSource.getRepository(Club);
+      const userClubRepository = AppDataSource.getRepository(UserClub);
 
       // Проверяем, существует ли пользователь с таким email
       const existingUser = await userRepository.findOne({ where: { email } });
@@ -149,10 +201,29 @@ export class UsersController {
 
       await userRepository.save(user);
 
+      // Устанавливаем привязку к нескольким яхт-клубам (новая связь многие-ко-многим)
+      if (clubIds && Array.isArray(clubIds) && clubIds.length > 0) {
+        for (const clubIdStr of clubIds) {
+          const clubId = parseInt(clubIdStr);
+          if (!isNaN(clubId)) {
+            const club = await clubRepository.findOne({ where: { id: clubId } });
+            if (!club) {
+              continue; // Пропускаем несуществующие клубы
+            }
+            
+            const userClub = userClubRepository.create({
+              userId: user.id,
+              clubId: clubId,
+            });
+            await userClubRepository.save(userClub);
+          }
+        }
+      }
+
       // Получаем созданного пользователя с связями
       const createdUser = await userRepository.findOne({
         where: { id: user.id },
-        relations: ['managedClub', 'ownedClubs'],
+        relations: ['managedClub', 'managedClubs', 'managedClubs.club', 'ownedClubs'],
       });
 
       res.status(201).json({
@@ -166,6 +237,7 @@ export class UsersController {
           role: createdUser!.role,
           managedClubId: createdUser!.managedClubId,
           managedClub: createdUser!.managedClub,
+          managedClubs: createdUser!.managedClubs || [],
           createdAt: createdUser!.createdAt,
         },
       });
@@ -182,7 +254,7 @@ export class UsersController {
       }
 
       const userId = parseInt(req.params.id);
-      const { email, phone, role, managedClubId } = req.body;
+      const { email, phone, role, managedClubId, clubIds } = req.body;
 
       if (!userId || isNaN(userId)) {
         throw new AppError('Неверный ID пользователя', 400);
@@ -190,11 +262,12 @@ export class UsersController {
 
       const userRepository = AppDataSource.getRepository(User);
       const clubRepository = AppDataSource.getRepository(Club);
+      const userClubRepository = AppDataSource.getRepository(UserClub);
 
       // Находим пользователя
       const user = await userRepository.findOne({
         where: { id: userId },
-        relations: ['managedClub', 'ownedClubs'],
+        relations: ['managedClub', 'managedClubs', 'managedClubs.club', 'ownedClubs'],
       });
 
       if (!user) {
@@ -224,7 +297,7 @@ export class UsersController {
         user.role = role as UserRole;
       }
 
-      // Обновление привязки к яхт-клубу
+      // Обновление привязки к яхт-клубу (старая связь для обратной совместимости)
       if (managedClubId !== undefined) {
         if (managedClubId === null || managedClubId === '') {
           // Удаляем привязку
@@ -246,12 +319,37 @@ export class UsersController {
         }
       }
 
+      // Обновление привязки к нескольким яхт-клубам (новая связь многие-ко-многим)
+      if (clubIds !== undefined) {
+        // Удаляем все существующие связи
+        await userClubRepository.delete({ userId: user.id });
+
+        // Создаем новые связи
+        if (Array.isArray(clubIds) && clubIds.length > 0) {
+          for (const clubIdStr of clubIds) {
+            const clubId = parseInt(clubIdStr);
+            if (!isNaN(clubId)) {
+              const club = await clubRepository.findOne({ where: { id: clubId } });
+              if (!club) {
+                continue; // Пропускаем несуществующие клубы
+              }
+
+              const userClub = userClubRepository.create({
+                userId: user.id,
+                clubId: clubId,
+              });
+              await userClubRepository.save(userClub);
+            }
+          }
+        }
+      }
+
       await userRepository.save(user);
 
       // Получаем обновленного пользователя с связями
       const updatedUser = await userRepository.findOne({
         where: { id: userId },
-        relations: ['managedClub', 'ownedClubs'],
+        relations: ['managedClub', 'managedClubs', 'managedClubs.club', 'ownedClubs'],
       });
 
       res.json({

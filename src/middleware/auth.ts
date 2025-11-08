@@ -61,4 +61,40 @@ export const authorize = (...roles: UserRole[]) => {
   };
 };
 
+// Опциональная аутентификация - устанавливает userRole если токен есть, но не требует его
+export const optionalAuthenticate = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Если токена нет, просто продолжаем без установки userRole
+      next();
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    const payload = verifyToken(token);
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: payload.userId, isActive: true },
+    });
+
+    if (user) {
+      req.user = user;
+      req.userId = user.id;
+      req.userRole = user.role;
+    }
+    
+    next();
+  } catch (error) {
+    // Если токен невалидный, просто продолжаем без установки userRole
+    next();
+  }
+};
+
 
