@@ -15,7 +15,8 @@
     "seed": "ts-node src/database/seed.ts",
     "reset-admin": "ts-node src/database/reset-admin-password.ts",
     "check-admin": "ts-node src/database/check-admin.ts",
-    "check-clubs": "ts-node src/database/check-clubs.ts"
+    "check-clubs": "ts-node src/database/check-clubs.ts",
+    "check-isvalidated": "ts-node src/database/check-isvalidated.ts"
   },
   "keywords": ["crm", "marina", "yacht-club", "booking"],
   "author": "",
@@ -55,5 +56,6 @@
     "eslint": "^8.56.0"
   }
 }
+
 
 

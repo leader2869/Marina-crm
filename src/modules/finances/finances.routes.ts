@@ -28,3 +28,4 @@ router.post('/budgets', authenticate, financesController.createBudget.bind(finan
 export default router;
 
 
+

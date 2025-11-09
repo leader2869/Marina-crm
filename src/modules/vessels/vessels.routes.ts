@@ -14,3 +14,4 @@ router.delete('/:id', authenticate, vesselsController.delete.bind(vesselsControl
 export default router;
 
 
+

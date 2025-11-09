@@ -13,6 +13,8 @@ import financesRoutes from './modules/finances/finances.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
 import usersRoutes from './modules/users/users.routes';
 import berthsRoutes from './modules/berths/berths.routes';
+import tariffsRoutes from './modules/tariffs/tariffs.routes';
+import bookingRulesRoutes from './modules/booking-rules/booking-rules.routes';
 
 const app: Express = express();
 
@@ -38,6 +40,8 @@ app.use('/api/finances', financesRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/berths', berthsRoutes);
+app.use('/api/tariffs', tariffsRoutes);
+app.use('/api/booking-rules', bookingRulesRoutes);
 
 // Error handler
 app.use(errorHandler);
@@ -71,5 +75,6 @@ process.on('SIGTERM', async () => {
   await AppDataSource.destroy();
   process.exit(0);
 });
+
 
 

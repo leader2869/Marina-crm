@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Club } from './Club';
 import { Booking } from './Booking';
+import { TariffBerth } from './TariffBerth';
 
 @Entity('berths')
 export class Berth {
@@ -50,6 +51,10 @@ export class Berth {
 
   @OneToMany(() => Booking, (booking) => booking.berth)
   bookings: Booking[];
+
+  @OneToMany(() => TariffBerth, (tariffBerth) => tariffBerth.berth)
+  tariffBerths: TariffBerth[];
 }
+
 
 

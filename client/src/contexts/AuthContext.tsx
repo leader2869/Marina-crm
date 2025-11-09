@@ -5,18 +5,18 @@ import { User } from '../types'
 interface AuthContextType {
   user: User | null
   token: string | null
-  login: (email: string, password: string) => Promise<void>
+  login: (emailOrPhone: string, password: string) => Promise<void>
+  loginAsGuest: (firstName: string, phone?: string) => Promise<void>
   register: (data: RegisterData) => Promise<void>
   logout: () => void
   loading: boolean
 }
 
 interface RegisterData {
-  email: string
   password: string
   firstName: string
   lastName: string
-  phone?: string
+  phone: string
   role: 'vessel_owner' | 'club_owner'
 }
 
@@ -46,20 +46,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth()
   }, [token])
 
-  const login = async (email: string, password: string) => {
-    const response = await authService.login(email, password)
-    console.log('Login response:', response)
-    console.log('User role from login:', response.user?.role)
-    setToken(response.token)
-    setUser(response.user)
-    localStorage.setItem('token', response.token)
+  const login = async (emailOrPhone: string, password: string) => {
+    const data = await authService.login(emailOrPhone, password)
+    console.log('Login response:', data)
+    console.log('User role from login:', data.user?.role)
+    setToken(data.token)
+    setUser(data.user)
+    localStorage.setItem('token', data.token)
+  }
+
+  const loginAsGuest = async (firstName: string, phone?: string) => {
+    const data = await authService.loginAsGuest(firstName, phone)
+    console.log('Guest login response:', data)
+    console.log('User role from guest login:', data.user?.role)
+    setToken(data.token)
+    setUser(data.user)
+    localStorage.setItem('token', data.token)
   }
 
   const register = async (data: RegisterData) => {
-    const response = await authService.register(data)
-    setToken(response.token)
-    setUser(response.user)
-    localStorage.setItem('token', response.token)
+    const responseData = await authService.register(data)
+    setToken(responseData.token)
+    setUser(responseData.user)
+    localStorage.setItem('token', responseData.token)
+    return responseData
   }
 
   const logout = () => {
@@ -69,7 +79,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, loginAsGuest, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   )

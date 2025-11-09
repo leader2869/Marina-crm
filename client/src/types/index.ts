@@ -1,9 +1,15 @@
+export enum TariffType {
+  SEASON_PAYMENT = 'season_payment',
+  MONTHLY_PAYMENT = 'monthly_payment',
+}
+
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   ADMIN = 'admin',
   CLUB_OWNER = 'club_owner',
   VESSEL_OWNER = 'vessel_owner',
   GUEST = 'guest',
+  PENDING_VALIDATION = 'pending_validation', // Ожидает валидации суперадминистратором
 }
 
 export enum BookingStatus {
@@ -38,6 +44,7 @@ export interface User {
   role: UserRole
   avatar?: string
   isActive?: boolean
+  isValidated?: boolean
   ownedClubs?: Club[]
   vessels?: Vessel[]
   managedClub?: Club
@@ -62,11 +69,25 @@ export interface Club {
   basePrice: number
   minPricePerMonth?: number
   isActive: boolean
+  isValidated?: boolean
+  isSubmittedForValidation?: boolean
+  rejectionComment?: string | null
   ownerId: number
   owner?: User
   berths?: Berth[]
+  season?: number
+  rentalMonths?: number[] | null // месяцы, в которые можно арендовать место (1-12)
+  bookingRules?: string | null // правила бронирования
   createdAt: string
   updatedAt: string
+}
+
+export interface TariffBerth {
+  id: number
+  tariffId: number
+  berthId: number
+  tariff?: Tariff
+  createdAt: string
 }
 
 export interface Berth {
@@ -79,6 +100,20 @@ export interface Berth {
   notes?: string
   clubId: number
   club?: Club
+  tariffBerths?: TariffBerth[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Tariff {
+  id: number
+  name: string
+  type: TariffType
+  amount: number
+  season: number
+  clubId: number
+  months?: number[] | null // Месяца для помесячной оплаты (1-12)
+  berths?: Berth[]
   createdAt: string
   updatedAt: string
 }

@@ -15,6 +15,8 @@ import { Income } from './Income';
 import { Expense } from './Expense';
 import { Budget } from './Budget';
 import { UserClub } from './UserClub';
+import { Tariff } from './Tariff';
+import { BookingRule } from './BookingRule';
 
 @Entity('clubs')
 export class Club {
@@ -63,8 +65,26 @@ export class Club {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   minPricePerMonth: number | null; // минимальная цена за месяц
 
+  @Column({ type: 'int', nullable: true })
+  season: number | null; // год сезона
+
+  @Column({ type: 'json', nullable: true })
+  rentalMonths: number[] | null; // месяцы, в которые можно арендовать место (1-12)
+
+  @Column({ type: 'text', nullable: true })
+  bookingRulesText: string | null; // текстовые правила бронирования (устаревшее, используйте BookingRule)
+
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ default: false })
+  isValidated: boolean; // валидирован ли клуб суперадминистратором
+
+  @Column({ default: false })
+  isSubmittedForValidation: boolean; // отправлен ли клуб на валидацию владельцем
+
+  @Column({ type: 'text', nullable: true })
+  rejectionComment: string | null; // комментарий об отказе в валидации
 
   @CreateDateColumn()
   createdAt: Date;
@@ -101,6 +121,13 @@ export class Club {
 
   @OneToMany(() => Budget, (budget) => budget.club)
   budgets: Budget[];
+
+  @OneToMany(() => Tariff, (tariff) => tariff.club)
+  tariffs: Tariff[];
+
+  @OneToMany(() => BookingRule, (bookingRule) => bookingRule.club)
+  bookingRules: BookingRule[];
 }
+
 
 

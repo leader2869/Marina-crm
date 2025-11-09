@@ -62,7 +62,7 @@ export default function Dashboard() {
       color: 'bg-green-500',
     },
     {
-      name: 'Бронирования',
+      name: 'Брони',
       value: stats.bookings,
       icon: Calendar,
       color: 'bg-yellow-500',
@@ -135,7 +135,7 @@ export default function Dashboard() {
             className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Calendar className="h-6 w-6 text-primary-600 mb-2" />
-            <p className="font-medium text-gray-900">Бронирования</p>
+            <p className="font-medium text-gray-900">Брони</p>
           </a>
           <a
             href="/finances"

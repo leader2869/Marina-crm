@@ -59,6 +59,9 @@ export class User {
   @Column({ nullable: true })
   emailVerificationToken: string;
 
+  @Column({ default: true })
+  isValidated: boolean; // Для CLUB_OWNER: true после валидации суперадминистратором
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -86,5 +89,6 @@ export class User {
   @OneToMany(() => UserClub, (userClub) => userClub.user)
   managedClubs: UserClub[];
 }
+
 
 

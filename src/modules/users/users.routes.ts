@@ -14,6 +14,14 @@ router.get(
   usersController.getAll.bind(usersController)
 );
 
+// Только супер-администратор может получить список гостей
+router.get(
+  '/guests',
+  authenticate,
+  authorize(UserRole.SUPER_ADMIN),
+  usersController.getGuests.bind(usersController)
+);
+
 // Только супер-администратор может получить детали пользователя
 router.get(
   '/:id',

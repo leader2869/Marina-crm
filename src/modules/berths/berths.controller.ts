@@ -5,7 +5,7 @@ import { Club } from '../../entities/Club';
 import { Booking } from '../../entities/Booking';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
-import { UserRole } from '../../types';
+import { UserRole, BookingStatus } from '../../types';
 
 export class BerthsController {
   // Получить все места клуба
@@ -250,6 +250,101 @@ export class BerthsController {
       }
 
       res.json({ message: 'Место успешно удалено' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Получить доступные места клуба для бронирования (для судовладельца и гостя)
+  async getAvailableByClub(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      // Гость может видеть доступные места без аутентификации
+      // Но для бронирования потребуется регистрация
+      // Если пользователь не аутентифицирован, считаем его гостем
+
+      const { clubId } = req.params;
+      const { startDate, endDate } = req.query;
+
+      const clubRepository = AppDataSource.getRepository(Club);
+      const club = await clubRepository.findOne({
+        where: { id: parseInt(clubId) },
+      });
+
+      if (!club) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
+
+      if (!club.isActive) {
+        throw new AppError('Яхт-клуб неактивен', 400);
+      }
+
+      // Получаем все места клуба с тарифами
+      const berthRepository = AppDataSource.getRepository(Berth);
+      const allBerths = await berthRepository.find({
+        where: { clubId: club.id, isAvailable: true },
+        relations: ['tariffBerths', 'tariffBerths.tariff'],
+        order: {
+          number: 'ASC',
+        },
+      });
+
+      // Фильтруем тарифы по сезону клуба, если сезон указан
+      if (club.season) {
+        allBerths.forEach(berth => {
+          if (berth.tariffBerths) {
+            berth.tariffBerths = berth.tariffBerths.filter(tb => 
+              tb.tariff && (tb.tariff.season === club.season || !tb.tariff.season)
+            )
+          }
+        })
+      }
+
+      // Если указаны даты, проверяем конфликты с бронированиями
+      if (startDate && endDate) {
+        const bookingRepository = AppDataSource.getRepository(Booking);
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+
+        // Получаем все конфликтующие бронирования
+        // Включаем PENDING, CONFIRMED и ACTIVE - эти статусы блокируют место
+        const conflictingBookings = await bookingRepository
+          .createQueryBuilder('booking')
+          .where('booking.clubId = :clubId', { clubId: club.id })
+          .andWhere('booking.status IN (:...statuses)', {
+            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+          })
+          .andWhere(
+            '(booking.startDate <= :endDate AND booking.endDate >= :startDate)',
+            { startDate: start, endDate: end }
+          )
+          .getMany();
+
+        // Получаем ID занятых мест
+        const occupiedBerthIds = new Set(
+          conflictingBookings.map((booking) => booking.berthId)
+        );
+
+        // Фильтруем доступные места
+        const availableBerths = allBerths.filter(
+          (berth) => !occupiedBerthIds.has(berth.id)
+        );
+
+        res.json(availableBerths);
+      } else {
+        // Если даты не указаны, все равно фильтруем места с учетом всех активных бронирований
+        const bookingRepository = AppDataSource.getRepository(Booking);
+        const activeBookings = await bookingRepository
+          .createQueryBuilder('booking')
+          .where('booking.clubId = :clubId', { clubId: club.id })
+          .andWhere('booking.status IN (:...statuses)', {
+            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+          })
+          .getMany();
+
+        const occupiedBerthIds = new Set(activeBookings.map((booking) => booking.berthId));
+        const availableBerths = allBerths.filter((berth) => !occupiedBerthIds.has(berth.id));
+        res.json(availableBerths);
+      }
     } catch (error) {
       next(error);
     }

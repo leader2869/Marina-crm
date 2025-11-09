@@ -14,6 +14,7 @@ import { Berth } from './Berth';
 import { Vessel } from './Vessel';
 import { User } from './User';
 import { Payment } from './Payment';
+import { Tariff } from './Tariff';
 
 @Entity('bookings')
 export class Booking {
@@ -82,6 +83,14 @@ export class Booking {
 
   @OneToMany(() => Payment, (payment) => payment.booking)
   payments: Payment[];
+
+  @ManyToOne(() => Tariff, { nullable: true })
+  @JoinColumn({ name: 'tariffId' })
+  tariff: Tariff;
+
+  @Column({ nullable: true })
+  tariffId: number | null;
 }
+
 
 

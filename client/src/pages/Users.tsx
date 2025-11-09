@@ -273,6 +273,7 @@ export default function UsersPage() {
       [UserRole.CLUB_OWNER]: 'Владелец клуба',
       [UserRole.VESSEL_OWNER]: 'Судовладелец',
       [UserRole.GUEST]: 'Гость',
+      [UserRole.PENDING_VALIDATION]: 'Ожидает валидации',
     }
     return roleMap[role] || role
   }
@@ -284,6 +285,7 @@ export default function UsersPage() {
       [UserRole.CLUB_OWNER]: 'bg-green-100 text-green-800',
       [UserRole.VESSEL_OWNER]: 'bg-yellow-100 text-yellow-800',
       [UserRole.GUEST]: 'bg-gray-100 text-gray-800',
+      [UserRole.PENDING_VALIDATION]: 'bg-red-500 text-white font-bold',
     }
     return colorMap[role] || 'bg-gray-100 text-gray-800'
   }

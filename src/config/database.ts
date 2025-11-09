@@ -11,6 +11,9 @@ import { ExpenseCategory } from '../entities/ExpenseCategory';
 import { Payment } from '../entities/Payment';
 import { Budget } from '../entities/Budget';
 import { UserClub } from '../entities/UserClub';
+import { Tariff } from '../entities/Tariff';
+import { TariffBerth } from '../entities/TariffBerth';
+import { BookingRule } from '../entities/BookingRule';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -36,9 +39,13 @@ export const AppDataSource = new DataSource({
     Payment,
     Budget,
     UserClub,
+    Tariff,
+    TariffBerth,
+    BookingRule,
   ],
   migrations: ['src/database/migrations/**/*.ts'],
   subscribers: ['src/database/subscribers/**/*.ts'],
 });
+
 
 

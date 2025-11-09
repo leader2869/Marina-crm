@@ -1,11 +1,98 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { clubsService } from '../services/api'
-import { Club, UserRole } from '../types'
-import { Anchor, MapPin, Phone, Mail, Globe, Plus, Trash2, Download, X, EyeOff, Eye } from 'lucide-react'
+import { clubsService, bookingsService } from '../services/api'
+import { Club, UserRole, Booking } from '../types'
+import { Anchor, MapPin, Phone, Mail, Globe, Plus, Trash2, Download, X, EyeOff, Eye, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
+
+// Компонент для подсчета свободных мест с учетом бронирований
+function FreeBerthsCount({ club, user }: { club: Club; user: any }) {
+  const [count, setCount] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const calculateFreeBerths = async () => {
+      if (!club.berths || !Array.isArray(club.berths) || club.berths.length === 0) {
+        setCount(club.totalBerths || 0)
+        setLoading(false)
+        return
+      }
+
+      try {
+        let clubBookings: Booking[] = []
+        
+        // Для гостя, VESSEL_OWNER и PENDING_VALIDATION загружаем бронирования клуба через getByClub
+        // (так как у них может не быть своих клубов, и getAll не вернет все бронирования клуба)
+        if (user?.role === UserRole.GUEST || user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.PENDING_VALIDATION || !user) {
+          try {
+            const response = await bookingsService.getByClub(club.id)
+            clubBookings = (response as any)?.data || response || []
+            if (!Array.isArray(clubBookings)) {
+              clubBookings = []
+            }
+          } catch (error) {
+            console.error(`Ошибка загрузки бронирований для клуба ${club.id}:`, error)
+            clubBookings = []
+          }
+        } else {
+          // Для других ролей (CLUB_OWNER, SUPER_ADMIN, ADMIN) используем getAll
+          try {
+            const response = await bookingsService.getAll({ limit: 1000 })
+            const allBookings = (response as any)?.data || response || []
+            clubBookings = Array.isArray(allBookings) 
+              ? allBookings.filter((b: Booking) => 
+                  b.clubId === club.id &&
+                  (b.status === 'pending' || b.status === 'confirmed' || b.status === 'active')
+                )
+              : []
+          } catch (error) {
+            console.error('Ошибка загрузки бронирований:', error)
+            clubBookings = []
+          }
+        }
+
+        // Подсчитываем свободные места с учетом бронирований
+        const availableCount = club.berths.filter((berth: any) => {
+          // Проверяем базовую доступность места
+          const isAvail = berth.isAvailable
+          if (!(isAvail === true || isAvail === 'true' || isAvail === 1 || isAvail === '1')) {
+            return false
+          }
+          
+          // Проверяем, есть ли активные бронирования для этого места
+          const hasActiveBooking = clubBookings.some((booking: Booking) => 
+            booking.berthId === berth.id &&
+            (booking.status === 'pending' || booking.status === 'confirmed' || booking.status === 'active')
+          )
+          
+          return !hasActiveBooking
+        }).length
+
+        setCount(availableCount)
+      } catch (error) {
+        console.error('Ошибка подсчета свободных мест:', error)
+        // В случае ошибки показываем количество мест с isAvailable = true
+        const availableCount = club.berths.filter((berth: any) => {
+          const isAvail = berth.isAvailable
+          return isAvail === true || isAvail === 'true' || isAvail === 1 || isAvail === '1'
+        }).length
+        setCount(availableCount)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    calculateFreeBerths()
+  }, [club, user])
+
+  if (loading) {
+    return <span>-</span>
+  }
+
+  return <span>{count ?? 0}</span>
+}
 
 export default function Clubs() {
   const { user } = useAuth()
@@ -34,6 +121,7 @@ export default function Clubs() {
     maxRentalPeriod: '365',
     basePrice: '0',
     minPricePerMonth: '',
+    season: new Date().getFullYear().toString(),
   })
 
   useEffect(() => {
@@ -43,6 +131,7 @@ export default function Clubs() {
   const loadClubs = async () => {
     try {
       setLoading(true)
+      const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
       const params: any = { limit: 100 }
       if (showHidden && isSuperAdmin) {
         params.showHidden = 'true'
@@ -50,11 +139,19 @@ export default function Clubs() {
       const response = await clubsService.getAll(params)
       const clubsData = response.data || []
       
-      // Для суперадмина с флагом showHidden показываем все, иначе только активные
-      // Для остальных ролей (VESSEL_OWNER, GUEST и т.д.) всегда показываем только активные
+      // Для суперадмина с флагом showHidden показываем все, иначе только активные и валидированные
+      // Для остальных ролей (VESSEL_OWNER, GUEST и т.д.) всегда показываем только активные и валидированные
+      // Для владельца клуба показываем все его клубы (включая невалидированные)
       const filteredClubs = showHidden && isSuperAdmin 
         ? clubsData 
-        : clubsData.filter((club: Club) => club.isActive === true)
+        : clubsData.filter((club: Club) => {
+            // Для владельца клуба показываем все его клубы
+            if (isClubOwner && club.ownerId === user?.id) {
+              return true
+            }
+            // Для остальных - только активные, валидированные и отправленные на валидацию
+            return club.isActive === true && club.isValidated === true && club.isSubmittedForValidation === true
+          })
       
       setClubs(filteredClubs)
     } catch (error) {
@@ -63,6 +160,8 @@ export default function Clubs() {
       setLoading(false)
     }
   }
+
+
 
   const filteredClubs = clubs.filter((club) =>
     club.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -131,10 +230,65 @@ export default function Clubs() {
     }
   }
 
+  const handleSubmitForValidation = async (clubId: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!confirm('Вы уверены, что хотите отправить этот яхт-клуб на проверку? После отправки клуб получит статус "Ожидает валидации" и попадет в меню валидации суперадминистратора.')) return
+
+    try {
+      await clubsService.update(clubId, { 
+        isSubmittedForValidation: true,
+        isValidated: false,
+        isActive: true,
+        rejectionComment: null // Сбрасываем комментарий об отказе при повторной отправке
+      })
+      await loadClubs()
+      alert('Яхт-клуб успешно отправлен на проверку. Клуб получил статус "Ожидает валидации" и попал в меню валидации суперадминистратора.')
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка отправки яхт-клуба на проверку')
+    }
+  }
+
+  const handleValidate = async (clubId: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!confirm('Вы уверены, что хотите валидировать этот яхт-клуб? После валидации клуб будет виден всем пользователям.')) return
+
+    try {
+      await clubsService.update(clubId, { isValidated: true })
+      await loadClubs()
+      alert('Яхт-клуб успешно валидирован')
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка валидации яхт-клуба')
+    }
+  }
+
+  const handleUnpublish = async (clubId: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!confirm('Вы уверены, что хотите снять этот яхт-клуб с публикации? Клуб получит статус "Не опубликован" и попадет в скрытые яхт-клубы. Все связи останутся.')) return
+
+    try {
+      await clubsService.update(clubId, { 
+        isValidated: false,
+        isSubmittedForValidation: false,
+        isActive: false
+      })
+      await loadClubs()
+      alert('Яхт-клуб успешно снят с публикации. Клуб получил статус "Не опубликован" и попал в скрытые яхт-клубы.')
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка снятия с публикации')
+    }
+  }
+
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
   const isAdmin = user?.role === UserRole.ADMIN
   const isClubOwner = user?.role === UserRole.CLUB_OWNER
-  const canManageClubs = isSuperAdmin || isAdmin || isClubOwner
+  const isPendingValidation = user?.role === UserRole.PENDING_VALIDATION
+  const canManageClubs = isSuperAdmin || isAdmin || isClubOwner || isPendingValidation
 
   const handleOpenAdd = () => {
     setShowAddModal(true)
@@ -152,6 +306,7 @@ export default function Clubs() {
       maxRentalPeriod: '365',
       basePrice: '0',
       minPricePerMonth: '',
+      season: new Date().getFullYear().toString(),
     })
     setError('')
   }
@@ -172,13 +327,14 @@ export default function Clubs() {
       maxRentalPeriod: '365',
       basePrice: '0',
       minPricePerMonth: '',
+      season: new Date().getFullYear().toString(),
     })
     setError('')
   }
 
   const handleCreate = async () => {
-    if (!addForm.name || !addForm.address || !addForm.latitude || !addForm.longitude) {
-      setError('Заполните все обязательные поля: Название, Адрес, Широта, Долгота')
+    if (!addForm.name || !addForm.address || !addForm.latitude || !addForm.longitude || !addForm.season) {
+      setError('Заполните все обязательные поля: Название, Адрес, Широта, Долгота, Сезон')
       return
     }
 
@@ -200,11 +356,14 @@ export default function Clubs() {
         maxRentalPeriod: parseInt(addForm.maxRentalPeriod) || 365,
         basePrice: parseFloat(addForm.basePrice) || 0,
         minPricePerMonth: addForm.minPricePerMonth ? parseFloat(addForm.minPricePerMonth) : null,
+        season: addForm.season ? parseInt(addForm.season) : null,
       }
 
       const response = await clubsService.create(createData) as any
       await loadClubs()
       handleCloseAdd()
+      // Показываем сообщение о необходимости отправки на валидацию
+      alert('Яхт-клуб успешно создан! Клуб виден только вам. Вы можете отправить клуб на проверку суперадминистратору, нажав кнопку "Отправить на проверку". После валидации клуб станет доступен для бронирования.')
       // Перенаправляем на страницу деталей созданного клуба
       if (response && response.club && response.club.id) {
         navigate(`/clubs/${response.club.id}`)
@@ -335,13 +494,21 @@ export default function Clubs() {
           </div>
         )}
         {canManageClubs && !isSuperAdmin && (
-          <button
-            onClick={handleOpenAdd}
-            className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Добавить клуб
-          </button>
+          <>
+            {user?.role === UserRole.PENDING_VALIDATION ? (
+              <div className="px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+                Ваш аккаунт ожидает валидации суперадминистратором. Вы не можете добавлять клубы до завершения валидации.
+              </div>
+            ) : (
+              <button
+                onClick={handleOpenAdd}
+                className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Добавить клуб
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -360,110 +527,177 @@ export default function Clubs() {
           <Link
             key={club.id}
             to={`/clubs/${club.id}`}
-            className={`bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 ${
+            className={`bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 flex flex-col h-full ${
               club.isActive === false ? 'opacity-60 border-2 border-gray-300' : ''
             }`}
           >
             <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center">
-                <Anchor className="h-8 w-8 text-primary-600 mr-3" />
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {club.name}
-                  {club.isActive === false && (
-                    <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                      Скрыт
-                    </span>
+              <div className="flex items-center flex-1">
+                <Anchor className="h-8 w-8 text-primary-600 mr-3 flex-shrink-0" />
+                <div className="flex-1 min-h-[80px]">
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {club.name}
+                    {club.isActive === false && (
+                      <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
+                        Скрыт
+                      </span>
+                    )}
+                  </h3>
+                  {/* Статус публикации отображается только для суперадминистратора, администратора и владельца клуба */}
+                  {(isSuperAdmin || isAdmin || (isClubOwner && club.ownerId === user?.id)) && (
+                    <div className="mt-2 ml-6">
+                      {club.rejectionComment && (
+                        <span className="text-xs bg-red-600 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
+                          Отказано в публикации
+                        </span>
+                      )}
+                      {!club.rejectionComment && club.isSubmittedForValidation === false && (
+                        <span className="text-xs bg-red-500 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
+                          Не опубликован
+                        </span>
+                      )}
+                      {!club.rejectionComment && club.isSubmittedForValidation === true && club.isValidated === false && (
+                        <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
+                          Ожидает валидации
+                        </span>
+                      )}
+                      {!club.rejectionComment && club.isSubmittedForValidation === true && club.isValidated === true && (
+                        <span className="text-xs bg-purple-500 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
+                          Опубликован
+                        </span>
+                      )}
+                    </div>
                   )}
-                </h3>
+                  {/* Комментарий об отказе для владельца клуба */}
+                  {isClubOwner && club.ownerId === user?.id && club.rejectionComment && (
+                    <div className="mt-2 ml-6 p-3 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm font-semibold text-red-800 mb-1">Комментарий суперадминистратора:</p>
+                      <p className="text-sm text-red-700">{club.rejectionComment}</p>
+                    </div>
+                  )}
+                  <div className="mt-2 min-h-[40px] flex items-center">
+                    {club.season ? (
+                      <div className="text-xl font-semibold text-white bg-green-500 px-3 py-1 rounded inline-block ml-2">
+                        Сезон: {club.season}
+                      </div>
+                    ) : (
+                      <div className="min-h-[40px]"></div>
+                    )}
+                  </div>
+                </div>
               </div>
-              {isSuperAdmin && (
-                <div className="flex space-x-2">
-                  {club.isActive === false ? (
+              <div className="flex space-x-2">
+                {/* Кнопки для суперадминистратора */}
+                {isSuperAdmin && (
+                  <>
+                    {club.isSubmittedForValidation === true && club.isValidated === false && (
+                      <button
+                        onClick={(e) => handleValidate(club.id, e)}
+                        disabled={deleting || hiding || restoring}
+                        className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
+                        title="Валидировать клуб"
+                      >
+                        <ShieldCheck className="h-5 w-5" />
+                      </button>
+                    )}
+                    {club.isActive === false ? (
+                      <button
+                        onClick={(e) => handleRestore(club.id, e)}
+                        disabled={restoring || deleting || hiding}
+                        className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
+                        title="Восстановить клуб"
+                      >
+                        <Eye className="h-5 w-5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => handleHide(club.id, e)}
+                        disabled={hiding || deleting || restoring}
+                        className="p-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded disabled:opacity-50"
+                        title="Скрыть клуб"
+                      >
+                        <EyeOff className="h-5 w-5" />
+                      </button>
+                    )}
                     <button
-                      onClick={(e) => handleRestore(club.id, e)}
-                      disabled={restoring || deleting || hiding}
-                      className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
-                      title="Восстановить клуб"
+                      onClick={(e) => handleDelete(club.id, e)}
+                      disabled={deleting || hiding || restoring}
+                      className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                      title="Удалить"
                     >
-                      <Eye className="h-5 w-5" />
+                      <Trash2 className="h-5 w-5" />
                     </button>
-                  ) : (
-                    <button
-                      onClick={(e) => handleHide(club.id, e)}
-                      disabled={hiding || deleting || restoring}
-                      className="p-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded disabled:opacity-50"
-                      title="Скрыть клуб"
-                    >
-                      <EyeOff className="h-5 w-5" />
-                    </button>
-                  )}
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col">
+              {club.description && (
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{club.description}</p>
+              )}
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                  {club.address}
+                </div>
+                {club.phone && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
+                    {club.phone}
+                  </div>
+                )}
+                {club.email && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
+                    {club.email}
+                  </div>
+                )}
+                {club.website && (
+                  <div className="flex items-center text-sm text-primary-600">
+                    <Globe className="h-4 w-4 mr-2 flex-shrink-0" />
+                    {club.website}
+                  </div>
+                )}
+              </div>
+              <div className="mt-auto pt-4 border-t border-gray-200">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Всего мест:</span>
+                  <span className="font-semibold">{club.totalBerths}</span>
+                </div>
+                <div className="flex justify-between text-sm mt-2">
+                  <span className="text-gray-600">Свободных мест:</span>
+                  <span className="font-semibold text-green-600">
+                    <FreeBerthsCount club={club} user={user} />
+                  </span>
+                </div>
+                {/* Кнопка "Опубликовать" для владельца клуба, если клуб еще не отправлен или был отклонен */}
+                {isClubOwner && club.ownerId === user?.id && (club.isSubmittedForValidation === false || club.rejectionComment) && (
                   <button
-                    onClick={(e) => handleDelete(club.id, e)}
-                    disabled={deleting || hiding || restoring}
-                    className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
-                    title="Удалить"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleSubmitForValidation(club.id, e)
+                    }}
+                    className="mt-3 w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                   >
-                    <Trash2 className="h-5 w-5" />
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    {club.rejectionComment ? 'Повторно отправить на проверку' : 'Опубликовать'}
                   </button>
-                </div>
-              )}
-            </div>
-            {club.description && (
-              <p className="text-gray-600 text-sm mb-4 line-clamp-2">{club.description}</p>
-            )}
-            <div className="space-y-2">
-              <div className="flex items-center text-sm text-gray-600">
-                <MapPin className="h-4 w-4 mr-2" />
-                {club.address}
-              </div>
-              {club.phone && (
-                <div className="flex items-center text-sm text-gray-600">
-                  <Phone className="h-4 w-4 mr-2" />
-                  {club.phone}
-                </div>
-              )}
-              {club.email && (
-                <div className="flex items-center text-sm text-gray-600">
-                  <Mail className="h-4 w-4 mr-2" />
-                  {club.email}
-                </div>
-              )}
-              {club.website && (
-                <div className="flex items-center text-sm text-primary-600">
-                  <Globe className="h-4 w-4 mr-2" />
-                  {club.website}
-                </div>
-              )}
-            </div>
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Всего мест:</span>
-                <span className="font-semibold">{club.totalBerths}</span>
-              </div>
-              <div className="flex justify-between text-sm mt-2">
-                <span className="text-gray-600">Свободных мест:</span>
-                <span className="font-semibold text-green-600">
-                  {(() => {
-                    // Проверяем, загружены ли места
-                    if (!club.berths || !Array.isArray(club.berths) || club.berths.length === 0) {
-                      // Если места не загружены, показываем общее количество (предполагаем, что все свободны)
-                      return club.totalBerths || 0
-                    }
-                    // Подсчитываем свободные места
-                    // Проверяем isAvailable как boolean, string или number
-                    const availableCount = club.berths.filter((berth: any) => {
-                      const isAvail = berth.isAvailable
-                      // Проверяем разные варианты значения isAvailable
-                      // true, 'true', 1, '1' - все считаются свободными
-                      if (isAvail === true || isAvail === 'true' || isAvail === 1 || isAvail === '1') {
-                        return true
-                      }
-                      // false, 'false', 0, '0' - занятые
-                      return false
-                    }).length
-                    return availableCount
-                  })()}
-                </span>
+                )}
+                {/* Кнопка "Снять с публикации" для владельца клуба и суперадминистратора, если клуб опубликован */}
+                {(isSuperAdmin || (isClubOwner && club.ownerId === user?.id)) && club.isSubmittedForValidation === true && club.isValidated === true && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleUnpublish(club.id, e)
+                    }}
+                    className="mt-3 w-full flex items-center justify-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Снять с публикации
+                  </button>
+                )}
               </div>
             </div>
           </Link>
@@ -692,6 +926,22 @@ export default function Clubs() {
                     />
                   </div>
                 </div>
+
+                  <div>
+                    <label htmlFor="add-season" className="block text-sm font-medium text-gray-700">
+                      Сезон (год) *
+                    </label>
+                    <input
+                      id="add-season"
+                      type="number"
+                      required
+                      min="2000"
+                      max="2100"
+                      value={addForm.season}
+                      onChange={(e) => setAddForm({ ...addForm, season: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    />
+                  </div>
               </div>
 
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">

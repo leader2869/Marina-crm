@@ -38,9 +38,11 @@ api.interceptors.response.use(
 )
 
 export const authService = {
-  login: (email: string, password: string) =>
-    api.post('/auth/login', { email, password }),
+  login: (emailOrPhone: string, password: string) =>
+    api.post('/auth/login', { emailOrPhone, password }),
   register: (data: any) => api.post('/auth/register', data),
+  loginAsGuest: (firstName: string, phone?: string) => 
+    api.post('/auth/guest', { firstName, phone }),
   getProfile: () => api.get('/auth/profile'),
 }
 
@@ -64,6 +66,7 @@ export const vesselsService = {
 
 export const bookingsService = {
   getAll: (params?: any) => api.get('/bookings', { params }),
+  getByClub: (clubId: number) => api.get(`/bookings/club/${clubId}`),
   getById: (id: number) => api.get(`/bookings/${id}`),
   create: (data: any) => api.post('/bookings', data),
   update: (id: number, data: any) => api.put(`/bookings/${id}`, data),
@@ -93,6 +96,7 @@ export const paymentsService = {
 
 export const usersService = {
   getAll: (params?: any) => api.get('/users', { params }),
+  getGuests: (params?: any) => api.get('/users/guests', { params }),
   getById: (id: number) => api.get(`/users/${id}`),
   create: (data: any) => api.post('/users', data),
   update: (id: number, data: any) => api.put(`/users/${id}`, data),
@@ -101,9 +105,25 @@ export const usersService = {
 
 export const berthsService = {
   getByClub: (clubId: number) => api.get(`/berths/club/${clubId}`),
+  getAvailableByClub: (clubId: number, params?: { startDate?: string; endDate?: string }) => 
+    api.get(`/berths/club/${clubId}/available`, { params }),
   create: (data: any) => api.post('/berths', data),
   update: (id: number, data: any) => api.put(`/berths/${id}`, data),
   delete: (id: number) => api.delete(`/berths/${id}`),
+}
+
+export const tariffsService = {
+  getByClub: (clubId: number) => api.get(`/tariffs/club/${clubId}`),
+  create: (data: any) => api.post('/tariffs', data),
+  update: (id: number, data: any) => api.put(`/tariffs/${id}`, data),
+  delete: (id: number) => api.delete(`/tariffs/${id}`),
+}
+
+export const bookingRulesService = {
+  getByClub: (clubId: number) => api.get(`/booking-rules/club/${clubId}`),
+  create: (data: any) => api.post('/booking-rules', data),
+  update: (id: number, data: any) => api.put(`/booking-rules/${id}`, data),
+  delete: (id: number) => api.delete(`/booking-rules/${id}`),
 }
 
 export default api

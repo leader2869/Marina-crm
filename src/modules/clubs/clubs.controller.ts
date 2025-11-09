@@ -13,7 +13,7 @@ import { Payment } from '../../entities/Payment';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
-import { UserRole } from '../../types';
+import { UserRole, BookingStatus } from '../../types';
 
 export class ClubsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -33,14 +33,23 @@ export class ClubsController {
       // Если суперадмин запрашивает скрытые клубы, показываем все, иначе только активные
       // Проверяем userRole (может быть undefined, если запрос без аутентификации)
       const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
+      const isClubOwner = req.userRole === UserRole.CLUB_OWNER;
       
-      if (showHidden === 'true' && isSuperAdmin) {
-        // Суперадмин может видеть все клубы, включая скрытые
+      // Для владельца клуба показываем только его клубы (включая невалидированные)
+      if (isClubOwner && req.userId) {
+        queryBuilder.where('club.ownerId = :ownerId', { ownerId: req.userId });
+        console.log('Владелец клуба запросил свои клубы, userId:', req.userId);
+      } else if (showHidden === 'true' && isSuperAdmin) {
+        // Суперадмин может видеть все клубы, включая скрытые и невалидированные
         console.log('Суперадмин запросил скрытые клубы, userRole:', req.userRole);
       } else {
-        // Показываем только активные клубы
-        queryBuilder.where('club.isActive = :isActive', { isActive: true });
-        console.log('Фильтр по активным клубам применен, showHidden:', showHidden, 'isSuperAdmin:', isSuperAdmin);
+        // Показываем только активные И валидированные И отправленные на валидацию клубы для всех остальных
+        queryBuilder.where('club.isActive = :isActive AND club.isValidated = :isValidated AND club.isSubmittedForValidation = :isSubmittedForValidation', { 
+          isActive: true, 
+          isValidated: true,
+          isSubmittedForValidation: true
+        });
+        console.log('Фильтр по активным и валидированным клубам применен, showHidden:', showHidden, 'isSuperAdmin:', isSuperAdmin);
       }
 
       // Фильтры
@@ -72,12 +81,21 @@ export class ClubsController {
         .take(limit)
         .getManyAndCount();
 
+      // Если владелец клуба запросил свои клубы, возвращаем только его клубы
       // Если суперадмин запросил скрытые клубы, возвращаем все, иначе фильтруем только активные
       let filteredClubs = clubs;
       
-      if (showHidden !== 'true' || !isSuperAdmin) {
+      if (isClubOwner && req.userId) {
+        // Для владельца клуба показываем только его клубы (включая скрытые и невалидированные)
+        filteredClubs = clubs.filter((club) => club.ownerId === req.userId);
+      } else if (showHidden !== 'true' || !isSuperAdmin) {
         // Дополнительная фильтрация на случай, если фильтр не сработал
-        filteredClubs = clubs.filter((club) => club.isActive === true);
+        // Показываем только активные И валидированные И отправленные на валидацию клубы
+        filteredClubs = clubs.filter((club) => 
+          club.isActive === true && 
+          club.isValidated === true && 
+          club.isSubmittedForValidation === true
+        );
       }
       
       // Отладочная информация
@@ -109,12 +127,42 @@ export class ClubsController {
         throw new AppError('Яхт-клуб не найден', 404);
       }
 
+      // Гость и PENDING_VALIDATION могут видеть только активные И валидированные клубы
+      const isGuest = !req.userId || req.userRole === UserRole.GUEST;
+      const isPendingValidation = req.userRole === UserRole.PENDING_VALIDATION;
+      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
+      const isClubOwner = req.userRole === UserRole.CLUB_OWNER;
+      
+      // Проверяем доступ: для гостя и PENDING_VALIDATION - только активные, валидированные и отправленные на валидацию
+      // Для владельца клуба - может видеть свои клубы (включая неотправленные на валидацию)
+      // Для суперадмина - может видеть все клубы
+      if ((isGuest || isPendingValidation) && (!club.isActive || !club.isValidated || !club.isSubmittedForValidation)) {
+        throw new AppError('Яхт-клуб не найден или неактивен', 404);
+      }
+      
+      // Владелец клуба может видеть только свои клубы
+      if (isClubOwner && req.userId && club.ownerId !== req.userId) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
+
       // Загружаем места с сортировкой по номеру места
       // Сначала места, начинающиеся с текста (алфавитно), потом с числа (по возрастанию)
       const berthRepository = AppDataSource.getRepository(Berth);
-      const berths = await berthRepository
+      
+      // Для гостя показываем только доступные места (isAvailable = true), но включая забронированные
+      // Для PENDING_VALIDATION и других ролей показываем все места (включая занятые)
+      let berthsQuery = berthRepository
         .createQueryBuilder('berth')
-        .where('berth.clubId = :clubId', { clubId: club.id })
+        .leftJoinAndSelect('berth.tariffBerths', 'tariffBerths')
+        .leftJoinAndSelect('tariffBerths.tariff', 'tariff')
+        .where('berth.clubId = :clubId', { clubId: club.id });
+      
+      if (isGuest) {
+        berthsQuery = berthsQuery.andWhere('berth.isAvailable = :isAvailable', { isAvailable: true });
+      }
+      // Для PENDING_VALIDATION показываем все места (isAvailable = true), как и для других ролей
+      
+      const berths = await berthsQuery
         .orderBy(
           `CASE WHEN berth.number ~ '^[^0-9]' THEN 0 ELSE 1 END`,
           'ASC'
@@ -125,6 +173,17 @@ export class ClubsController {
         )
         .addOrderBy('berth.number', 'ASC')
         .getMany();
+
+      // Фильтруем тарифы по сезону клуба, если сезон указан
+      if (club.season) {
+        berths.forEach(berth => {
+          if (berth.tariffBerths) {
+            berth.tariffBerths = berth.tariffBerths.filter(tb => 
+              tb.tariff && (tb.tariff.season === club.season || !tb.tariff.season)
+            )
+          }
+        })
+      }
 
       // Добавляем отсортированные места к клубу
       club.berths = berths;
@@ -141,6 +200,11 @@ export class ClubsController {
         throw new AppError('Требуется аутентификация', 401);
       }
 
+      // Проверяем, что пользователь не имеет роль PENDING_VALIDATION
+      if (req.userRole === UserRole.PENDING_VALIDATION) {
+        throw new AppError('Ваш аккаунт ожидает валидации суперадминистратором. Вы не можете добавлять клубы до завершения валидации.', 403);
+      }
+
       const {
         name,
         description,
@@ -155,10 +219,12 @@ export class ClubsController {
         maxRentalPeriod,
         basePrice,
         minPricePerMonth,
+        season,
+        rentalMonths,
       } = req.body;
 
-      if (!name || !address || !latitude || !longitude) {
-        throw new AppError('Все обязательные поля должны быть заполнены', 400);
+      if (!name || !address || !latitude || !longitude || !season) {
+        throw new AppError('Все обязательные поля должны быть заполнены, включая сезон', 400);
       }
 
       const clubRepository = AppDataSource.getRepository(Club);
@@ -176,6 +242,19 @@ export class ClubsController {
         maxRentalPeriod: maxRentalPeriod || 365,
         basePrice: basePrice || 0,
         minPricePerMonth: minPricePerMonth ? parseFloat(minPricePerMonth) : null,
+        season: season ? parseInt(season) : null,
+        rentalMonths: rentalMonths && Array.isArray(rentalMonths) && rentalMonths.length > 0 
+          ? (() => {
+              // Валидация месяцев аренды
+              const invalidMonths = rentalMonths.filter((m: number) => m < 1 || m > 12);
+              if (invalidMonths.length > 0) {
+                throw new AppError('Месяца должны быть в диапазоне от 1 до 12', 400);
+              }
+              return rentalMonths;
+            })()
+          : null,
+        isValidated: false, // Новые клубы не валидированы
+        isSubmittedForValidation: false, // Новые клубы еще не отправлены на валидацию
         ownerId: req.userId,
       });
 
@@ -256,6 +335,9 @@ export class ClubsController {
         maxRentalPeriod,
         basePrice,
         minPricePerMonth,
+        season,
+        rentalMonths,
+        bookingRulesText,
       } = req.body;
 
       const clubRepository = AppDataSource.getRepository(Club);
@@ -290,6 +372,49 @@ export class ClubsController {
       if (maxRentalPeriod !== undefined) club.maxRentalPeriod = parseInt(maxRentalPeriod as string);
       if (basePrice !== undefined) club.basePrice = parseFloat(basePrice as string);
       if (minPricePerMonth !== undefined) club.minPricePerMonth = minPricePerMonth ? parseFloat(minPricePerMonth as string) : null;
+      if (season !== undefined) club.season = season ? parseInt(season as string) : null;
+      if (rentalMonths !== undefined) {
+        // Валидация месяцев аренды
+        if (rentalMonths !== null && (!Array.isArray(rentalMonths) || rentalMonths.length === 0)) {
+          club.rentalMonths = null;
+        } else if (Array.isArray(rentalMonths)) {
+          // Проверяем, что все месяцы в диапазоне 1-12
+          const invalidMonths = rentalMonths.filter((m: number) => m < 1 || m > 12);
+          if (invalidMonths.length > 0) {
+            throw new AppError('Месяца должны быть в диапазоне от 1 до 12', 400);
+          }
+          club.rentalMonths = rentalMonths;
+        } else {
+          club.rentalMonths = null;
+        }
+      }
+      if (bookingRulesText !== undefined) {
+        club.bookingRulesText = bookingRulesText || null;
+      }
+      // Только суперадмин может изменять isValidated и rejectionComment
+      if (req.userRole === UserRole.SUPER_ADMIN && req.body.isValidated !== undefined) {
+        club.isValidated = req.body.isValidated === true || req.body.isValidated === 'true';
+      }
+      if (req.userRole === UserRole.SUPER_ADMIN && req.body.rejectionComment !== undefined) {
+        club.rejectionComment = req.body.rejectionComment || null;
+      }
+      // Владелец клуба может отправлять клуб на валидацию
+      if (req.userRole === UserRole.CLUB_OWNER && req.userId === club.ownerId && req.body.isSubmittedForValidation !== undefined) {
+        club.isSubmittedForValidation = req.body.isSubmittedForValidation === true || req.body.isSubmittedForValidation === 'true';
+        // При отправке на валидацию сбрасываем isValidated и делаем клуб активным
+        if (club.isSubmittedForValidation) {
+          club.isValidated = false;
+          club.isActive = true;
+          // Сбрасываем комментарий об отказе при повторной отправке
+          if (req.body.rejectionComment !== undefined) {
+            club.rejectionComment = null;
+          }
+        }
+      }
+      // Владелец клуба и суперадмин могут снимать клуб с публикации (устанавливать isActive = false)
+      if ((req.userRole === UserRole.SUPER_ADMIN || (req.userRole === UserRole.CLUB_OWNER && req.userId === club.ownerId)) && req.body.isActive !== undefined) {
+        club.isActive = req.body.isActive === true || req.body.isActive === 'true';
+      }
 
       // totalBerths теперь автоматически подсчитывается на основе добавленных мест
       // Не обрабатываем изменение totalBerths при редактировании клуба
@@ -649,5 +774,6 @@ export class ClubsController {
     }
   }
 }
+
 
 

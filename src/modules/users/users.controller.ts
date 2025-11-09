@@ -11,6 +11,23 @@ import { PaymentStatus, UserRole } from '../../types';
 import { hashPassword } from '../../utils/password';
 
 export class UsersController {
+  // Вспомогательный метод для нормализации номера телефона
+  private normalizePhone(phone: string): string {
+    if (!phone) return '';
+    // Убираем все нецифровые символы
+    let normalized = phone.replace(/\D/g, '');
+    // Если начинается с 8, заменяем на 7
+    if (normalized.startsWith('8')) {
+      normalized = '7' + normalized.substring(1);
+    }
+    // Если не начинается с 7, добавляем 7
+    if (!normalized.startsWith('7')) {
+      normalized = '7' + normalized;
+    }
+    // Возвращаем последние 10 цифр (код страны + номер)
+    return normalized.slice(-10);
+  }
+
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       // Только супер-администратор может видеть всех пользователей
@@ -107,6 +124,60 @@ export class UsersController {
       );
 
       res.json(createPaginatedResponse(usersWithDebt, total, page, limit));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getGuests(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      // Только супер-администратор может видеть гостей
+      if (req.userRole !== 'super_admin') {
+        throw new AppError('Недостаточно прав доступа', 403);
+      }
+
+      const { page, limit, afterDate } = req.query;
+
+      const userRepository = AppDataSource.getRepository(User);
+      const queryBuilder = userRepository
+        .createQueryBuilder('user')
+        .where('user.role = :role', { role: UserRole.GUEST });
+
+      // Если указана дата, фильтруем гостей, созданных после этой даты
+      if (afterDate) {
+        const afterDateObj = new Date(afterDate as string);
+        queryBuilder.andWhere('user.createdAt > :afterDate', { afterDate: afterDateObj });
+      }
+
+      // Если запрашивается только количество (без пагинации)
+      if (req.query.countOnly === 'true') {
+        const count = await queryBuilder.getCount();
+        res.json({ count });
+        return;
+      }
+
+      const { page: pageNum, limit: limitNum } = getPaginationParams(
+        parseInt(page as string),
+        parseInt(limit as string)
+      );
+
+      // Получаем всех пользователей с ролью GUEST, отсортированных по дате создания (новые первыми)
+      const [guests, total] = await queryBuilder
+        .orderBy('user.createdAt', 'DESC')
+        .skip((pageNum - 1) * limitNum)
+        .take(limitNum)
+        .getManyAndCount();
+
+      // Форматируем данные для ответа
+      const guestsData = guests.map((guest) => ({
+        id: guest.id,
+        firstName: guest.firstName,
+        phone: guest.phone || '-',
+        createdAt: guest.createdAt,
+        email: guest.email,
+      }));
+
+      res.json(createPaginatedResponse(guestsData, total, pageNum, limitNum));
     } catch (error) {
       next(error);
     }
@@ -283,18 +354,67 @@ export class UsersController {
         user.email = email;
       }
 
-      // Обновление телефона
+      // Обновление телефона с проверкой уникальности
       if (phone !== undefined) {
+        if (phone && phone.trim()) {
+          // Нормализуем телефон для проверки
+          const normalizedPhone = this.normalizePhone(phone);
+          
+          // Проверяем, не используется ли этот номер другим пользователем
+          const allUsers = await userRepository.find({ where: { isActive: true } });
+          const existingUserByPhone = allUsers.find(u => {
+            if (!u.phone || u.id === userId) return false;
+            const normalizedDb = this.normalizePhone(u.phone);
+            return normalizedDb === normalizedPhone;
+          });
+          
+          if (existingUserByPhone) {
+            throw new AppError('Пользователь с таким номером телефона уже существует', 400);
+          }
+        }
         user.phone = phone || null;
       }
 
-      // Обновление роли
-      if (role) {
+      // Обновление роли и валидации
+      // Если одновременно обновляются роль и isValidated (валидация пользователя)
+      if (role && req.body.isValidated !== undefined) {
         // Валидация роли
         if (!Object.values(UserRole).includes(role)) {
           throw new AppError('Неверная роль', 400);
         }
-        user.role = role as UserRole;
+        const newRole = role as UserRole;
+        
+        // Если валидируем пользователя с PENDING_VALIDATION, меняем роль на CLUB_OWNER
+        if (user.role === UserRole.PENDING_VALIDATION && newRole === UserRole.CLUB_OWNER && req.body.isValidated === true) {
+          user.role = UserRole.CLUB_OWNER;
+          user.isValidated = true;
+        } else {
+          // Если меняем роль на CLUB_OWNER из другой роли, устанавливаем PENDING_VALIDATION
+          if (newRole === UserRole.CLUB_OWNER && user.role !== UserRole.CLUB_OWNER) {
+            user.role = UserRole.PENDING_VALIDATION;
+            user.isValidated = false;
+          } else {
+            user.role = newRole;
+            user.isValidated = req.body.isValidated === true;
+          }
+        }
+      } else if (role) {
+        // Обновление только роли
+        if (!Object.values(UserRole).includes(role)) {
+          throw new AppError('Неверная роль', 400);
+        }
+        const newRole = role as UserRole;
+        
+        // Если меняем роль на CLUB_OWNER из другой роли, устанавливаем PENDING_VALIDATION
+        if (newRole === UserRole.CLUB_OWNER && user.role !== UserRole.CLUB_OWNER) {
+          user.role = UserRole.PENDING_VALIDATION;
+          user.isValidated = false;
+        } else {
+          user.role = newRole;
+        }
+      } else if (req.body.isValidated !== undefined) {
+        // Обновление только статуса валидации
+        user.isValidated = req.body.isValidated === true;
       }
 
       // Обновление привязки к яхт-клубу (старая связь для обратной совместимости)
@@ -361,6 +481,7 @@ export class UsersController {
           lastName: updatedUser!.lastName,
           phone: updatedUser!.phone,
           role: updatedUser!.role,
+          isValidated: updatedUser!.isValidated,
           managedClubId: updatedUser!.managedClubId,
           managedClub: updatedUser!.managedClub,
         },

@@ -14,3 +14,4 @@ router.put('/:id/status', authenticate, paymentsController.updateStatus.bind(pay
 export default router;
 
 
+

@@ -1,9 +1,15 @@
+export enum TariffType {
+  SEASON_PAYMENT = 'season_payment',
+  MONTHLY_PAYMENT = 'monthly_payment',
+}
+
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   ADMIN = 'admin',
   CLUB_OWNER = 'club_owner',
   VESSEL_OWNER = 'vessel_owner',
   GUEST = 'guest',
+  PENDING_VALIDATION = 'pending_validation', // Ожидает валидации суперадминистратором
 }
 
 export enum BookingStatus {
@@ -71,5 +77,6 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
 
 

@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { BerthsController } from './berths.controller';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, optionalAuthenticate } from '../../middleware/auth';
 
 const router = Router();
 const berthsController = new BerthsController();
 
 // Получить все места клуба
 router.get('/club/:clubId', authenticate, berthsController.getByClub.bind(berthsController));
+
+// Получить доступные места клуба для бронирования (для судовладельца и гостя)
+router.get('/club/:clubId/available', optionalAuthenticate, berthsController.getAvailableByClub.bind(berthsController));
 
 // Создать новое место
 router.post('/', authenticate, berthsController.create.bind(berthsController));
