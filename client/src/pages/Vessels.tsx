@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { vesselsService } from '../services/api'
+import { vesselsService, usersService } from '../services/api'
 import { Vessel, UserRole } from '../types'
-import { Ship, Plus, Trash2, Search, Download } from 'lucide-react'
+import { Ship, Plus, Trash2, Search, Download, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
@@ -13,10 +13,27 @@ export default function Vessels() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
+  const [addForm, setAddForm] = useState({
+    name: '',
+    type: '',
+    length: '',
+    width: '',
+    heightAboveWaterline: '',
+    registrationNumber: '',
+    technicalSpecs: '',
+    ownerId: '',
+  })
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
 
   useEffect(() => {
     loadVessels()
-  }, [])
+    if (isSuperAdmin) {
+      loadUsers()
+    }
+  }, [isSuperAdmin])
 
   const loadVessels = async () => {
     try {
@@ -26,6 +43,76 @@ export default function Vessels() {
       console.error('Ошибка загрузки судов:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadUsers = async () => {
+    try {
+      // Загружаем пользователей для будущего использования (например, выбор владельца судна)
+      await usersService.getAll({ limit: 100 })
+      // setUsers(response.data || []) // Пока не используется, но оставляем для будущего
+    } catch (error) {
+      console.error('Ошибка загрузки пользователей:', error)
+    }
+  }
+
+  const handleOpenAdd = () => {
+    setShowAddModal(true)
+    setAddForm({
+      name: '',
+      type: '',
+      length: '',
+      width: '',
+      heightAboveWaterline: '',
+      registrationNumber: '',
+      technicalSpecs: '',
+      ownerId: user?.id?.toString() || '',
+    })
+    setError('')
+  }
+
+  const handleCloseAdd = () => {
+    setShowAddModal(false)
+    setAddForm({
+      name: '',
+      type: '',
+      length: '',
+      width: '',
+      heightAboveWaterline: '',
+      registrationNumber: '',
+      technicalSpecs: '',
+      ownerId: user?.id?.toString() || '',
+    })
+    setError('')
+  }
+
+  const handleCreate = async () => {
+    if (!addForm.name || !addForm.type || !addForm.length) {
+      setError('Заполните все обязательные поля: Название, Тип, Длина')
+      return
+    }
+
+    setError('')
+    setCreating(true)
+
+    try {
+      const createData: any = {
+        name: addForm.name,
+        type: addForm.type,
+        length: parseFloat(addForm.length),
+        width: addForm.width ? parseFloat(addForm.width) : null,
+        heightAboveWaterline: addForm.heightAboveWaterline ? parseFloat(addForm.heightAboveWaterline) : null,
+        registrationNumber: addForm.registrationNumber || null,
+        technicalSpecs: addForm.technicalSpecs || null,
+      }
+
+      await vesselsService.create(createData)
+      await loadVessels()
+      handleCloseAdd()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка создания судна')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -47,8 +134,6 @@ export default function Vessels() {
       setDeleting(false)
     }
   }
-
-  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
 
   const exportToExcel = async () => {
     try {
@@ -166,14 +251,20 @@ export default function Vessels() {
               <Download className="h-5 w-5 mr-2" />
               Экспорт в Excel
             </button>
-            <button className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
               <Plus className="h-5 w-5 mr-2" />
               Добавить судно
             </button>
           </div>
         )}
         {!isSuperAdmin && (
-          <button className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          >
             <Plus className="h-5 w-5 mr-2" />
             Добавить судно
           </button>
@@ -264,6 +355,154 @@ export default function Vessels() {
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <Ship className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">Судна не найдены</p>
+        </div>
+      )}
+
+      {/* Модальное окно создания судна */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={handleCloseAdd} />
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Создать новое судно</h3>
+                  <button
+                    onClick={handleCloseAdd}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                    {error}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="add-name" className="block text-sm font-medium text-gray-700">
+                      Название *
+                    </label>
+                    <input
+                      id="add-name"
+                      type="text"
+                      required
+                      value={addForm.name}
+                      onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="add-type" className="block text-sm font-medium text-gray-700">
+                      Тип *
+                    </label>
+                    <input
+                      id="add-type"
+                      type="text"
+                      required
+                      value={addForm.type}
+                      onChange={(e) => setAddForm({ ...addForm, type: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                      placeholder="Яхта, Катер, Лодка и т.д."
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="add-length" className="block text-sm font-medium text-gray-700">
+                      Длина (м) *
+                    </label>
+                    <input
+                      id="add-length"
+                      type="number"
+                      step="0.1"
+                      required
+                      value={addForm.length}
+                      onChange={(e) => setAddForm({ ...addForm, length: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="add-width" className="block text-sm font-medium text-gray-700">
+                      Ширина (м)
+                    </label>
+                    <input
+                      id="add-width"
+                      type="number"
+                      step="0.1"
+                      value={addForm.width}
+                      onChange={(e) => setAddForm({ ...addForm, width: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="add-height" className="block text-sm font-medium text-gray-700">
+                      Высота над ватерлинией (м)
+                    </label>
+                    <input
+                      id="add-height"
+                      type="number"
+                      step="0.1"
+                      value={addForm.heightAboveWaterline}
+                      onChange={(e) => setAddForm({ ...addForm, heightAboveWaterline: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="add-registration" className="block text-sm font-medium text-gray-700">
+                      Регистрационный номер
+                    </label>
+                    <input
+                      id="add-registration"
+                      type="text"
+                      value={addForm.registrationNumber}
+                      onChange={(e) => setAddForm({ ...addForm, registrationNumber: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="add-specs" className="block text-sm font-medium text-gray-700">
+                      Технические характеристики
+                    </label>
+                    <textarea
+                      id="add-specs"
+                      rows={4}
+                      value={addForm.technicalSpecs}
+                      onChange={(e) => setAddForm({ ...addForm, technicalSpecs: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={creating}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  {creating ? 'Создание...' : 'Создать'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseAdd}
+                  disabled={creating}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

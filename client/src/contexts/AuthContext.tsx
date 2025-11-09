@@ -32,8 +32,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (token) {
         try {
           const userData = await authService.getProfile()
+          console.log('Profile loaded:', userData)
+          console.log('User role from API:', userData.role)
           setUser(userData)
         } catch (error) {
+          console.error('Error loading profile:', error)
           localStorage.removeItem('token')
           setToken(null)
         }
@@ -45,6 +48,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (email: string, password: string) => {
     const response = await authService.login(email, password)
+    console.log('Login response:', response)
+    console.log('User role from login:', response.user?.role)
     setToken(response.token)
     setUser(response.user)
     localStorage.setItem('token', response.token)

@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
 import { Vessel } from '../../entities/Vessel';
+import { User } from '../../entities/User';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -138,10 +139,36 @@ export class VesselsController {
         throw new AppError('Недостаточно прав для редактирования', 403);
       }
 
-      Object.assign(vessel, req.body);
+      // Обработка изменения владельца (только для супер администратора)
+      if (req.body.ownerId !== undefined) {
+        if (req.userRole !== 'super_admin') {
+          throw new AppError('Только супер администратор может изменять владельца судна', 403);
+        }
+
+        const userRepository = AppDataSource.getRepository(User);
+        const newOwner = await userRepository.findOne({
+          where: { id: parseInt(req.body.ownerId as string) },
+        });
+
+        if (!newOwner) {
+          throw new AppError('Новый владелец не найден', 404);
+        }
+
+        if (!newOwner.isActive) {
+          throw new AppError('Новый владелец неактивен', 400);
+        }
+
+        vessel.ownerId = newOwner.id;
+      }
+
+      // Обновление остальных полей (исключая ownerId, который обработан выше)
+      const { ownerId, technicalSpecs, ...otherFields } = req.body;
+      Object.assign(vessel, otherFields);
+
       if (req.body.technicalSpecs) {
         vessel.technicalSpecs = JSON.stringify(req.body.technicalSpecs);
       }
+
       await vesselRepository.save(vessel);
 
       const updatedVessel = await vesselRepository.findOne({

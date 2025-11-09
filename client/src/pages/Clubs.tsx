@@ -50,10 +50,11 @@ export default function Clubs() {
       const response = await clubsService.getAll(params)
       const clubsData = response.data || []
       
-      // Если показываем скрытые, оставляем все, иначе фильтруем только активные
+      // Для суперадмина с флагом showHidden показываем все, иначе только активные
+      // Для остальных ролей (VESSEL_OWNER, GUEST и т.д.) всегда показываем только активные
       const filteredClubs = showHidden && isSuperAdmin 
         ? clubsData 
-        : clubsData.filter((club: Club) => club.isActive !== false)
+        : clubsData.filter((club: Club) => club.isActive === true)
       
       setClubs(filteredClubs)
     } catch (error) {
@@ -131,6 +132,9 @@ export default function Clubs() {
   }
 
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
+  const isAdmin = user?.role === UserRole.ADMIN
+  const isClubOwner = user?.role === UserRole.CLUB_OWNER
+  const canManageClubs = isSuperAdmin || isAdmin || isClubOwner
 
   const handleOpenAdd = () => {
     setShowAddModal(true)
@@ -330,7 +334,7 @@ export default function Clubs() {
             </button>
           </div>
         )}
-        {!isSuperAdmin && (
+        {canManageClubs && !isSuperAdmin && (
           <button
             onClick={handleOpenAdd}
             className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"

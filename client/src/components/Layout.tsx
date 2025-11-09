@@ -25,16 +25,44 @@ export default function Layout() {
     const allItems = [
       { name: 'Дашборд', href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
       { name: 'Пользователи', href: '/users', icon: Users, roles: [UserRole.SUPER_ADMIN] },
-      { name: 'Яхт-клубы', href: '/clubs', icon: Anchor, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
+      { name: 'Яхт-клубы', href: '/clubs', icon: Anchor, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST] },
       { name: 'Судна', href: '/vessels', icon: Ship, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER] },
       { name: 'Бронирования', href: '/bookings', icon: Calendar, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
     ]
 
-    if (!user) return []
+    if (!user || !user.role) {
+      console.log('No user or role:', { user, role: user?.role })
+      return []
+    }
     
-    return allItems.filter(item => item.roles.includes(user.role))
+    // Фильтруем пункты меню по роли пользователя
+    const userRole = user.role as UserRole
+    
+    // Отладочная информация
+    console.log('=== Menu Debug ===')
+    console.log('User:', user)
+    console.log('User role:', userRole, 'Type:', typeof userRole)
+    console.log('CLUB_OWNER enum:', UserRole.CLUB_OWNER, 'Type:', typeof UserRole.CLUB_OWNER)
+    console.log('Roles match:', userRole === UserRole.CLUB_OWNER, 'String match:', String(userRole) === String(UserRole.CLUB_OWNER))
+    
+    const filteredItems = allItems.filter(item => {
+      // Проверяем, что роль пользователя есть в списке разрешенных ролей для этого пункта меню
+      const hasAccess = item.roles.some(role => {
+        // Сравниваем как enum, так и строковые значения
+        return role === userRole || String(role) === String(userRole)
+      })
+      if (userRole === UserRole.CLUB_OWNER || String(userRole) === 'club_owner') {
+        console.log(`Item "${item.name}": roles=${JSON.stringify(item.roles)}, hasAccess=${hasAccess}`)
+      }
+      return hasAccess
+    })
+    
+    console.log('Filtered items count:', filteredItems.length, 'Items:', filteredItems.map(i => i.name))
+    console.log('=== End Debug ===')
+    
+    return filteredItems
   }, [user])
 
   const isActive = (path: string) => location.pathname === path
@@ -52,24 +80,30 @@ export default function Layout() {
             </button>
           </div>
           <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg ${
-                    isActive(item.href)
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
-              )
-            })}
+            {navigation.length > 0 ? (
+              navigation.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg ${
+                      isActive(item.href)
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Icon className="mr-3 h-5 w-5" />
+                    {item.name}
+                  </Link>
+                )
+              })
+            ) : (
+              <div className="px-4 py-2 text-sm text-gray-500">
+                Нет доступных пунктов меню
+              </div>
+            )}
           </nav>
         </div>
       </div>
@@ -81,23 +115,29 @@ export default function Layout() {
             <h1 className="text-xl font-bold text-primary-600">Marina CRM</h1>
           </div>
           <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg ${
-                    isActive(item.href)
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
-              )
-            })}
+            {navigation.length > 0 ? (
+              navigation.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg ${
+                      isActive(item.href)
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Icon className="mr-3 h-5 w-5" />
+                    {item.name}
+                  </Link>
+                )
+              })
+            ) : (
+              <div className="px-4 py-2 text-sm text-gray-500">
+                Нет доступных пунктов меню
+              </div>
+            )}
           </nav>
           <div className="p-4 border-t">
             <div className="flex items-center justify-between mb-2">
