@@ -18,6 +18,24 @@ import bookingRulesRoutes from './modules/booking-rules/booking-rules.routes';
 
 const app: Express = express();
 
+// Инициализация базы данных
+let isInitialized = false;
+let initializationError: Error | null = null;
+
+const initializeApp = async (): Promise<void> => {
+  if (!isInitialized && !initializationError) {
+    try {
+      await AppDataSource.initialize();
+      console.log('✅ База данных подключена');
+      isInitialized = true;
+    } catch (error: any) {
+      console.error('❌ Ошибка при подключении к базе данных:', error);
+      initializationError = error;
+      // Не блокируем запуск приложения, но логируем ошибку
+    }
+  }
+};
+
 // Middleware
 app.use(cors({
   origin: config.frontendUrl,
@@ -38,6 +56,28 @@ if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
     next();
   });
 }
+
+// Initialize on first request (for Vercel) - ДО маршрутов!
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await initializeApp();
+    if (initializationError) {
+      // Если есть ошибка инициализации, возвращаем 503 вместо 500
+      return res.status(503).json({ 
+        error: 'Сервис временно недоступен',
+        message: 'База данных не подключена',
+        details: process.env.NODE_ENV === 'development' ? initializationError.message : undefined
+      });
+    }
+    next();
+  } catch (error: any) {
+    console.error('❌ Ошибка при инициализации:', error);
+    return res.status(503).json({ 
+      error: 'Сервис временно недоступен',
+      message: error.message
+    });
+  }
+});
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
@@ -62,46 +102,6 @@ app.use(errorHandler);
 // 404 handler
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Маршрут не найден' });
-});
-
-// Инициализация базы данных
-let isInitialized = false;
-let initializationError: Error | null = null;
-
-const initializeApp = async (): Promise<void> => {
-  if (!isInitialized && !initializationError) {
-    try {
-      await AppDataSource.initialize();
-      console.log('✅ База данных подключена');
-      isInitialized = true;
-    } catch (error: any) {
-      console.error('❌ Ошибка при подключении к базе данных:', error);
-      initializationError = error;
-      // Не блокируем запуск приложения, но логируем ошибку
-    }
-  }
-};
-
-// Initialize on first request (for Vercel)
-app.use(async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    await initializeApp();
-    if (initializationError) {
-      // Если есть ошибка инициализации, возвращаем 503 вместо 500
-      return res.status(503).json({ 
-        error: 'Сервис временно недоступен',
-        message: 'База данных не подключена',
-        details: process.env.NODE_ENV === 'development' ? initializationError.message : undefined
-      });
-    }
-    next();
-  } catch (error: any) {
-    console.error('❌ Ошибка при инициализации:', error);
-    return res.status(503).json({ 
-      error: 'Сервис временно недоступен',
-      message: error.message
-    });
-  }
 });
 
 // Export app for Vercel (serverless)
