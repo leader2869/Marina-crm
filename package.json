@@ -15,6 +15,7 @@
     "seed": "ts-node src/database/seed.ts",
     "reset-admin": "ts-node src/database/reset-admin-password.ts",
     "check-admin": "ts-node src/database/check-admin.ts",
+    "check-users": "ts-node src/database/check-users.ts",
     "check-clubs": "ts-node src/database/check-clubs.ts",
     "check-isvalidated": "ts-node src/database/check-isvalidated.ts",
     "backup": "ts-node src/database/backup.ts",
