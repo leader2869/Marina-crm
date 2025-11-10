@@ -16,11 +16,17 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl()
 
+// Логируем URL API для отладки
+console.log('API URL:', API_URL)
+console.log('VITE_API_URL:', import.meta.env.VITE_API_URL)
+console.log('PROD:', import.meta.env.PROD)
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 секунд таймаут
 })
 
 // Добавляем токен к каждому запросу

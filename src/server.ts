@@ -51,16 +51,38 @@ const initializeApp = async (): Promise<void> => {
 
 // Middleware
 // CORS с поддержкой preflight запросов
-app.use(cors({
-  origin: config.frontendUrl || '*', // Разрешаем все источники, если не указан
+// Разрешаем все источники в development, или указанный в production
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // В development разрешаем все источники
+    if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+      callback(null, true);
+      return;
+    }
+    
+    // В production разрешаем указанный frontend URL или все (если не указан)
+    const allowedOrigins = config.frontendUrl 
+      ? [config.frontendUrl, 'http://localhost:5173', 'http://localhost:3000']
+      : ['*'];
+    
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Authorization'],
+  maxAge: 86400, // 24 часа
+};
+
+app.use(cors(corsOptions));
 
 // Обработка OPTIONS запросов (preflight)
 app.options('*', (req: Request, res: Response) => {
-  console.log(`[CORS] OPTIONS ${req.url}`);
+  console.log(`[CORS] OPTIONS ${req.url} from origin: ${req.headers.origin}`);
   res.sendStatus(200);
 });
 
