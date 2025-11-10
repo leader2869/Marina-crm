@@ -51,30 +51,56 @@ app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Маршрут не найден' });
 });
 
-// Инициализация базы данных и запуск сервера
-const startServer = async (): Promise<void> => {
-  try {
-    await AppDataSource.initialize();
-    console.log('✅ База данных подключена');
+// Инициализация базы данных
+let isInitialized = false;
 
-    app.listen(config.port, () => {
-      console.log(`🚀 Сервер запущен на порту ${config.port}`);
-      console.log(`📝 API доступен по адресу http://localhost:${config.port}/api`);
-    });
-  } catch (error) {
-    console.error('❌ Ошибка при запуске сервера:', error);
-    process.exit(1);
+const initializeApp = async (): Promise<void> => {
+  if (!isInitialized) {
+    try {
+      await AppDataSource.initialize();
+      console.log('✅ База данных подключена');
+      isInitialized = true;
+    } catch (error) {
+      console.error('❌ Ошибка при подключении к базе данных:', error);
+    }
   }
 };
 
-startServer();
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM получен, закрытие соединений...');
-  await AppDataSource.destroy();
-  process.exit(0);
+// Initialize on first request (for Vercel)
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  await initializeApp();
+  next();
 });
+
+// Export app for Vercel (serverless)
+export default app;
+
+// For local development, start server
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  const startServer = async (): Promise<void> => {
+    try {
+      await AppDataSource.initialize();
+      console.log('✅ База данных подключена');
+
+      app.listen(config.port, () => {
+        console.log(`🚀 Сервер запущен на порту ${config.port}`);
+        console.log(`📝 API доступен по адресу http://localhost:${config.port}/api`);
+      });
+    } catch (error) {
+      console.error('❌ Ошибка при запуске сервера:', error);
+      process.exit(1);
+    }
+  };
+
+  startServer();
+
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM получен, закрытие соединений...');
+    await AppDataSource.destroy();
+    process.exit(0);
+  });
+}
 
 
 
