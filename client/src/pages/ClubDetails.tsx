@@ -5,6 +5,7 @@ import { Club, Berth, Vessel } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
 import { MapPin, Phone, Mail, Globe, Anchor, Edit2, X, Plus, Trash2, Calendar, UserPlus, ShieldCheck } from 'lucide-react'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export default function ClubDetails() {
   const { id } = useParams<{ id: string }>()
@@ -470,7 +471,7 @@ export default function ClubDetails() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка деталей клуба..." />
   }
 
   if (!club) {

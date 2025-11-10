@@ -6,6 +6,7 @@ import { Ship, Plus, Trash2, Search, Download, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export default function Vessels() {
   const { user } = useAuth()
@@ -237,7 +238,7 @@ export default function Vessels() {
   })
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка судов..." />
   }
 
   return (

@@ -6,6 +6,7 @@ import { Anchor, MapPin, Phone, Mail, Globe, Plus, Trash2, Download, X, EyeOff, 
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 // Компонент для подсчета свободных мест с учетом бронирований
 function FreeBerthsCount({ club, user }: { club: Club; user: any }) {
@@ -459,7 +460,7 @@ export default function Clubs() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка клубов..." />
   }
 
   return (

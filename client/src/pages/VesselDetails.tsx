@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
 import { Ship, ArrowLeft, User as UserIcon, Calendar, FileText, Edit2, X, Save, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export default function VesselDetails() {
   const { id } = useParams<{ id: string }>()
@@ -149,12 +150,7 @@ export default function VesselDetails() {
   }
 
   if (loading) {
-    return (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Загрузка...</p>
-      </div>
-    )
+    return <LoadingAnimation message="Загрузка данных судна..." />
   }
 
   if (error || !vessel) {

@@ -3,6 +3,7 @@ import { paymentsService } from '../services/api'
 import { Payment } from '../types'
 import { CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export default function Payments() {
   const [payments, setPayments] = useState<Payment[]>([])
@@ -47,7 +48,7 @@ export default function Payments() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка платежей..." />
   }
 
   return (

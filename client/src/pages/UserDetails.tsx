@@ -5,6 +5,7 @@ import { User, UserRole, Club } from '../types'
 import { Users, ArrowLeft, Ship, Anchor, Edit2, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export default function UserDetails() {
   const { id } = useParams<{ id: string }>()
@@ -179,12 +180,7 @@ export default function UserDetails() {
 
 
   if (loading) {
-    return (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Загрузка...</p>
-      </div>
-    )
+    return <LoadingAnimation message="Загрузка данных пользователя..." />
   }
 
   if (error || !user) {

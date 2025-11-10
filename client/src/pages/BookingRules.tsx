@@ -3,6 +3,7 @@ import { clubsService, tariffsService, bookingRulesService } from '../services/a
 import { Club, Tariff } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { Anchor, Save, X, Plus, Trash2, Edit2 } from 'lucide-react'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export enum BookingRuleType {
   REQUIRE_PAYMENT_MONTHS = 'require_payment_months',
@@ -258,11 +259,7 @@ export default function BookingRules() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Загрузка...</div>
-      </div>
-    )
+    return <LoadingAnimation message="Загрузка правил бронирования..." />
   }
 
   if (clubs.length === 0) {

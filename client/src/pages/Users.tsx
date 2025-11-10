@@ -6,6 +6,7 @@ import { Users, Edit2, X, Plus, Trash2, Search, Ship, Download, ArrowUp, ArrowDo
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import * as XLSX from 'xlsx'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 interface UserData {
   id: number
@@ -447,7 +448,7 @@ export default function UsersPage() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка пользователей..." />
   }
 
   return (

@@ -4,6 +4,7 @@ import { clubsService, berthsService, tariffsService } from '../services/api'
 import { Club, Berth, Tariff, TariffType } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { Anchor, Edit2, Save, X, Plus, Trash2, CheckSquare, Square } from 'lucide-react'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export default function Tariffs() {
   const { user } = useAuth()
@@ -225,7 +226,7 @@ export default function Tariffs() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка тарифов..." />
   }
 
   if (clubs.length === 0) {

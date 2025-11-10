@@ -5,6 +5,7 @@ import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X } from 'lu
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useAuth } from '../contexts/AuthContext'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export default function Bookings() {
   const { user } = useAuth()
@@ -93,7 +94,7 @@ export default function Bookings() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка бронирований..." />
   }
 
   return (

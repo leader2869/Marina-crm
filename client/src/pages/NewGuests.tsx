@@ -3,6 +3,7 @@ import { usersService } from '../services/api'
 import { UserCheck, Phone, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 interface GuestData {
   id: number
@@ -36,7 +37,7 @@ export default function NewGuests() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка гостей..." />
   }
 
   return (

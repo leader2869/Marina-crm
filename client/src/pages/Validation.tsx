@@ -5,6 +5,7 @@ import { User, UserRole, Club } from '../types'
 import { CheckCircle, XCircle, User as UserIcon, Phone, Mail, Calendar, ArrowLeft, Anchor } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 interface PendingUser {
   id: number
@@ -175,7 +176,7 @@ export default function Validation() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка данных для валидации..." />
   }
 
   const totalPending = users.length + clubs.length

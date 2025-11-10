@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { clubsService, bookingsService, vesselsService } from '../services/api'
 import { UserRole } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
+import { LoadingAnimation } from '../components/LoadingAnimation'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -83,7 +84,7 @@ export default function Dashboard() {
   ]
 
   if (loading) {
-    return <div className="text-center py-12">Загрузка...</div>
+    return <LoadingAnimation message="Загрузка данных..." />
   }
 
   return (
