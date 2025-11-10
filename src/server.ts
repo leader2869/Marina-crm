@@ -85,7 +85,10 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', (req, res, next) => {
+  console.log(`[Auth Route] ${req.method} ${req.path}`, { originalUrl: req.originalUrl });
+  next();
+}, authRoutes);
 app.use('/api/clubs', clubsRoutes);
 app.use('/api/vessels', vesselsRoutes);
 app.use('/api/bookings', bookingsRoutes);
