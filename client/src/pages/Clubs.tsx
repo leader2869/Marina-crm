@@ -274,6 +274,26 @@ export default function Clubs() {
     }
   }
 
+  const handlePublish = async (clubId: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!confirm('Вы уверены, что хотите опубликовать этот яхт-клуб? Клуб будет виден всем пользователям.')) return
+
+    try {
+      await clubsService.update(clubId, { 
+        isSubmittedForValidation: true,
+        isValidated: true,
+        isActive: true,
+        rejectionComment: null
+      })
+      await loadClubs()
+      alert('Яхт-клуб успешно опубликован')
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка публикации яхт-клуба')
+    }
+  }
+
   const handleUnpublish = async (clubId: number, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -691,6 +711,20 @@ export default function Clubs() {
                   >
                     <ShieldCheck className="h-4 w-4 mr-2" />
                     {club.rejectionComment ? 'Повторно отправить на проверку' : 'Опубликовать'}
+                  </button>
+                )}
+                {/* Кнопка "Опубликовать" для суперадминистратора, если клуб скрыт (снят с публикации) */}
+                {isSuperAdmin && club.isActive === false && (club.isSubmittedForValidation === false || club.isValidated === false) && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handlePublish(club.id, e)
+                    }}
+                    className="mt-3 w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    Опубликовать
                   </button>
                 )}
                 {/* Кнопка "Снять с публикации" для владельца клуба и суперадминистратора, если клуб опубликован */}
