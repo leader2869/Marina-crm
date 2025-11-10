@@ -70,18 +70,34 @@ if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
 // Initialize on first request (for Vercel) - ДО маршрутов!
 app.use(async (req: Request, res: Response, next: NextFunction) => {
   console.log(`[DB Init] ${req.method} ${req.url} - инициализация БД`);
+  
+  // Проверяем наличие переменных окружения
+  const hasDatabaseUrl = !!process.env.DATABASE_URL;
+  const hasDbConfig = !!(process.env.DB_HOST && process.env.DB_PASSWORD);
+  
+  if (!hasDatabaseUrl && !hasDbConfig) {
+    console.error(`[DB Init] ❌ Переменные окружения не настроены!`);
+    console.error(`[DB Init] Нужно установить DATABASE_URL или DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD`);
+    return res.status(503).json({ 
+      error: 'Сервис временно недоступен',
+      message: 'База данных не настроена',
+      details: 'Проверьте переменные окружения в Vercel Dashboard. См. VERCEL_DATABASE_SETUP.md'
+    });
+  }
+  
   try {
     await initializeApp();
     if (initializationError) {
-      console.error(`[DB Init] Ошибка инициализации БД:`, initializationError.message);
+      console.error(`[DB Init] ❌ Ошибка инициализации БД:`, initializationError.message);
+      console.error(`[DB Init] Проверьте: 1) Переменные окружения, 2) Connection string, 3) Пароль, 4) Статус проекта Supabase`);
       // Если есть ошибка инициализации, возвращаем 503 вместо 500
       return res.status(503).json({ 
         error: 'Сервис временно недоступен',
         message: 'База данных не подключена',
-        details: process.env.NODE_ENV === 'development' ? initializationError.message : undefined
+        details: process.env.NODE_ENV === 'development' ? initializationError.message : 'Проверьте логи в Vercel Dashboard. См. VERCEL_DATABASE_SETUP.md'
       });
     }
-    console.log(`[DB Init] БД инициализирована, продолжаем запрос`);
+    console.log(`[DB Init] ✅ БД инициализирована, продолжаем запрос`);
     next();
   } catch (error: any) {
     console.error('❌ Ошибка при инициализации:', error);
