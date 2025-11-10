@@ -291,6 +291,12 @@ export default function Clubs() {
   const canManageClubs = isSuperAdmin || isAdmin || isClubOwner || isPendingValidation
 
   const handleOpenAdd = () => {
+    // Проверяем роль Guest
+    if (user?.role === UserRole.GUEST) {
+      alert('Для добавления яхт-клуба необходимо зарегистрироваться. Пожалуйста, зарегистрируйтесь как владелец яхт-клуба.')
+      return
+    }
+    
     setShowAddModal(true)
     setAddForm({
       name: '',

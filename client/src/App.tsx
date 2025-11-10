@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { RoleProtectedRoute } from './components/RoleProtectedRoute'
 import Layout from './components/Layout'
@@ -21,6 +21,44 @@ import NewGuests from './pages/NewGuests'
 import Validation from './pages/Validation'
 import { UserRole } from './types'
 
+// Компонент для редиректа на начальную страницу в зависимости от роли
+function NavigateToDefault() {
+  const { user, loading } = useAuth()
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    )
+  }
+  
+  if (user?.role === UserRole.GUEST) {
+    return <Navigate to="/clubs" replace />
+  }
+  
+  return <Navigate to="/dashboard" replace />
+}
+
+// Компонент для редиректа с dashboard на clubs для Guest
+function DashboardRedirect() {
+  const { user, loading } = useAuth()
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    )
+  }
+  
+  if (user?.role === UserRole.GUEST) {
+    return <Navigate to="/clubs" replace />
+  }
+  
+  return <Dashboard />
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -36,8 +74,8 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
+            <Route index element={<NavigateToDefault />} />
+            <Route path="dashboard" element={<DashboardRedirect />} />
             <Route path="clubs" element={<Clubs />} />
             <Route path="clubs/:id" element={<ClubDetails />} />
             <Route path="vessels" element={<Vessels />} />

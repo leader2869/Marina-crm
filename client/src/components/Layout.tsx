@@ -17,7 +17,10 @@ import {
   UserCheck,
   ShieldCheck,
   Receipt,
-  FileText
+  FileText,
+  Edit2,
+  Check,
+  X as XIcon
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -27,6 +30,14 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [newGuestsCount, setNewGuestsCount] = useState(0)
   const [pendingValidationCount, setPendingValidationCount] = useState(0)
+  // Загружаем сохраненную дату из localStorage или используем текущую
+  const [currentDate, setCurrentDate] = useState(() => {
+    const savedDate = localStorage.getItem('superAdminDate')
+    return savedDate ? new Date(savedDate) : new Date()
+  })
+  const [isEditingDate, setIsEditingDate] = useState(false)
+  const [dateInput, setDateInput] = useState('')
+  const [timeInput, setTimeInput] = useState('')
 
   // Определяем доступные пункты меню в зависимости от роли
   const navigation = useMemo(() => {
@@ -73,6 +84,25 @@ export default function Layout() {
       }
       return hasAccess
     })
+    
+    // Для владельца яхт-клуба сортируем пункты меню в нужном порядке
+    if (userRole === UserRole.CLUB_OWNER || String(userRole) === 'club_owner') {
+      const clubOwnerOrder: { [key: string]: number } = {
+        '/dashboard': 1,
+        '/clubs': 2,
+        '/tariffs': 3,
+        '/booking-rules': 4,
+        '/bookings': 5,
+        '/finances': 6,
+        '/payments': 7,
+      }
+      
+      filteredItems.sort((a, b) => {
+        const orderA = clubOwnerOrder[a.href] || 999
+        const orderB = clubOwnerOrder[b.href] || 999
+        return orderA - orderB
+      })
+    }
     
     console.log('Filtered items count:', filteredItems.length, 'Items:', filteredItems.map(i => i.name))
     console.log('=== End Debug ===')
@@ -169,6 +199,34 @@ export default function Layout() {
       setPendingValidationCount(0)
     }
   }, [location.pathname, user])
+
+  // Функция для начала редактирования даты
+  const handleStartEditDate = () => {
+    if (user?.role === UserRole.SUPER_ADMIN) {
+      const dateStr = currentDate.toISOString().split('T')[0]
+      const timeStr = currentDate.toTimeString().slice(0, 5)
+      setDateInput(dateStr)
+      setTimeInput(timeStr)
+      setIsEditingDate(true)
+    }
+  }
+
+  // Функция для сохранения даты
+  const handleSaveDate = () => {
+    if (dateInput && timeInput) {
+      const newDate = new Date(`${dateInput}T${timeInput}`)
+      setCurrentDate(newDate)
+      localStorage.setItem('superAdminDate', newDate.toISOString())
+      setIsEditingDate(false)
+    }
+  }
+
+  // Функция для отмены редактирования
+  const handleCancelEditDate = () => {
+    setIsEditingDate(false)
+    setDateInput('')
+    setTimeInput('')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -296,6 +354,63 @@ export default function Layout() {
                   {user?.role === UserRole.SUPER_ADMIN && 'Супер-администратор'}
                   {user?.role === UserRole.PENDING_VALIDATION && 'Ожидает валидации'}
                 </p>
+                {user?.role === UserRole.SUPER_ADMIN && (
+                  <div className="mt-1">
+                    {isEditingDate ? (
+                      <div className="space-y-1">
+                        <div className="flex gap-1">
+                          <input
+                            type="date"
+                            value={dateInput}
+                            onChange={(e) => setDateInput(e.target.value)}
+                            className="text-xs px-2 py-1 border border-gray-300 rounded text-gray-900"
+                          />
+                          <input
+                            type="time"
+                            value={timeInput}
+                            onChange={(e) => setTimeInput(e.target.value)}
+                            className="text-xs px-2 py-1 border border-gray-300 rounded text-gray-900"
+                          />
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={handleSaveDate}
+                            className="flex items-center justify-center px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                            title="Сохранить"
+                          >
+                            <Check className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={handleCancelEditDate}
+                            className="flex items-center justify-center px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
+                            title="Отмена"
+                          >
+                            <XIcon className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs text-gray-500">
+                          {currentDate.toLocaleString('ru-RU', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        <button
+                          onClick={handleStartEditDate}
+                          className="p-0.5 text-gray-400 hover:text-gray-600"
+                          title="Изменить дату и время"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <button

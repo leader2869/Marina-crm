@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { clubsService, bookingsService, financesService, vesselsService } from '../services/api'
+import { clubsService, bookingsService, vesselsService } from '../services/api'
 import { UserRole } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 
@@ -27,15 +27,15 @@ export default function Dashboard() {
         let vesselsCount = 0
         if (user?.role === UserRole.SUPER_ADMIN) {
           const vesselsRes = await vesselsService.getAll({ limit: 1 })
-          vesselsCount = vesselsRes.total || 0
+          vesselsCount = (vesselsRes as any)?.data?.total || (vesselsRes as any)?.total || 0
         } else {
           vesselsCount = user?.vessels?.length || 0
         }
 
         setStats({
-          clubs: clubsRes.total || 0,
+          clubs: (clubsRes as any)?.data?.total || (clubsRes as any)?.total || 0,
           vessels: vesselsCount,
-          bookings: bookingsRes.total || 0,
+          bookings: (bookingsRes as any)?.data?.total || (bookingsRes as any)?.total || 0,
           totalIncome: 0,
           totalExpense: 0,
         })
@@ -55,12 +55,13 @@ export default function Dashboard() {
       icon: Anchor,
       color: 'bg-blue-500',
     },
-    {
+    // Судна не показываем для владельца яхт-клуба
+    ...(user?.role !== UserRole.CLUB_OWNER ? [{
       name: 'Судна',
       value: stats.vessels,
       icon: Ship,
       color: 'bg-green-500',
-    },
+    }] : []),
     {
       name: 'Брони',
       value: stats.bookings,
@@ -123,13 +124,16 @@ export default function Dashboard() {
             <Anchor className="h-6 w-6 text-primary-600 mb-2" />
             <p className="font-medium text-gray-900">Управление клубами</p>
           </a>
-          <a
-            href="/vessels"
-            className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Ship className="h-6 w-6 text-primary-600 mb-2" />
-            <p className="font-medium text-gray-900">Мои суда</p>
-          </a>
+          {/* Мои суда не показываем для владельца яхт-клуба */}
+          {user?.role !== UserRole.CLUB_OWNER && (
+            <a
+              href="/vessels"
+              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Ship className="h-6 w-6 text-primary-600 mb-2" />
+              <p className="font-medium text-gray-900">Мои суда</p>
+            </a>
+          )}
           <a
             href="/bookings"
             className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"

@@ -57,6 +57,12 @@ export default function Vessels() {
   }
 
   const handleOpenAdd = () => {
+    // Проверяем роль Guest
+    if (user?.role === UserRole.GUEST) {
+      alert('Для добавления судна необходимо зарегистрироваться. Пожалуйста, зарегистрируйтесь как судовладелец.')
+      return
+    }
+    
     setShowAddModal(true)
     setAddForm({
       name: '',
