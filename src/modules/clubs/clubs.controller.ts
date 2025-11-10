@@ -479,8 +479,20 @@ export class ClubsController {
         throw new AppError('Яхт-клуб не найден', 404);
       }
 
-      // Проверка прав доступа - только супер-администратор может скрывать клубы
-      if (req.userRole !== UserRole.SUPER_ADMIN) {
+      // Проверка прав доступа - супер-администратор или владелец клуба может скрывать клубы
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+      
+      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === 'super_admin';
+      const isClubOwner = req.userRole === UserRole.CLUB_OWNER || req.userRole === 'club_owner';
+      // Сравниваем с учетом возможных различий в типах (число vs строка)
+      const isOwnerOfClub = club.ownerId === req.userId || club.ownerId === parseInt(req.userId.toString()) || parseInt(club.ownerId.toString()) === req.userId;
+      
+      console.log('Hide club - userRole:', req.userRole, 'userId:', req.userId, 'club.ownerId:', club.ownerId);
+      console.log('Hide club - isSuperAdmin:', isSuperAdmin, 'isClubOwner:', isClubOwner, 'isOwnerOfClub:', isOwnerOfClub);
+      
+      if (!isSuperAdmin && (!isClubOwner || !isOwnerOfClub)) {
         throw new AppError('Недостаточно прав для скрытия клуба', 403);
       }
 
@@ -503,19 +515,27 @@ export class ClubsController {
           throw new AppError('Яхт-клуб не найден в транзакции', 404);
         }
 
-        // Удаляем все связи многие-ко-многим (user_clubs)
-        await userClubRepository.delete({ clubId: clubId });
-        console.log('Удалены связи user_clubs для клуба:', clubId);
+        // Если скрывает суперадминистратор, удаляем все связи
+        // Если скрывает владелец клуба (снятие с публикации), связи остаются
+        const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
+        
+        if (isSuperAdmin) {
+          // Удаляем все связи многие-ко-многим (user_clubs)
+          await userClubRepository.delete({ clubId: clubId });
+          console.log('Удалены связи user_clubs для клуба:', clubId);
 
-        // Обновляем пользователей, у которых этот клуб был установлен как managedClub
-        const updateResult = await userRepository.update(
-          { managedClubId: clubId },
-          { managedClubId: null }
-        );
-        console.log('Обновлено пользователей с managedClubId:', updateResult.affected || 0);
+          // Обновляем пользователей, у которых этот клуб был установлен как managedClub
+          const updateResult = await userRepository.update(
+            { managedClubId: clubId },
+            { managedClubId: null }
+          );
+          console.log('Обновлено пользователей с managedClubId:', updateResult.affected || 0);
+        }
 
-        // Устанавливаем клуб как неактивный
+        // Устанавливаем клуб как неактивный и сбрасываем статус публикации
         clubInTransaction.isActive = false;
+        clubInTransaction.isValidated = false;
+        clubInTransaction.isSubmittedForValidation = false;
         const savedClub = await clubRepositoryTransaction.save(clubInTransaction);
         console.log('Клуб скрыт (isActive = false), ID:', savedClub.id, 'isActive:', savedClub.isActive);
         
@@ -528,7 +548,10 @@ export class ClubsController {
 
         // Коммитим транзакцию
         await queryRunner.commitTransaction();
-        res.json({ message: 'Яхт-клуб успешно скрыт. Все связи оборваны.' });
+        const message = isSuperAdmin 
+          ? 'Яхт-клуб успешно скрыт. Все связи оборваны.' 
+          : 'Яхт-клуб успешно снят с публикации. Клуб попал в скрытые яхт-клубы. Все связи остались.';
+        res.json({ message });
       } catch (error: any) {
         // Откатываем транзакцию в случае ошибки
         try {

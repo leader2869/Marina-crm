@@ -43,6 +43,18 @@ export class Vessel {
   @Column({ nullable: true })
   photo: string;
 
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Column({ default: false })
+  isValidated: boolean; // валидировано ли судно суперадминистратором
+
+  @Column({ default: false })
+  isSubmittedForValidation: boolean; // отправлено ли судно на валидацию владельцем
+
+  @Column({ type: 'text', nullable: true })
+  rejectionComment: string | null; // комментарий об отказе в валидации
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -278,25 +278,22 @@ export default function Clubs() {
     e.preventDefault()
     e.stopPropagation()
     
-    if (!confirm('Вы уверены, что хотите снять этот яхт-клуб с публикации? Клуб получит статус "Не опубликован" и попадет в скрытые яхт-клубы. Все связи останутся.')) return
+    if (!confirm('Вы уверены, что хотите снять этот яхт-клуб с публикации? Клуб попадет в скрытые яхт-клубы. Все связи останутся.')) return
 
     try {
-      await clubsService.update(clubId, { 
-        isValidated: false,
-        isSubmittedForValidation: false,
-        isActive: false
-      })
+      // Используем метод hide для скрытия клуба
+      await clubsService.hide(clubId)
       await loadClubs()
-      alert('Яхт-клуб успешно снят с публикации. Клуб получил статус "Не опубликован" и попал в скрытые яхт-клубы.')
+      alert('Яхт-клуб успешно снят с публикации. Клуб попал в скрытые яхт-клубы.')
     } catch (err: any) {
       alert(err.error || err.message || 'Ошибка снятия с публикации')
     }
   }
 
-  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
-  const isAdmin = user?.role === UserRole.ADMIN
-  const isClubOwner = user?.role === UserRole.CLUB_OWNER
-  const isPendingValidation = user?.role === UserRole.PENDING_VALIDATION
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN || user?.role === 'super_admin'
+  const isAdmin = user?.role === UserRole.ADMIN || user?.role === 'admin'
+  const isClubOwner = user?.role === UserRole.CLUB_OWNER || user?.role === 'club_owner'
+  const isPendingValidation = user?.role === UserRole.PENDING_VALIDATION || user?.role === 'pending_validation'
   const canManageClubs = isSuperAdmin || isAdmin || isClubOwner || isPendingValidation
 
   const handleOpenAdd = () => {
@@ -560,23 +557,29 @@ export default function Clubs() {
                   </h3>
                   {/* Статус публикации отображается только для суперадминистратора, администратора и владельца клуба */}
                   {(isSuperAdmin || isAdmin || (isClubOwner && club.ownerId === user?.id)) && (
-                    <div className="mt-2 ml-6">
+                    <div className="mt-2 flex justify-center">
                       {club.rejectionComment && (
                         <span className="text-xs bg-red-600 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
                           Отказано в публикации
                         </span>
                       )}
-                      {!club.rejectionComment && club.isSubmittedForValidation === false && (
+                      {/* Если клуб скрыт, показываем статус "Не опубликован" */}
+                      {!club.rejectionComment && club.isActive === false && (
                         <span className="text-xs bg-red-500 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
                           Не опубликован
                         </span>
                       )}
-                      {!club.rejectionComment && club.isSubmittedForValidation === true && club.isValidated === false && (
+                      {!club.rejectionComment && club.isActive !== false && club.isSubmittedForValidation === false && (
+                        <span className="text-xs bg-red-500 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
+                          Не опубликован
+                        </span>
+                      )}
+                      {!club.rejectionComment && club.isActive !== false && club.isSubmittedForValidation === true && club.isValidated === false && (
                         <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
                           Ожидает валидации
                         </span>
                       )}
-                      {!club.rejectionComment && club.isSubmittedForValidation === true && club.isValidated === true && (
+                      {!club.rejectionComment && club.isActive !== false && club.isSubmittedForValidation === true && club.isValidated === true && (
                         <span className="text-xs bg-purple-500 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
                           Опубликован
                         </span>
@@ -590,9 +593,9 @@ export default function Clubs() {
                       <p className="text-sm text-red-700">{club.rejectionComment}</p>
                     </div>
                   )}
-                  <div className="mt-2 min-h-[40px] flex items-center">
+                  <div className="mt-2 min-h-[40px] flex items-center justify-center">
                     {club.season ? (
-                      <div className="text-xl font-semibold text-white bg-green-500 px-3 py-1 rounded inline-block ml-2">
+                      <div className="text-xl font-semibold text-white bg-green-500 px-3 py-1 rounded inline-block">
                         Сезон: {club.season}
                       </div>
                     ) : (
@@ -615,7 +618,7 @@ export default function Clubs() {
                         <ShieldCheck className="h-5 w-5" />
                       </button>
                     )}
-                    {club.isActive === false ? (
+                    {club.isActive === false && (
                       <button
                         onClick={(e) => handleRestore(club.id, e)}
                         disabled={restoring || deleting || hiding}
@@ -623,15 +626,6 @@ export default function Clubs() {
                         title="Восстановить клуб"
                       >
                         <Eye className="h-5 w-5" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={(e) => handleHide(club.id, e)}
-                        disabled={hiding || deleting || restoring}
-                        className="p-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded disabled:opacity-50"
-                        title="Скрыть клуб"
-                      >
-                        <EyeOff className="h-5 w-5" />
                       </button>
                     )}
                     <button
@@ -707,7 +701,7 @@ export default function Clubs() {
                       e.stopPropagation()
                       handleUnpublish(club.id, e)
                     }}
-                    className="mt-3 w-full flex items-center justify-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+                    className="mt-3 w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                   >
                     <X className="h-4 w-4 mr-2" />
                     Снять с публикации

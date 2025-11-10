@@ -293,14 +293,25 @@ export default function Vessels() {
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredVessels.map((vessel) => (
-          <div key={vessel.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 relative">
+          <div key={vessel.id} className={`bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 relative ${
+            vessel.isActive === false ? 'opacity-60 border-2 border-gray-300' : ''
+          }`}>
             <div className="flex items-start justify-between mb-4">
               <Link
                 to={`/vessels/${vessel.id}`}
                 className="flex items-center flex-1 hover:text-primary-600 transition-colors"
               >
                 <Ship className="h-8 w-8 text-primary-600 mr-3" />
-                <h3 className="text-xl font-semibold text-gray-900">{vessel.name}</h3>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {vessel.name}
+                    {vessel.isActive === false && (
+                      <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
+                        Скрыт
+                      </span>
+                    )}
+                  </h3>
+                </div>
               </Link>
               {isSuperAdmin && (
                 <button

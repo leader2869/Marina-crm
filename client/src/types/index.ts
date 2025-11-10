@@ -131,6 +131,10 @@ export interface Vessel {
   photo?: string
   ownerId: number
   owner?: User
+  isActive?: boolean
+  isValidated?: boolean
+  isSubmittedForValidation?: boolean
+  rejectionComment?: string | null
   createdAt: string
   updatedAt: string
 }

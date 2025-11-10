@@ -163,6 +163,27 @@ export class VesselsController {
 
       // Обновление остальных полей (исключая ownerId, который обработан выше)
       const { ownerId, technicalSpecs, ...otherFields } = req.body;
+      
+      // Проверка: если судно скрыто, то оно не может быть опубликовано
+      if (vessel.isActive === false) {
+        // Если судно скрыто, сбрасываем статус публикации
+        if (otherFields.isValidated !== undefined && otherFields.isValidated === true) {
+          throw new AppError('Скрытое судно не может быть опубликовано. Сначала восстановите судно.', 400);
+        }
+        if (otherFields.isSubmittedForValidation !== undefined && otherFields.isSubmittedForValidation === true) {
+          throw new AppError('Скрытое судно не может быть отправлено на валидацию. Сначала восстановите судно.', 400);
+        }
+        // Если судно скрыто, автоматически сбрасываем статус публикации
+        vessel.isValidated = false;
+        vessel.isSubmittedForValidation = false;
+      }
+      
+      // Если судно скрывается (isActive становится false), сбрасываем статус публикации
+      if (otherFields.isActive !== undefined && otherFields.isActive === false && vessel.isActive === true) {
+        vessel.isValidated = false;
+        vessel.isSubmittedForValidation = false;
+      }
+      
       Object.assign(vessel, otherFields);
 
       if (req.body.technicalSpecs) {
@@ -206,6 +227,80 @@ export class VesselsController {
       await vesselRepository.remove(vessel);
 
       res.json({ message: 'Судно удалено' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async hide(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const vesselId = parseInt(id);
+
+      if (isNaN(vesselId)) {
+        throw new AppError('Неверный ID судна', 400);
+      }
+
+      const vesselRepository = AppDataSource.getRepository(Vessel);
+      const vessel = await vesselRepository.findOne({
+        where: { id: vesselId },
+      });
+
+      if (!vessel) {
+        throw new AppError('Судно не найдено', 404);
+      }
+
+      // Проверка прав доступа - только владелец или супер-администратор может скрывать суда
+      if (
+        vessel.ownerId !== req.userId &&
+        req.userRole !== 'super_admin'
+      ) {
+        throw new AppError('Недостаточно прав для скрытия судна', 403);
+      }
+
+      // Устанавливаем судно как неактивное и сбрасываем статус публикации
+      vessel.isActive = false;
+      vessel.isValidated = false;
+      vessel.isSubmittedForValidation = false;
+      await vesselRepository.save(vessel);
+
+      res.json({ message: 'Судно успешно скрыто. Статус публикации сброшен.' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restore(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const vesselId = parseInt(id);
+
+      if (isNaN(vesselId)) {
+        throw new AppError('Неверный ID судна', 400);
+      }
+
+      const vesselRepository = AppDataSource.getRepository(Vessel);
+      const vessel = await vesselRepository.findOne({
+        where: { id: vesselId },
+      });
+
+      if (!vessel) {
+        throw new AppError('Судно не найдено', 404);
+      }
+
+      // Проверка прав доступа - только владелец или супер-администратор может восстанавливать суда
+      if (
+        vessel.ownerId !== req.userId &&
+        req.userRole !== 'super_admin'
+      ) {
+        throw new AppError('Недостаточно прав для восстановления судна', 403);
+      }
+
+      // Устанавливаем судно как активное
+      vessel.isActive = true;
+      await vesselRepository.save(vessel);
+
+      res.json({ message: 'Судно успешно восстановлено' });
     } catch (error) {
       next(error);
     }
