@@ -353,10 +353,12 @@ export class ClubsController {
       }
 
       // Проверка прав доступа - владелец клуба может редактировать свой клуб
+      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === 'super_admin';
+      const isAdmin = req.userRole === UserRole.ADMIN || req.userRole === 'admin';
       if (
         club.ownerId !== req.userId &&
-        req.userRole !== UserRole.SUPER_ADMIN &&
-        req.userRole !== UserRole.ADMIN
+        !isSuperAdmin &&
+        !isAdmin
       ) {
         throw new AppError('Недостаточно прав для редактирования', 403);
       }
@@ -394,11 +396,19 @@ export class ClubsController {
         club.bookingRulesText = bookingRulesText || null;
       }
       // Только суперадмин может изменять isValidated и rejectionComment
-      if (req.userRole === UserRole.SUPER_ADMIN && req.body.isValidated !== undefined) {
+      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === 'super_admin';
+      if (isSuperAdmin && req.body.isValidated !== undefined) {
         club.isValidated = req.body.isValidated === true || req.body.isValidated === 'true';
       }
-      if (req.userRole === UserRole.SUPER_ADMIN && req.body.rejectionComment !== undefined) {
+      if (isSuperAdmin && req.body.rejectionComment !== undefined) {
         club.rejectionComment = req.body.rejectionComment || null;
+      }
+      // Суперадмин может устанавливать isSubmittedForValidation и isActive
+      if (isSuperAdmin && req.body.isSubmittedForValidation !== undefined) {
+        club.isSubmittedForValidation = req.body.isSubmittedForValidation === true || req.body.isSubmittedForValidation === 'true';
+      }
+      if (isSuperAdmin && req.body.isActive !== undefined) {
+        club.isActive = req.body.isActive === true || req.body.isActive === 'true';
       }
       // Владелец клуба может отправлять клуб на валидацию
       if (req.userRole === UserRole.CLUB_OWNER && req.userId === club.ownerId && req.body.isSubmittedForValidation !== undefined) {
@@ -413,8 +423,8 @@ export class ClubsController {
           }
         }
       }
-      // Владелец клуба и суперадмин могут снимать клуб с публикации (устанавливать isActive = false)
-      if ((req.userRole === UserRole.SUPER_ADMIN || (req.userRole === UserRole.CLUB_OWNER && req.userId === club.ownerId)) && req.body.isActive !== undefined) {
+      // Владелец клуба может снимать клуб с публикации (устанавливать isActive = false)
+      if (req.userRole === UserRole.CLUB_OWNER && req.userId === club.ownerId && req.body.isActive !== undefined) {
         club.isActive = req.body.isActive === true || req.body.isActive === 'true';
       }
 
