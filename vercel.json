@@ -1,0 +1,23 @@
+{
+  "buildCommand": "",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "src/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ]
+}
+

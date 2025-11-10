@@ -1,0 +1,118 @@
+# Пример конфигурации Nginx для Marina CRM
+# Скопируйте этот файл в /etc/nginx/sites-available/marina-crm
+# и настройте под ваш домен
+
+# Backend API (api.yourdomain.com)
+server {
+    listen 80;
+    server_name api.yourdomain.com;
+
+    # Редирект на HTTPS (после установки SSL)
+    # return 301 https://$server_name$request_uri;
+
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Таймауты
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+
+# Frontend (yourdomain.com)
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+
+    # Редирект на HTTPS (после установки SSL)
+    # return 301 https://$server_name$request_uri;
+
+    root /var/www/marina-crm/client/dist;
+    index index.html;
+
+    # Логи
+    access_log /var/log/nginx/marina-crm-access.log;
+    error_log /var/log/nginx/marina-crm-error.log;
+
+    # Основная локация
+    location / {
+        try_files $uri $uri/ /index.html;
+        
+        # Заголовки безопасности
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+    }
+
+    # Кеширование статических файлов
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # Сжатие
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json application/javascript;
+}
+
+# HTTPS конфигурация (после установки SSL)
+# Раскомментируйте после получения SSL сертификата
+
+# server {
+#     listen 443 ssl http2;
+#     server_name api.yourdomain.com;
+#
+#     ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers HIGH:!aNULL:!MD5;
+#     ssl_prefer_server_ciphers on;
+#
+#     location / {
+#         proxy_pass http://localhost:3001;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection 'upgrade';
+#         proxy_set_header Host $host;
+#         proxy_cache_bypass $http_upgrade;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#     }
+# }
+#
+# server {
+#     listen 443 ssl http2;
+#     server_name yourdomain.com www.yourdomain.com;
+#
+#     ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers HIGH:!aNULL:!MD5;
+#     ssl_prefer_server_ciphers on;
+#
+#     root /var/www/marina-crm/client/dist;
+#     index index.html;
+#
+#     location / {
+#         try_files $uri $uri/ /index.html;
+#     }
+#
+#     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+#         expires 1y;
+#         add_header Cache-Control "public, immutable";
+#     }
+# }
+
