@@ -23,12 +23,25 @@ let isInitialized = false;
 let initializationError: Error | null = null;
 
 const initializeApp = async (): Promise<void> => {
+  // Проверяем, не инициализирована ли уже БД
+  if (AppDataSource.isInitialized) {
+    console.log('✅ База данных уже подключена');
+    isInitialized = true;
+    return;
+  }
+  
   if (!isInitialized && !initializationError) {
     try {
       await AppDataSource.initialize();
       console.log('✅ База данных подключена');
       isInitialized = true;
     } catch (error: any) {
+      // Проверяем, не связана ли ошибка с тем, что БД уже подключена
+      if (error.message && error.message.includes('already established')) {
+        console.log('✅ База данных уже подключена (обнаружено существующее соединение)');
+        isInitialized = true;
+        return;
+      }
       console.error('❌ Ошибка при подключении к базе данных:', error);
       initializationError = error;
       // Не блокируем запуск приложения, но логируем ошибку
