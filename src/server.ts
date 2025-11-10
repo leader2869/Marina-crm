@@ -53,27 +53,52 @@ app.use((req: Request, res: Response) => {
 
 // Инициализация базы данных
 let isInitialized = false;
+let initializationError: Error | null = null;
 
 const initializeApp = async (): Promise<void> => {
-  if (!isInitialized) {
+  if (!isInitialized && !initializationError) {
     try {
       await AppDataSource.initialize();
       console.log('✅ База данных подключена');
       isInitialized = true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Ошибка при подключении к базе данных:', error);
+      initializationError = error;
+      // Не блокируем запуск приложения, но логируем ошибку
     }
   }
 };
 
 // Initialize on first request (for Vercel)
 app.use(async (req: Request, res: Response, next: NextFunction) => {
-  await initializeApp();
-  next();
+  try {
+    await initializeApp();
+    if (initializationError) {
+      // Если есть ошибка инициализации, возвращаем 503 вместо 500
+      return res.status(503).json({ 
+        error: 'Сервис временно недоступен',
+        message: 'База данных не подключена',
+        details: process.env.NODE_ENV === 'development' ? initializationError.message : undefined
+      });
+    }
+    next();
+  } catch (error: any) {
+    console.error('❌ Ошибка при инициализации:', error);
+    return res.status(503).json({ 
+      error: 'Сервис временно недоступен',
+      message: error.message
+    });
+  }
 });
 
 // Export app for Vercel (serverless)
+// Для CommonJS также экспортируем напрямую
 export default app;
+// Для совместимости с CommonJS require
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = app;
+  module.exports.default = app;
+}
 
 // For local development, start server
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
