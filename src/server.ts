@@ -37,10 +37,20 @@ const initializeApp = async (): Promise<void> => {
 };
 
 // Middleware
+// CORS с поддержкой preflight запросов
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: config.frontendUrl || '*', // Разрешаем все источники, если не указан
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Обработка OPTIONS запросов (preflight)
+app.options('*', (req: Request, res: Response) => {
+  console.log(`[CORS] OPTIONS ${req.url}`);
+  res.sendStatus(200);
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -59,9 +69,11 @@ if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
 
 // Initialize on first request (for Vercel) - ДО маршрутов!
 app.use(async (req: Request, res: Response, next: NextFunction) => {
+  console.log(`[DB Init] ${req.method} ${req.url} - инициализация БД`);
   try {
     await initializeApp();
     if (initializationError) {
+      console.error(`[DB Init] Ошибка инициализации БД:`, initializationError.message);
       // Если есть ошибка инициализации, возвращаем 503 вместо 500
       return res.status(503).json({ 
         error: 'Сервис временно недоступен',
@@ -69,6 +81,7 @@ app.use(async (req: Request, res: Response, next: NextFunction) => {
         details: process.env.NODE_ENV === 'development' ? initializationError.message : undefined
       });
     }
+    console.log(`[DB Init] БД инициализирована, продолжаем запрос`);
     next();
   } catch (error: any) {
     console.error('❌ Ошибка при инициализации:', error);
