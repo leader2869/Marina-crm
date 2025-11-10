@@ -126,7 +126,10 @@ export class AuthController {
     try {
       const { emailOrPhone, password } = req.body;
 
+      console.log(`[Login] Попытка входа: emailOrPhone=${emailOrPhone?.substring(0, 10)}...`);
+
       if (!emailOrPhone || !password) {
+        console.log(`[Login] ❌ Отсутствуют обязательные поля: emailOrPhone=${!!emailOrPhone}, password=${!!password}`);
         throw new AppError('Email/телефон и пароль обязательны', 400);
       }
 
@@ -181,18 +184,31 @@ export class AuthController {
         }) || null;
       } else {
         // Ищем по email
+        console.log(`[Login] Поиск пользователя по email: ${emailOrPhone}`);
         user = await userRepository.findOne({ where: { email: emailOrPhone } });
       }
 
-      if (!user || !user.isActive) {
+      if (!user) {
+        console.log(`[Login] ❌ Пользователь не найден: ${emailOrPhone}`);
         throw new AppError('Неверный email/телефон или пароль', 401);
       }
 
+      console.log(`[Login] Пользователь найден: ${user.email}, isActive=${user.isActive}, role=${user.role}`);
+
+      if (!user.isActive) {
+        console.log(`[Login] ❌ Пользователь неактивен: ${user.email}`);
+        throw new AppError('Неверный email/телефон или пароль', 401);
+      }
+
+      console.log(`[Login] Проверка пароля для пользователя: ${user.email}`);
       const isPasswordValid = await comparePassword(password, user.password);
 
       if (!isPasswordValid) {
+        console.log(`[Login] ❌ Неверный пароль для пользователя: ${user.email}`);
         throw new AppError('Неверный email/телефон или пароль', 401);
       }
+
+      console.log(`[Login] ✅ Пароль верный для пользователя: ${user.email}`);
 
       const token = generateToken({
         userId: user.id,
