@@ -353,8 +353,8 @@ export class ClubsController {
       }
 
       // Проверка прав доступа - владелец клуба может редактировать свой клуб
-      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === 'super_admin';
-      const isAdmin = req.userRole === UserRole.ADMIN || req.userRole === 'admin';
+      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
+      const isAdmin = req.userRole === UserRole.ADMIN;
       if (
         club.ownerId !== req.userId &&
         !isSuperAdmin &&
@@ -396,7 +396,6 @@ export class ClubsController {
         club.bookingRulesText = bookingRulesText || null;
       }
       // Только суперадмин может изменять isValidated и rejectionComment
-      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === 'super_admin';
       if (isSuperAdmin && req.body.isValidated !== undefined) {
         club.isValidated = req.body.isValidated === true || req.body.isValidated === 'true';
       }
@@ -496,8 +495,8 @@ export class ClubsController {
         throw new AppError('Требуется аутентификация', 401);
       }
       
-      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === 'super_admin';
-      const isClubOwner = req.userRole === UserRole.CLUB_OWNER || req.userRole === 'club_owner';
+      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
+      const isClubOwner = req.userRole === UserRole.CLUB_OWNER;
       // Сравниваем с учетом возможных различий в типах (число vs строка)
       const isOwnerOfClub = club.ownerId === req.userId || club.ownerId === parseInt(req.userId.toString()) || parseInt(club.ownerId.toString()) === req.userId;
       
