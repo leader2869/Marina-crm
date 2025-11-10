@@ -10,6 +10,8 @@ import { Budget } from '../../entities/Budget';
 import { UserClub } from '../../entities/UserClub';
 import { User } from '../../entities/User';
 import { Payment } from '../../entities/Payment';
+import { Tariff } from '../../entities/Tariff';
+import { BookingRule } from '../../entities/BookingRule';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -646,6 +648,8 @@ export class ClubsController {
           const userClubRepository = queryRunner.manager.getRepository(UserClub);
           const userRepository = queryRunner.manager.getRepository(User);
           const paymentRepository = queryRunner.manager.getRepository(Payment);
+          const tariffRepository = queryRunner.manager.getRepository(Tariff);
+          const bookingRuleRepository = queryRunner.manager.getRepository(BookingRule);
           const clubRepositoryTransaction = queryRunner.manager.getRepository(Club);
           
           // Загружаем клуб в транзакции
@@ -689,6 +693,12 @@ export class ClubsController {
 
           // Удаляем бронирования, напрямую связанные с клубом
           await bookingRepository.delete({ clubId: clubId });
+
+          // Удаляем тарифы (tariffs) перед удалением мест, так как tariff_berths может иметь связи
+          await tariffRepository.delete({ clubId: clubId });
+
+          // Удаляем правила бронирования (booking_rules) перед удалением мест
+          await bookingRuleRepository.delete({ clubId: clubId });
 
           // Теперь можно безопасно удалить места (berths)
           // Проверяем, что все бронирования удалены перед удалением мест
