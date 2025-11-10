@@ -1,6 +1,20 @@
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+// Определяем URL API: если VITE_API_URL не установлен, используем относительный путь для production
+// или localhost для development
+const getApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  // Если мы на production (Vercel), используем относительный путь
+  if (import.meta.env.PROD) {
+    return '/api'
+  }
+  // Для development используем localhost
+  return 'http://localhost:3001/api'
+}
+
+const API_URL = getApiUrl()
 
 const api = axios.create({
   baseURL: API_URL,
