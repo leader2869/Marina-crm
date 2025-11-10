@@ -133,6 +133,7 @@ export default function Clubs() {
     try {
       setLoading(true)
       const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
+      const isClubOwner = user?.role === UserRole.CLUB_OWNER
       const params: any = { limit: 100 }
       if (showHidden && isSuperAdmin) {
         params.showHidden = 'true'
@@ -140,19 +141,26 @@ export default function Clubs() {
       const response = await clubsService.getAll(params)
       const clubsData = response.data || []
       
+      // Бэкенд уже фильтрует клубы для владельца клуба (только его клубы)
       // Для суперадмина с флагом showHidden показываем все, иначе только активные и валидированные
       // Для остальных ролей (VESSEL_OWNER, GUEST и т.д.) всегда показываем только активные и валидированные
-      // Для владельца клуба показываем все его клубы (включая невалидированные)
-      const filteredClubs = showHidden && isSuperAdmin 
-        ? clubsData 
-        : clubsData.filter((club: Club) => {
-            // Для владельца клуба показываем все его клубы
-            if (isClubOwner && club.ownerId === user?.id) {
-              return true
-            }
-            // Для остальных - только активные, валидированные и отправленные на валидацию
-            return club.isActive === true && club.isValidated === true && club.isSubmittedForValidation === true
-          })
+      // Для владельца клуба бэкенд уже вернул только его клубы, но для безопасности проверяем еще раз
+      let filteredClubs = clubsData
+      
+      if (showHidden && isSuperAdmin) {
+        // Суперадмин видит все клубы
+        filteredClubs = clubsData
+      } else if (isClubOwner) {
+        // Для владельца клуба показываем только его клубы (бэкенд уже отфильтровал, но проверяем для безопасности)
+        filteredClubs = clubsData.filter((club: Club) => club.ownerId === user?.id)
+      } else {
+        // Для остальных - только активные, валидированные и отправленные на валидацию
+        filteredClubs = clubsData.filter((club: Club) => 
+          club.isActive === true && 
+          club.isValidated === true && 
+          club.isSubmittedForValidation === true
+        )
+      }
       
       setClubs(filteredClubs)
     } catch (error) {

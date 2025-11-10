@@ -1,4 +1,4 @@
-// ВАРИАНТ 3: Моторный катер (без парусов)
+<div className=""></div>// ВАРИАНТ 3: Моторный катер (без парусов)
 import React from 'react'
 
 interface LoadingAnimationProps {
