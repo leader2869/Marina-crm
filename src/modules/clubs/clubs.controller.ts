@@ -596,12 +596,21 @@ export class ClubsController {
         throw new AppError('Недостаточно прав для восстановления клуба', 403);
       }
 
-      // Восстанавливаем клуб (делаем активным)
+      // Восстанавливаем клуб (делаем активным и восстанавливаем статус публикации)
+      // Если клуб был опубликован до скрытия, восстанавливаем статус публикации
       club.isActive = true;
+      // Восстанавливаем статус публикации, если клуб был опубликован
+      // Проверяем, был ли клуб опубликован (если есть валидация или отправка на валидацию)
+      // Если клуб был скрыт через hide, статусы были сброшены, поэтому восстанавливаем их
+      if (club.isValidated === false && club.isSubmittedForValidation === false) {
+        // Если статусы были сброшены, восстанавливаем их (клуб был опубликован до скрытия)
+        club.isSubmittedForValidation = true;
+        club.isValidated = true;
+      }
       await clubRepository.save(club);
-      console.log('Клуб восстановлен (isActive = true), ID:', club.id);
+      console.log('Клуб восстановлен (isActive = true), ID:', club.id, 'isValidated:', club.isValidated, 'isSubmittedForValidation:', club.isSubmittedForValidation);
 
-      res.json({ message: 'Яхт-клуб успешно восстановлен' });
+      res.json({ message: 'Яхт-клуб успешно восстановлен и опубликован' });
     } catch (error) {
       next(error);
     }

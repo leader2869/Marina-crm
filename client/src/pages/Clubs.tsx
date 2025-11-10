@@ -202,14 +202,14 @@ export default function Clubs() {
     e.stopPropagation()
     
     // Подтверждение
-    if (!confirm('Вы уверены, что хотите восстановить этот яхт-клуб? Клуб станет активным.')) return
+    if (!confirm('Вы уверены, что хотите восстановить этот яхт-клуб? Клуб станет активным и будет опубликован.')) return
 
     setRestoring(true)
 
     try {
       await clubsService.restore(clubId)
       await loadClubs()
-      alert('Яхт-клуб успешно восстановлен.')
+      alert('Яхт-клуб успешно восстановлен и опубликован.')
     } catch (err: any) {
       alert(err.error || err.message || 'Ошибка восстановления яхт-клуба')
     } finally {
@@ -618,12 +618,12 @@ export default function Clubs() {
                         <ShieldCheck className="h-5 w-5" />
                       </button>
                     )}
-                    {club.isActive === false && (
+                    {(club.isActive === false || club.isActive === 'false' || !club.isActive) && (
                       <button
                         onClick={(e) => handleRestore(club.id, e)}
                         disabled={restoring || deleting || hiding}
                         className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
-                        title="Восстановить клуб"
+                        title="Восстановить и опубликовать клуб"
                       >
                         <Eye className="h-5 w-5" />
                       </button>
