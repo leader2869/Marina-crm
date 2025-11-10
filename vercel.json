@@ -1,5 +1,10 @@
 {
   "buildCommand": "",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "src/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",
