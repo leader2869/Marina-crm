@@ -26,7 +26,11 @@ export default function Login() {
       await login(emailOrPhone, password)
       navigate('/dashboard')
     } catch (err: any) {
-      setError(err.error || 'Ошибка входа')
+      console.error('Login error:', err)
+      // Показываем более подробную информацию об ошибке
+      const errorMessage = err.message || err.error || 'Ошибка входа'
+      const errorDetails = err.details ? ` (${err.details})` : ''
+      setError(errorMessage + errorDetails)
     } finally {
       setLoading(false)
     }

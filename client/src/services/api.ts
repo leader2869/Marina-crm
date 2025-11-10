@@ -36,10 +36,20 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    console.error('API Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      url: error.config?.url,
+      method: error.config?.method
+    })
+    
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
+    
     // Если ошибка 404, возвращаем объект с error
     if (error.response?.status === 404) {
       return Promise.reject({
@@ -47,6 +57,34 @@ api.interceptors.response.use(
         message: error.response?.data?.error || 'Маршрут не найден',
       })
     }
+    
+    // Если ошибка 500 или другая серверная ошибка
+    if (error.response?.status >= 500) {
+      return Promise.reject({
+        error: error.response?.data?.error || 'Ошибка сервера',
+        message: error.response?.data?.message || error.response?.data?.error || 'Сервер временно недоступен',
+        details: error.response?.data?.details
+      })
+    }
+    
+    // Если есть данные об ошибке в ответе
+    if (error.response?.data) {
+      return Promise.reject({
+        error: error.response.data.error || error.response.data.message || 'Ошибка запроса',
+        message: error.response.data.message || error.response.data.error || 'Ошибка запроса',
+        details: error.response.data.details
+      })
+    }
+    
+    // Если нет ответа от сервера (сетевая ошибка)
+    if (!error.response) {
+      return Promise.reject({
+        error: 'Ошибка сети',
+        message: 'Не удалось подключиться к серверу. Проверьте подключение к интернету и настройки API URL.',
+        details: error.message
+      })
+    }
+    
     return Promise.reject(error.response?.data || error.message)
   }
 )
