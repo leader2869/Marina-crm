@@ -413,8 +413,16 @@ export default function ClubDetails() {
         let lastNumber = 0
         
         // Пытаемся найти максимальный числовой номер
+        // Обрабатываем как обычные числа, так и названия вида "Место 1", "Место 2" и т.д.
         for (const berth of existingBerths) {
-          const num = parseInt(berth.number)
+          let num = 0
+          // Если название начинается с "Место ", извлекаем число после него
+          if (berth.number.startsWith('Место ')) {
+            num = parseInt(berth.number.replace('Место ', ''))
+          } else {
+            // Иначе пытаемся распарсить как число
+            num = parseInt(berth.number)
+          }
           if (!isNaN(num) && num > lastNumber) {
             lastNumber = num
           }
