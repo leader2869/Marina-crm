@@ -1188,7 +1188,7 @@ export default function ClubDetails() {
                         value={berthForm.number}
                         onChange={(e) => setBerthForm({ ...berthForm, number: e.target.value })}
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                        placeholder="Например: 1, A1, VIP-1"
+                        placeholder="Например: Место 1"
                       />
                     </div>
                   )}
