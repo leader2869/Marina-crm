@@ -45,6 +45,7 @@ export default function ClubDetails() {
   })
   const [savingBerth, setSavingBerth] = useState(false)
   const [deletingBerth, setDeletingBerth] = useState(false)
+  const [selectedBerths, setSelectedBerths] = useState<Set<number>>(new Set())
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [availableBerths, setAvailableBerths] = useState<Berth[]>([])
   const [userVessels, setUserVessels] = useState<Vessel[]>([])
@@ -484,8 +485,64 @@ export default function ClubDetails() {
     try {
       await berthsService.delete(berthId)
       await loadClub()
+      // Убираем из выбранных, если было выбрано
+      setSelectedBerths(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(berthId)
+        return newSet
+      })
     } catch (err: any) {
       setError(err.error || err.message || 'Ошибка удаления места')
+    } finally {
+      setDeletingBerth(false)
+    }
+  }
+
+  const handleToggleBerthSelection = (berthId: number) => {
+    setSelectedBerths(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(berthId)) {
+        newSet.delete(berthId)
+      } else {
+        newSet.add(berthId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAllBerths = () => {
+    if (!club || !club.berths) return
+    
+    if (selectedBerths.size === club.berths.length) {
+      // Если все выбраны, снимаем выбор
+      setSelectedBerths(new Set())
+    } else {
+      // Выбираем все
+      setSelectedBerths(new Set(club.berths.map(b => b.id)))
+    }
+  }
+
+  const handleDeleteSelectedBerths = async () => {
+    if (selectedBerths.size === 0) return
+
+    const count = selectedBerths.size
+    if (!confirm(`Вы уверены, что хотите удалить ${count} ${count === 1 ? 'место' : count < 5 ? 'места' : 'мест'}?`)) return
+
+    setDeletingBerth(true)
+    setError('')
+
+    try {
+      // Удаляем все выбранные места
+      const deletePromises = Array.from(selectedBerths).map(berthId => 
+        berthsService.delete(berthId)
+      )
+      await Promise.all(deletePromises)
+      
+      await loadClub()
+      setSelectedBerths(new Set())
+      alert(`Успешно удалено ${count} ${count === 1 ? 'место' : count < 5 ? 'места' : 'мест'}`)
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка удаления мест')
     } finally {
       setDeletingBerth(false)
     }
@@ -1002,23 +1059,54 @@ export default function ClubDetails() {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">Места</h2>
-          {canManageBerths() && (
-            <button
-              onClick={handleOpenAddBerth}
-              className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Добавить место
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {canManageBerths() && club.berths && club.berths.length > 0 && (
+              <>
+                <button
+                  onClick={handleSelectAllBerths}
+                  className="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 text-sm"
+                >
+                  {selectedBerths.size === club.berths.length ? 'Снять выбор' : 'Выбрать все'}
+                </button>
+                {selectedBerths.size > 0 && (
+                  <button
+                    onClick={handleDeleteSelectedBerths}
+                    disabled={deletingBerth}
+                    className="flex items-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 text-sm disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Удалить ({selectedBerths.size})
+                  </button>
+                )}
+              </>
+            )}
+            {canManageBerths() && (
+              <button
+                onClick={handleOpenAddBerth}
+                className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Добавить место
+              </button>
+            )}
+          </div>
         </div>
 
         {club.berths && club.berths.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {club.berths.map((berth) => (
-              <div key={berth.id} className="border border-gray-200 rounded-lg p-4 relative">
+              <div key={berth.id} className={`border rounded-lg p-4 relative ${selectedBerths.has(berth.id) ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}`}>
                 {canManageBerths() && (
-                  <div className="absolute top-2 right-2 flex space-x-2">
+                  <>
+                    <div className="absolute top-2 left-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedBerths.has(berth.id)}
+                        onChange={() => handleToggleBerthSelection(berth.id)}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                    </div>
+                    <div className="absolute top-2 right-2 flex space-x-2">
                     <button
                       onClick={() => handleOpenEditBerth(berth)}
                       className="p-1 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded"
