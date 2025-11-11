@@ -117,9 +117,6 @@ export default function Clubs() {
     email: '',
     website: '',
     totalBerths: '0',
-    minRentalPeriod: '1',
-    maxRentalPeriod: '365',
-    basePrice: '0',
     minPricePerMonth: '',
     season: new Date().getFullYear().toString(),
   })
@@ -316,9 +313,6 @@ export default function Clubs() {
       email: '',
       website: '',
       totalBerths: '0',
-      minRentalPeriod: '1',
-      maxRentalPeriod: '365',
-      basePrice: '0',
       minPricePerMonth: '',
       season: new Date().getFullYear().toString(),
     })
@@ -337,9 +331,6 @@ export default function Clubs() {
       email: '',
       website: '',
       totalBerths: '0',
-      minRentalPeriod: '1',
-      maxRentalPeriod: '365',
-      basePrice: '0',
       minPricePerMonth: '',
       season: new Date().getFullYear().toString(),
     })
@@ -366,9 +357,6 @@ export default function Clubs() {
         email: addForm.email || null,
         website: addForm.website || null,
         totalBerths: parseInt(addForm.totalBerths) || 0,
-        minRentalPeriod: parseInt(addForm.minRentalPeriod) || 1,
-        maxRentalPeriod: parseInt(addForm.maxRentalPeriod) || 365,
-        basePrice: parseFloat(addForm.basePrice) || 0,
         minPricePerMonth: addForm.minPricePerMonth ? parseFloat(addForm.minPricePerMonth) : null,
         season: addForm.season ? parseInt(addForm.season) : null,
       }
@@ -441,9 +429,6 @@ export default function Clubs() {
         { wch: 25 }, // Email
         { wch: 25 }, // Веб-сайт
         { wch: 12 }, // Всего мест
-        { wch: 20 }, // Мин. период аренды
-        { wch: 20 }, // Макс. период аренды
-        { wch: 20 }, // Базовая цена за день
         { wch: 20 }, // Мин. цена за месяц
         { wch: 10 }, // Активен
         { wch: 15 }, // Владелец (Имя)
@@ -890,50 +875,6 @@ export default function Clubs() {
                       />
                     </div>
 
-                    <div>
-                      <label htmlFor="add-basePrice" className="block text-sm font-medium text-gray-700">
-                        Базовая цена за день (₽)
-                      </label>
-                      <input
-                        id="add-basePrice"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={addForm.basePrice}
-                        onChange={(e) => setAddForm({ ...addForm, basePrice: e.target.value })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="add-minRentalPeriod" className="block text-sm font-medium text-gray-700">
-                        Мин. период аренды (дней)
-                      </label>
-                      <input
-                        id="add-minRentalPeriod"
-                        type="number"
-                        min="1"
-                        value={addForm.minRentalPeriod}
-                        onChange={(e) => setAddForm({ ...addForm, minRentalPeriod: e.target.value })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor="add-maxRentalPeriod" className="block text-sm font-medium text-gray-700">
-                        Макс. период аренды (дней)
-                      </label>
-                      <input
-                        id="add-maxRentalPeriod"
-                        type="number"
-                        min="1"
-                        value={addForm.maxRentalPeriod}
-                        onChange={(e) => setAddForm({ ...addForm, maxRentalPeriod: e.target.value })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      />
-                    </div>
                   </div>
 
                   <div>
