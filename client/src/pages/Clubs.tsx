@@ -908,7 +908,6 @@ export default function Clubs() {
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                     />
                   </div>
-                </div>
 
                   <div>
                     <label htmlFor="add-season" className="block text-sm font-medium text-gray-700">
@@ -925,10 +924,9 @@ export default function Clubs() {
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                     />
                   </div>
-                </div>
 
-                {/* Выбор месяцев навигации */}
-                <div>
+                  {/* Выбор месяцев навигации */}
+                  <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Период навигации *
                   </label>
