@@ -20,8 +20,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
     "@types/xlsx": "^0.0.35",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
