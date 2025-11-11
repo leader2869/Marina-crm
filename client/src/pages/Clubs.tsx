@@ -102,7 +102,6 @@ export default function Clubs() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [deleting, setDeleting] = useState(false)
-  const [hiding, setHiding] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -614,7 +613,7 @@ export default function Clubs() {
                     {club.isSubmittedForValidation === true && club.isValidated === false && (
                       <button
                         onClick={(e) => handleValidate(club.id, e)}
-                        disabled={deleting || hiding || restoring}
+                        disabled={deleting || restoring}
                         className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
                         title="Валидировать клуб"
                       >
