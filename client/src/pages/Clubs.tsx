@@ -996,6 +996,7 @@ export default function Clubs() {
                     Отмена
                   </button>
                 </div>
+              </div>
             </div>
           </div>
         </div>
