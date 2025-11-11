@@ -36,11 +36,10 @@ export default function ClubDetails() {
   const [showEditBerthModal, setShowEditBerthModal] = useState(false)
   const [selectedBerth, setSelectedBerth] = useState<Berth | null>(null)
   const [berthForm, setBerthForm] = useState({
-    number: '',
     length: '',
     width: '',
-    pricePerDay: '',
     notes: '',
+    count: '1', // Количество мест для создания
   })
   const [savingBerth, setSavingBerth] = useState(false)
   const [deletingBerth, setDeletingBerth] = useState(false)
@@ -332,11 +331,10 @@ export default function ClubDetails() {
 
   const handleOpenAddBerth = () => {
     setBerthForm({
-      number: '',
       length: '20',
       width: '5',
-      pricePerDay: club?.basePrice?.toString() || '',
       notes: '',
+      count: '1',
     })
     setShowAddBerthModal(true)
   }
@@ -344,7 +342,7 @@ export default function ClubDetails() {
   const handleOpenEditBerth = (berth: Berth) => {
     setSelectedBerth(berth)
     setBerthForm({
-      number: berth.number,
+      number: berth.number || '',
       length: berth.length.toString(),
       width: berth.width.toString(),
       pricePerDay: berth.pricePerDay?.toString() || '',
@@ -358,11 +356,10 @@ export default function ClubDetails() {
     setShowEditBerthModal(false)
     setSelectedBerth(null)
     setBerthForm({
-      number: '',
-      length: '20',
-      width: '5',
-      pricePerDay: '',
+      length: '',
+      width: '',
       notes: '',
+      count: '1',
     })
   }
 
@@ -373,17 +370,25 @@ export default function ClubDetails() {
     setError('')
 
     try {
-      await berthsService.create({
-        clubId: club.id,
-        number: berthForm.number,
-        length: parseFloat(berthForm.length),
-        width: parseFloat(berthForm.width),
-        pricePerDay: berthForm.pricePerDay ? parseFloat(berthForm.pricePerDay) : null,
-        notes: berthForm.notes || null,
-      })
+      const count = parseInt(berthForm.count) || 1
+      const length = parseFloat(berthForm.length)
+      const width = parseFloat(berthForm.width)
+      const notes = berthForm.notes || null
+
+      // Создаем несколько мест с номерами от 1 до count
+      for (let i = 1; i <= count; i++) {
+        await berthsService.create({
+          clubId: club.id,
+          number: i.toString(),
+          length: length,
+          width: width,
+          notes: notes,
+        })
+      }
 
       await loadClub()
       handleCloseBerthModal()
+      alert(`Успешно создано ${count} ${count === 1 ? 'место' : count < 5 ? 'места' : 'мест'}`)
     } catch (err: any) {
       setError(err.error || err.message || 'Ошибка создания места')
     } finally {
@@ -1094,18 +1099,22 @@ export default function ClubDetails() {
 
                 <div className="space-y-4">
                   <div>
-                    <label htmlFor="berth-number" className="block text-sm font-medium text-gray-700">
-                      Номер места *
+                    <label htmlFor="berth-count" className="block text-sm font-medium text-gray-700">
+                      Количество мест *
                     </label>
                     <input
-                      id="berth-number"
-                      type="text"
+                      id="berth-count"
+                      type="number"
                       required
-                      value={berthForm.number}
-                      onChange={(e) => setBerthForm({ ...berthForm, number: e.target.value })}
+                      min="1"
+                      value={berthForm.count}
+                      onChange={(e) => setBerthForm({ ...berthForm, count: e.target.value })}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      placeholder="Место 1"
+                      placeholder="1"
                     />
+                    <p className="mt-1 text-sm text-gray-500">
+                      Будет создано мест с номерами от 1 до {berthForm.count || '1'}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -1140,22 +1149,6 @@ export default function ClubDetails() {
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="berth-price" className="block text-sm font-medium text-gray-700">
-                      Цена за день (₽)
-                    </label>
-                    <input
-                      id="berth-price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={berthForm.pricePerDay}
-                      onChange={(e) => setBerthForm({ ...berthForm, pricePerDay: e.target.value })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      placeholder={club?.basePrice?.toString() || '0'}
-                    />
                   </div>
 
                   <div>
