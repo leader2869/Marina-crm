@@ -42,6 +42,7 @@ export default function ClubDetails() {
     width: '',
     notes: '',
     count: '1', // Количество мест для создания нескольких
+    pricePerDay: '', // Цена за день (используется только при редактировании)
   })
   const [savingBerth, setSavingBerth] = useState(false)
   const [deletingBerth, setDeletingBerth] = useState(false)
@@ -340,6 +341,7 @@ export default function ClubDetails() {
       width: '5',
       notes: '',
       count: '1',
+      pricePerDay: '',
     })
     setShowAddBerthModal(true)
   }
@@ -347,11 +349,13 @@ export default function ClubDetails() {
   const handleOpenEditBerth = (berth: Berth) => {
     setSelectedBerth(berth)
     setBerthForm({
+      mode: 'single', // При редактировании всегда одно место
       number: berth.number || '',
       length: berth.length.toString(),
       width: berth.width.toString(),
       pricePerDay: berth.pricePerDay?.toString() || '',
       notes: berth.notes || '',
+      count: '1', // Не используется при редактировании
     })
     setShowEditBerthModal(true)
   }
@@ -367,6 +371,7 @@ export default function ClubDetails() {
       width: '',
       notes: '',
       count: '1',
+      pricePerDay: '',
     })
   }
 
@@ -1254,7 +1259,7 @@ export default function ClubDetails() {
                           name="berth-mode"
                           value="single"
                           checked={berthForm.mode === 'single'}
-                          onChange={(e) => setBerthForm({ ...berthForm, mode: 'single' })}
+                          onChange={() => setBerthForm({ ...berthForm, mode: 'single' })}
                           className="mr-2"
                         />
                         <span className="text-sm text-gray-700">Одно место</span>
@@ -1265,7 +1270,7 @@ export default function ClubDetails() {
                           name="berth-mode"
                           value="multiple"
                           checked={berthForm.mode === 'multiple'}
-                          onChange={(e) => setBerthForm({ ...berthForm, mode: 'multiple' })}
+                          onChange={() => setBerthForm({ ...berthForm, mode: 'multiple' })}
                           className="mr-2"
                         />
                         <span className="text-sm text-gray-700">Несколько мест</span>
