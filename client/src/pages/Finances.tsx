@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { DollarSign, TrendingUp, TrendingDown, PieChart } from 'lucide-react'
+import { TrendingUp, TrendingDown, PieChart } from 'lucide-react'
 
 export default function Finances() {
   return (

@@ -3,7 +3,6 @@ import { bookingsService } from '../services/api'
 import { Booking, UserRole, BookingStatus } from '../types'
 import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X } from 'lucide-react'
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 

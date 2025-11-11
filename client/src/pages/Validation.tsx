@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usersService, clubsService } from '../services/api'
-import { User, UserRole, Club } from '../types'
+import { UserRole, Club } from '../types'
 import { CheckCircle, XCircle, User as UserIcon, Phone, Mail, Calendar, ArrowLeft, Anchor } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'

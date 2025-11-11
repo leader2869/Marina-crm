@@ -96,12 +96,13 @@ api.interceptors.response.use(
 )
 
 export const authService = {
-  login: (emailOrPhone: string, password: string) =>
-    api.post('/auth/login', { emailOrPhone, password }),
-  register: (data: any) => api.post('/auth/register', data),
-  loginAsGuest: (firstName: string, phone?: string) => 
-    api.post('/auth/guest', { firstName, phone }),
-  getProfile: () => api.get('/auth/profile'),
+  login: (emailOrPhone: string, password: string): Promise<{ user: any; token: string }> =>
+    api.post('/auth/login', { emailOrPhone, password }) as Promise<{ user: any; token: string }>,
+  register: (data: any): Promise<{ user: any; token: string }> => 
+    api.post('/auth/register', data) as Promise<{ user: any; token: string }>,
+  loginAsGuest: (firstName: string, phone?: string): Promise<{ user: any; token: string }> => 
+    api.post('/auth/guest', { firstName, phone }) as Promise<{ user: any; token: string }>,
+  getProfile: (): Promise<any> => api.get('/auth/profile') as Promise<any>,
 }
 
 export const clubsService = {

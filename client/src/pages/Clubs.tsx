@@ -177,25 +177,8 @@ export default function Clubs() {
     club.address.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleHide = async (clubId: number, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    // Подтверждение
-    if (!confirm('Вы уверены, что хотите скрыть этот яхт-клуб? Клуб станет неактивным, все связи с пользователями будут оборваны.')) return
-
-    setHiding(true)
-
-    try {
-      await clubsService.hide(clubId)
-      await loadClubs()
-      alert('Яхт-клуб успешно скрыт. Все связи оборваны.')
-    } catch (err: any) {
-      alert(err.error || err.message || 'Ошибка скрытия яхт-клуба')
-    } finally {
-      setHiding(false)
-    }
-  }
+  // handleHide удалена, так как кнопка "Скрыть" была удалена
+  // Используется только handleUnpublish
 
   const handleRestore = async (clubId: number, e: React.MouseEvent) => {
     e.preventDefault()
@@ -310,10 +293,10 @@ export default function Clubs() {
     }
   }
 
-  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN || user?.role === 'super_admin'
-  const isAdmin = user?.role === UserRole.ADMIN || user?.role === 'admin'
-  const isClubOwner = user?.role === UserRole.CLUB_OWNER || user?.role === 'club_owner'
-  const isPendingValidation = user?.role === UserRole.PENDING_VALIDATION || user?.role === 'pending_validation'
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
+  const isAdmin = user?.role === UserRole.ADMIN
+  const isClubOwner = user?.role === UserRole.CLUB_OWNER
+  const isPendingValidation = user?.role === UserRole.PENDING_VALIDATION
   const canManageClubs = isSuperAdmin || isAdmin || isClubOwner || isPendingValidation
 
   const handleOpenAdd = () => {
@@ -638,7 +621,7 @@ export default function Clubs() {
                         <ShieldCheck className="h-5 w-5" />
                       </button>
                     )}
-                    {(club.isActive === false || club.isActive === 'false' || !club.isActive) && (
+                    {(club.isActive === false || !club.isActive) && (
                       <button
                         onClick={(e) => handleRestore(club.id, e)}
                         disabled={restoring || deleting || hiding}
