@@ -421,10 +421,11 @@ export default function ClubDetails() {
         }
 
         // Создаем места начиная с последнего номера + 1
+        // В названии всегда добавляем слово "Место"
         for (let i = 1; i <= count; i++) {
           await berthsService.create({
             clubId: club.id,
-            number: (lastNumber + i).toString(),
+            number: `Место ${lastNumber + i}`,
             length: length,
             width: width,
             notes: notes,
