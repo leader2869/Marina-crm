@@ -16,7 +16,7 @@
       "destination": "/api/index"
     },
     {
-      "source": "/((?!api|health|assets|.*\\.(js|css|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
