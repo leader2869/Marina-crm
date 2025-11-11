@@ -1107,22 +1107,23 @@ export default function ClubDetails() {
                       />
                     </div>
                     <div className="absolute top-2 right-2 flex space-x-2">
-                    <button
-                      onClick={() => handleOpenEditBerth(berth)}
-                      className="p-1 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded"
-                      title="Редактировать"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteBerth(berth.id)}
-                      disabled={deletingBerth}
-                      className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
-                      title="Удалить"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => handleOpenEditBerth(berth)}
+                        className="p-1 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded"
+                        title="Редактировать"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBerth(berth.id)}
+                        disabled={deletingBerth}
+                        className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                        title="Удалить"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </>
                 )}
                 <div className="flex items-center mb-2">
                   <Anchor className="h-5 w-5 text-primary-600 mr-2" />
