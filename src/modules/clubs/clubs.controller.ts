@@ -631,7 +631,52 @@ export class ClubsController {
         throw new AppError('Недостаточно прав для удаления', 403);
       }
 
-      // Супер-администратор может полностью удалить клуб
+      // Для владельца клуба проверяем наличие связей
+      const isClubOwner = req.userRole === UserRole.CLUB_OWNER && club.ownerId === req.userId;
+      if (isClubOwner) {
+        // Проверяем наличие связей
+        const berthRepository = AppDataSource.getRepository(Berth);
+        const bookingRepository = AppDataSource.getRepository(Booking);
+        const userClubRepository = AppDataSource.getRepository(UserClub);
+        const tariffRepository = AppDataSource.getRepository(Tariff);
+        const bookingRuleRepository = AppDataSource.getRepository(BookingRule);
+        const paymentRepository = AppDataSource.getRepository(Payment);
+        const incomeRepository = AppDataSource.getRepository(Income);
+        const expenseRepository = AppDataSource.getRepository(Expense);
+        const budgetRepository = AppDataSource.getRepository(Budget);
+
+        // Проверяем наличие связей
+        const hasBerths = await berthRepository.count({ where: { clubId: clubId } }) > 0;
+        const hasBookings = await bookingRepository.count({ where: { clubId: clubId } }) > 0;
+        const hasUserClubs = await userClubRepository.count({ where: { clubId: clubId } }) > 0;
+        const hasTariffs = await tariffRepository.count({ where: { clubId: clubId } }) > 0;
+        const hasBookingRules = await bookingRuleRepository.count({ where: { clubId: clubId } }) > 0;
+        
+        // Проверяем payments через bookings
+        const clubBookings = await bookingRepository.find({ 
+          where: { clubId: clubId },
+          select: ['id']
+        });
+        const bookingIds = clubBookings.map(b => b.id);
+        const hasPayments = bookingIds.length > 0 && await paymentRepository.count({ 
+          where: { bookingId: In(bookingIds) } 
+        }) > 0;
+        
+        const hasIncomes = await incomeRepository.count({ where: { clubId: clubId } }) > 0;
+        const hasExpenses = await expenseRepository.count({ where: { clubId: clubId } }) > 0;
+        const hasBudgets = await budgetRepository.count({ where: { clubId: clubId } }) > 0;
+
+        if (hasBerths || hasBookings || hasUserClubs || hasTariffs || hasBookingRules || hasPayments || hasIncomes || hasExpenses || hasBudgets) {
+          throw new AppError('Невозможно удалить яхт-клуб: у клуба есть связи (места, бронирования, пользователи, тарифы и т.д.). Сначала удалите все связи.', 400);
+        }
+
+        // Если связей нет, владелец может удалить клуб
+        await clubRepository.remove(club);
+        res.json({ message: 'Яхт-клуб успешно удален' });
+        return;
+      }
+
+      // Супер-администратор может полностью удалить клуб (удаляет все связи)
       if (req.userRole === UserRole.SUPER_ADMIN) {
         console.log(`Начало удаления клуба ID: ${clubId}`);
         
@@ -799,11 +844,6 @@ export class ClubsController {
             console.error('Ошибка при освобождении соединения:', releaseError);
           }
         }
-      } else {
-        // Владелец клуба может только деактивировать
-        club.isActive = false;
-        await clubRepository.save(club);
-        res.json({ message: 'Яхт-клуб деактивирован' });
       }
     } catch (error) {
       next(error);
