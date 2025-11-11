@@ -6,6 +6,7 @@ import { Club } from '../../entities/Club';
 import { UserClub } from '../../entities/UserClub';
 import { Tariff } from '../../entities/Tariff';
 import { BookingRule, BookingRuleType } from '../../entities/BookingRule';
+import { Vessel } from '../../entities/Vessel';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { BookingStatus } from '../../types';
@@ -162,6 +163,24 @@ export class BookingsController {
 
       if (!berth.isAvailable) {
         throw new AppError('Место недоступно', 400);
+      }
+
+      // Проверка длины катера относительно максимальной длины места
+      const vesselRepository = AppDataSource.getRepository(Vessel);
+      const vessel = await vesselRepository.findOne({
+        where: { id: parseInt(vesselId) },
+      });
+
+      if (!vessel) {
+        throw new AppError('Судно не найдено', 404);
+      }
+
+      // Проверяем, что длина катера не превышает максимальную длину места
+      if (vessel.length > berth.length) {
+        throw new AppError(
+          `Длина катера (${vessel.length} м) превышает максимальную длину места (${berth.length} м). Бронирование невозможно.`,
+          400
+        );
       }
 
       // Загружаем клуб с месяцами навигации

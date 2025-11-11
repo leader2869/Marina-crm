@@ -244,6 +244,15 @@ export default function ClubDetails() {
       return
     }
 
+    // Проверка длины катера относительно максимальной длины места
+    const selectedVessel = userVessels.find(v => v.id.toString() === bookingForm.vesselId)
+    if (selectedVessel && berthFromClub) {
+      if (selectedVessel.length > berthFromClub.length) {
+        setError(`Длина катера (${selectedVessel.length} м) превышает максимальную длину места (${berthFromClub.length} м). Бронирование невозможно.`)
+        return
+      }
+    }
+
     setError('')
     setCreatingBooking(true)
 
