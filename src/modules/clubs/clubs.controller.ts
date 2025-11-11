@@ -696,11 +696,12 @@ export class ClubsController {
           // Удаляем бронирования, напрямую связанные с клубом
           await bookingRepository.delete({ clubId: clubId });
 
-          // Удаляем тарифы (tariffs) перед удалением мест, так как tariff_berths может иметь связи
-          await tariffRepository.delete({ clubId: clubId });
-
-          // Удаляем правила бронирования (booking_rules) перед удалением мест
+          // Удаляем правила бронирования (booking_rules) ПЕРЕД удалением тарифов,
+          // так как booking_rules имеют внешний ключ на tariffs
           await bookingRuleRepository.delete({ clubId: clubId });
+
+          // Удаляем тарифы (tariffs) после удаления booking_rules, так как tariff_berths может иметь связи
+          await tariffRepository.delete({ clubId: clubId });
 
           // Теперь можно безопасно удалить места (berths)
           // Проверяем, что все бронирования удалены перед удалением мест
