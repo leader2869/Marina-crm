@@ -119,6 +119,7 @@ export default function Clubs() {
     totalBerths: '0',
     minPricePerMonth: '',
     season: new Date().getFullYear().toString(),
+    rentalMonths: [] as number[],
   })
 
   useEffect(() => {
@@ -315,6 +316,7 @@ export default function Clubs() {
       totalBerths: '0',
       minPricePerMonth: '',
       season: new Date().getFullYear().toString(),
+      rentalMonths: [],
     })
     setError('')
   }
@@ -333,6 +335,7 @@ export default function Clubs() {
       totalBerths: '0',
       minPricePerMonth: '',
       season: new Date().getFullYear().toString(),
+      rentalMonths: [],
     })
     setError('')
   }
@@ -340,6 +343,11 @@ export default function Clubs() {
   const handleCreate = async () => {
     if (!addForm.name || !addForm.address || !addForm.latitude || !addForm.longitude || !addForm.season) {
       setError('Заполните все обязательные поля: Название, Адрес, Широта, Долгота, Сезон')
+      return
+    }
+
+    if (!addForm.rentalMonths || addForm.rentalMonths.length === 0) {
+      setError('Выберите хотя бы один месяц периода навигации')
       return
     }
 
@@ -359,6 +367,7 @@ export default function Clubs() {
         totalBerths: parseInt(addForm.totalBerths) || 0,
         minPricePerMonth: addForm.minPricePerMonth ? parseFloat(addForm.minPricePerMonth) : null,
         season: addForm.season ? parseInt(addForm.season) : null,
+        rentalMonths: addForm.rentalMonths.length > 0 ? addForm.rentalMonths : null,
       }
 
       const response = await clubsService.create(createData) as any
@@ -916,6 +925,60 @@ export default function Clubs() {
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                     />
                   </div>
+                </div>
+
+                {/* Выбор месяцев навигации */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Период навигации *
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 border border-gray-300 rounded-md p-4">
+                    {[
+                      { value: 1, name: 'Январь' },
+                      { value: 2, name: 'Февраль' },
+                      { value: 3, name: 'Март' },
+                      { value: 4, name: 'Апрель' },
+                      { value: 5, name: 'Май' },
+                      { value: 6, name: 'Июнь' },
+                      { value: 7, name: 'Июль' },
+                      { value: 8, name: 'Август' },
+                      { value: 9, name: 'Сентябрь' },
+                      { value: 10, name: 'Октябрь' },
+                      { value: 11, name: 'Ноябрь' },
+                      { value: 12, name: 'Декабрь' },
+                    ].map((month) => (
+                      <label
+                        key={month.value}
+                        className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={addForm.rentalMonths.includes(month.value)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAddForm({
+                                ...addForm,
+                                rentalMonths: [...addForm.rentalMonths, month.value].sort((a, b) => a - b),
+                              })
+                            } else {
+                              setAddForm({
+                                ...addForm,
+                                rentalMonths: addForm.rentalMonths.filter((m) => m !== month.value),
+                              })
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-900">{month.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {addForm.rentalMonths.length > 0 && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      Выбрано месяцев: {addForm.rentalMonths.length} из 12
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
