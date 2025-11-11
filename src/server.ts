@@ -60,14 +60,22 @@ const corsOptions = {
       return;
     }
     
+    // На Vercel фронтенд и бэкенд на одном домене, поэтому разрешаем все origin
+    if (process.env.VERCEL) {
+      callback(null, true);
+      return;
+    }
+    
     // В production разрешаем указанный frontend URL или все (если не указан)
     const allowedOrigins = config.frontendUrl 
       ? [config.frontendUrl, 'http://localhost:5173', 'http://localhost:3000']
       : ['*'];
     
+    // Разрешаем запросы без origin (same-origin requests) или из списка разрешенных
     if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log(`[CORS] Заблокирован origin: ${origin}, разрешены: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
