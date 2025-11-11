@@ -976,8 +976,8 @@ export default function Clubs() {
                       Выбрано месяцев: {addForm.rentalMonths.length} из 12
                     </p>
                   )}
+                  </div>
                 </div>
-              </div>
 
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
