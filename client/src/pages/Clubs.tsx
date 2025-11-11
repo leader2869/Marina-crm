@@ -623,7 +623,7 @@ export default function Clubs() {
                     {(club.isActive === false || !club.isActive) && (
                       <button
                         onClick={(e) => handleRestore(club.id, e)}
-                        disabled={restoring || deleting || hiding}
+                        disabled={restoring || deleting}
                         className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
                         title="Восстановить и опубликовать клуб"
                       >
@@ -632,7 +632,7 @@ export default function Clubs() {
                     )}
                     <button
                       onClick={(e) => handleDelete(club.id, e)}
-                      disabled={deleting || hiding || restoring}
+                      disabled={deleting || restoring}
                       className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
                       title="Удалить"
                     >
