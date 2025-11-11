@@ -57,7 +57,7 @@ export class TariffsController {
     try {
       const { clubId, name, type, amount, season, berthIds, months } = req.body;
 
-      if (!clubId || !name || !type || !amount || !season) {
+      if (!clubId || !name || !type || !amount) {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
       }
 
@@ -82,6 +82,9 @@ export class TariffsController {
       if (req.userRole === 'club_owner' && req.userId !== club.ownerId) {
         throw new AppError('Доступ запрещен', 403);
       }
+
+      // Используем season клуба, если season не передан
+      const tariffSeason = season ? parseInt(season) : (club.season || new Date().getFullYear());
 
       // Проверяем, что места принадлежат клубу
       if (berthIds && Array.isArray(berthIds) && berthIds.length > 0) {
@@ -112,7 +115,7 @@ export class TariffsController {
         name,
         type,
         amount: parseFloat(amount),
-        season: parseInt(season),
+        season: tariffSeason,
         clubId: parseInt(clubId),
         months: type === TariffType.MONTHLY_PAYMENT ? months : null,
       });

@@ -19,7 +19,6 @@ export default function Tariffs() {
     name: '',
     type: TariffType.SEASON_PAYMENT,
     amount: '',
-    season: new Date().getFullYear().toString(),
     selectedBerthIds: [] as number[],
     selectedMonths: [] as number[],
   })
@@ -88,7 +87,6 @@ export default function Tariffs() {
       name: '',
       type: TariffType.SEASON_PAYMENT,
       amount: '',
-      season: selectedClub?.season?.toString() || new Date().getFullYear().toString(),
       selectedBerthIds: [],
       selectedMonths: [],
     })
@@ -102,7 +100,6 @@ export default function Tariffs() {
       name: '',
       type: TariffType.SEASON_PAYMENT,
       amount: '',
-      season: new Date().getFullYear().toString(),
       selectedBerthIds: [],
       selectedMonths: [],
     })
@@ -114,7 +111,6 @@ export default function Tariffs() {
       name: tariff.name,
       type: tariff.type,
       amount: tariff.amount.toString(),
-      season: tariff.season.toString(),
       selectedBerthIds: tariff.berths?.map((b) => b.id) || [],
       selectedMonths: tariff.months || [],
     })
@@ -144,7 +140,7 @@ export default function Tariffs() {
   const handleSave = async () => {
     if (!selectedClub) return
 
-    if (!tariffForm.name || !tariffForm.amount || !tariffForm.season) {
+    if (!tariffForm.name || !tariffForm.amount) {
       alert('Заполните все обязательные поля')
       return
     }
@@ -172,7 +168,7 @@ export default function Tariffs() {
         name: tariffForm.name,
         type: tariffForm.type,
         amount: parseFloat(tariffForm.amount),
-        season: parseInt(tariffForm.season),
+        season: selectedClub.season || new Date().getFullYear(),
         berthIds: tariffForm.selectedBerthIds,
         months: tariffForm.type === TariffType.MONTHLY_PAYMENT ? tariffForm.selectedMonths : null,
       }
@@ -528,22 +524,6 @@ export default function Tariffs() {
                   onChange={(e) => setTariffForm({ ...tariffForm, amount: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                   placeholder="0.00"
-                />
-              </div>
-
-              {/* Сезон */}
-              <div>
-                <label htmlFor="tariff-season" className="block text-sm font-medium text-gray-700 mb-1">
-                  Сезон (год) *
-                </label>
-                <input
-                  id="tariff-season"
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  value={tariffForm.season}
-                  onChange={(e) => setTariffForm({ ...tariffForm, season: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 />
               </div>
 
