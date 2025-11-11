@@ -1793,19 +1793,6 @@ export default function ClubDetails() {
                       </div>
                     )
                   })()}
-
-                  <div className="flex items-center">
-                    <input
-                      id="booking-auto-renewal"
-                      type="checkbox"
-                      checked={bookingForm.autoRenewal}
-                      onChange={(e) => setBookingForm({ ...bookingForm, autoRenewal: e.target.checked })}
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="booking-auto-renewal" className="ml-2 block text-sm text-gray-700">
-                      Автоматическое продление
-                    </label>
-                  </div>
                 </div>
               </div>
 
