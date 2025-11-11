@@ -8,11 +8,9 @@ import app from '../src/server';
 // Но rewrites должны применяться ПЕРЕД вызовом serverless functions
 // Если запрос не на /api/* или /health, то это ошибка конфигурации
 export default (req: Request, res: Response) => {
-  // Логируем для отладки
-  console.log(`[Vercel Handler] ${req.method} ${req.url}`);
-  
   // Обрабатываем через Express app
   // Express app сам проверит маршруты и вернет 404 для несуществующих
+  // Логирование происходит в server.ts и в роутерах
   return app(req, res);
 };
 
