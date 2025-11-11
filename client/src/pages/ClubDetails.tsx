@@ -36,10 +36,12 @@ export default function ClubDetails() {
   const [showEditBerthModal, setShowEditBerthModal] = useState(false)
   const [selectedBerth, setSelectedBerth] = useState<Berth | null>(null)
   const [berthForm, setBerthForm] = useState({
+    mode: 'single' as 'single' | 'multiple', // Режим: одно место или несколько
+    number: '', // Номер для одного места
     length: '',
     width: '',
     notes: '',
-    count: '1', // Количество мест для создания
+    count: '1', // Количество мест для создания нескольких
   })
   const [savingBerth, setSavingBerth] = useState(false)
   const [deletingBerth, setDeletingBerth] = useState(false)
@@ -331,6 +333,8 @@ export default function ClubDetails() {
 
   const handleOpenAddBerth = () => {
     setBerthForm({
+      mode: 'single',
+      number: '',
       length: '20',
       width: '5',
       notes: '',
@@ -356,6 +360,8 @@ export default function ClubDetails() {
     setShowEditBerthModal(false)
     setSelectedBerth(null)
     setBerthForm({
+      mode: 'single',
+      number: '',
       length: '',
       width: '',
       notes: '',
@@ -370,25 +376,65 @@ export default function ClubDetails() {
     setError('')
 
     try {
-      const count = parseInt(berthForm.count) || 1
       const length = parseFloat(berthForm.length)
       const width = parseFloat(berthForm.width)
       const notes = berthForm.notes || null
 
-      // Создаем несколько мест с номерами от 1 до count
-      for (let i = 1; i <= count; i++) {
+      if (berthForm.mode === 'single') {
+        // Создаем одно место с указанным номером
+        if (!berthForm.number.trim()) {
+          setError('Укажите номер места')
+          setSavingBerth(false)
+          return
+        }
+
         await berthsService.create({
           clubId: club.id,
-          number: i.toString(),
+          number: berthForm.number.trim(),
           length: length,
           width: width,
           notes: notes,
         })
-      }
 
-      await loadClub()
-      handleCloseBerthModal()
-      alert(`Успешно создано ${count} ${count === 1 ? 'место' : count < 5 ? 'места' : 'мест'}`)
+        await loadClub()
+        handleCloseBerthModal()
+        alert('Место успешно создано')
+      } else {
+        // Создаем несколько мест с автонумерацией
+        const count = parseInt(berthForm.count) || 1
+        if (count < 1) {
+          setError('Количество мест должно быть больше 0')
+          setSavingBerth(false)
+          return
+        }
+
+        // Находим последний номер места
+        const existingBerths = club.berths || []
+        let lastNumber = 0
+        
+        // Пытаемся найти максимальный числовой номер
+        for (const berth of existingBerths) {
+          const num = parseInt(berth.number)
+          if (!isNaN(num) && num > lastNumber) {
+            lastNumber = num
+          }
+        }
+
+        // Создаем места начиная с последнего номера + 1
+        for (let i = 1; i <= count; i++) {
+          await berthsService.create({
+            clubId: club.id,
+            number: (lastNumber + i).toString(),
+            length: length,
+            width: width,
+            notes: notes,
+          })
+        }
+
+        await loadClub()
+        handleCloseBerthModal()
+        alert(`Успешно создано ${count} ${count === 1 ? 'место' : count < 5 ? 'места' : 'мест'} с номерами от ${lastNumber + 1} до ${lastNumber + count}`)
+      }
     } catch (err: any) {
       setError(err.error || err.message || 'Ошибка создания места')
     } finally {
@@ -1098,24 +1144,76 @@ export default function ClubDetails() {
                 )}
 
                 <div className="space-y-4">
+                  {/* Переключатель режима */}
                   <div>
-                    <label htmlFor="berth-count" className="block text-sm font-medium text-gray-700">
-                      Количество мест *
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Режим создания
                     </label>
-                    <input
-                      id="berth-count"
-                      type="number"
-                      required
-                      min="1"
-                      value={berthForm.count}
-                      onChange={(e) => setBerthForm({ ...berthForm, count: e.target.value })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      placeholder="1"
-                    />
-                    <p className="mt-1 text-sm text-gray-500">
-                      Будет создано мест с номерами от 1 до {berthForm.count || '1'}
-                    </p>
+                    <div className="flex gap-4">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="berth-mode"
+                          value="single"
+                          checked={berthForm.mode === 'single'}
+                          onChange={(e) => setBerthForm({ ...berthForm, mode: 'single' })}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Одно место</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="berth-mode"
+                          value="multiple"
+                          checked={berthForm.mode === 'multiple'}
+                          onChange={(e) => setBerthForm({ ...berthForm, mode: 'multiple' })}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Несколько мест</span>
+                      </label>
+                    </div>
                   </div>
+
+                  {/* Поле для одного места */}
+                  {berthForm.mode === 'single' && (
+                    <div>
+                      <label htmlFor="berth-number" className="block text-sm font-medium text-gray-700">
+                        Номер места *
+                      </label>
+                      <input
+                        id="berth-number"
+                        type="text"
+                        required
+                        value={berthForm.number}
+                        onChange={(e) => setBerthForm({ ...berthForm, number: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                        placeholder="Например: 1, A1, VIP-1"
+                      />
+                    </div>
+                  )}
+
+                  {/* Поле для нескольких мест */}
+                  {berthForm.mode === 'multiple' && (
+                    <div>
+                      <label htmlFor="berth-count" className="block text-sm font-medium text-gray-700">
+                        Количество мест *
+                      </label>
+                      <input
+                        id="berth-count"
+                        type="number"
+                        required
+                        min="1"
+                        value={berthForm.count}
+                        onChange={(e) => setBerthForm({ ...berthForm, count: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                        placeholder="60"
+                      />
+                      <p className="mt-1 text-sm text-gray-500">
+                        Места будут созданы с номерами начиная с последнего свободного номера
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
