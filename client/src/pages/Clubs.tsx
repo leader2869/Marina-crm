@@ -622,6 +622,17 @@ export default function Clubs() {
                     </button>
                   </>
                 )}
+                {/* Кнопка удаления для владельца клуба */}
+                {isClubOwner && club.ownerId === user?.id && (
+                  <button
+                    onClick={(e) => handleDelete(club.id, e)}
+                    disabled={deleting || restoring}
+                    className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                    title="Удалить (доступно только если нет связей)"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                )}
               </div>
             </div>
             <div className="flex-1 flex flex-col">
