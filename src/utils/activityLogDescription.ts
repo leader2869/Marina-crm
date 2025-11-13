@@ -91,6 +91,8 @@ export function generateActivityDescription(
             minPricePerMonth: 'Минимальная цена за месяц',
             season: 'Сезон',
             rentalMonths: 'Месяца аренды',
+            amount: 'Сумма',
+            months: 'Месяца',
           };
           
           const fieldName = fieldNames[key] || key;

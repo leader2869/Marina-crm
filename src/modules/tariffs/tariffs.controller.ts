@@ -8,6 +8,9 @@ import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { TariffType } from '../../entities/Tariff';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
+import { ActivityLogService } from '../../services/activityLog.service';
+import { ActivityType, EntityType } from '../../entities/ActivityLog';
+import { generateActivityDescription } from '../../utils/activityLogDescription';
 
 export class TariffsController {
   // Получить все тарифы клуба
@@ -172,6 +175,16 @@ export class TariffsController {
         throw new AppError('Доступ запрещен', 403);
       }
 
+      // Сохраняем старые значения для логирования
+      const oldValues = {
+        name: tariff.name,
+        type: tariff.type,
+        amount: tariff.amount,
+        season: tariff.season,
+        months: tariff.months,
+        clubId: tariff.clubId,
+      };
+
       if (name !== undefined) tariff.name = name;
       if (type !== undefined) {
         if (!Object.values(TariffType).includes(type)) {
@@ -259,6 +272,43 @@ export class TariffsController {
         ...updatedTariff,
         berths: updatedTariff?.tariffBerths?.map((tb) => tb.berth) || [],
       };
+
+      // Формируем новые значения для логирования
+      const newValues = {
+        name: updatedTariff!.name,
+        type: updatedTariff!.type,
+        amount: updatedTariff!.amount,
+        season: updatedTariff!.season,
+        months: updatedTariff!.months,
+        clubId: updatedTariff!.clubId,
+      };
+
+      // Логируем обновление с детальным описанием изменений
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
+      const description = generateActivityDescription(
+        ActivityType.UPDATE,
+        EntityType.TARIFF,
+        tariff.id,
+        userName,
+        updatedTariff!.name,
+        oldValues,
+        newValues
+      );
+
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.UPDATE,
+        entityType: EntityType.TARIFF,
+        entityId: tariff.id,
+        userId: req.userId || null,
+        description,
+        oldValues,
+        newValues,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
+
+      // Помечаем, что детальное логирование уже выполнено, чтобы избежать дублирования
+      (res as any).locals = { ...(res as any).locals, skipAutoLogging: true };
 
       res.json(result);
     } catch (error) {
