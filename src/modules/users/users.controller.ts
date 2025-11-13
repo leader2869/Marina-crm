@@ -11,6 +11,7 @@ import { PaymentStatus, UserRole } from '../../types';
 import { hashPassword } from '../../utils/password';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
+import { generateActivityDescription } from '../../utils/activityLogDescription';
 
 export class UsersController {
   // Вспомогательный метод для нормализации номера телефона
@@ -300,18 +301,22 @@ export class UsersController {
       });
 
       // Логируем создание пользователя
+      const currentUser = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      const newUserName = `${createdUser!.firstName} ${createdUser!.lastName}`;
       await ActivityLogService.logActivity({
         activityType: ActivityType.CREATE,
         entityType: EntityType.USER,
         entityId: createdUser!.id,
         userId: req.userId || null,
-        description: `Создан пользователь: ${createdUser!.firstName} ${createdUser!.lastName} (${createdUser!.email})`,
-        newValues: {
-          email: createdUser!.email,
-          firstName: createdUser!.firstName,
-          lastName: createdUser!.lastName,
-          role: createdUser!.role,
-        },
+        description: generateActivityDescription(
+          ActivityType.CREATE,
+          EntityType.USER,
+          createdUser!.id,
+          currentUser,
+          newUserName
+        ),
+        oldValues: null,
+        newValues: null,
         ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
         userAgent: req.headers['user-agent'] || null,
       });

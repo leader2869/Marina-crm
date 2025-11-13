@@ -3,6 +3,7 @@ import { ActivityLogService } from '../services/activityLog.service';
 import { ActivityType, EntityType } from '../entities/ActivityLog';
 import { AuthRequest } from './auth';
 import { getEntityTypeFromPath } from './activityLogger';
+import { generateActivityDescription } from '../utils/activityLogDescription';
 
 /**
  * Универсальный middleware для автоматического логирования всех изменений
@@ -74,25 +75,39 @@ export const autoActivityLogger = async (
         entityId = parseInt(body.vessel.id);
       }
       
-      // Формируем описание
-      let description: string | null = null;
-      if (activityType === ActivityType.CREATE) {
-        description = `Создана сущность ${entityType}`;
-      } else if (activityType === ActivityType.UPDATE) {
-        description = `Обновлена сущность ${entityType}`;
-      } else if (activityType === ActivityType.DELETE) {
-        description = `Удалена сущность ${entityType}`;
+      // Формируем понятное описание на русском языке
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      let entityName: string | null = null;
+      
+      // Пытаемся получить название сущности из ответа
+      if (body?.name) {
+        entityName = body.name;
+      } else if (body?.user?.firstName && body?.user?.lastName) {
+        entityName = `${body.user.firstName} ${body.user.lastName}`;
+      } else if (body?.club?.name) {
+        entityName = body.club.name;
+      } else if (body?.vessel?.name) {
+        entityName = body.vessel.name;
       }
       
+      const description = generateActivityDescription(
+        activityType,
+        entityType,
+        entityId,
+        userName,
+        entityName
+      );
+      
       // Логируем действие (не ждем завершения, чтобы не замедлять ответ)
+      // Не сохраняем oldValues и newValues, так как описание уже содержит всю необходимую информацию
       ActivityLogService.logActivity({
         activityType,
         entityType,
         entityId,
         userId: req.userId || null,
         description,
-        oldValues: activityType === ActivityType.UPDATE ? req.body : null,
-        newValues: activityType === ActivityType.DELETE ? null : (body || req.body),
+        oldValues: null, // Не сохраняем JSON, только понятное описание
+        newValues: null, // Не сохраняем JSON, только понятное описание
         ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
         userAgent: req.headers['user-agent'] || null,
       }).catch((error) => {
