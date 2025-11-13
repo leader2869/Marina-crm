@@ -189,42 +189,45 @@ export class BookingsController {
       });
 
       // Проверяем, что длина катера не превышает максимальную длину места
-      // TypeORM с PostgreSQL возвращает decimal как строки, поэтому преобразуем их в числа
+      // КРИТИЧЕСКИ ВАЖНО: TypeORM может возвращать decimal как строки
+      // Нужно явно преобразовать в числа, иначе сравнение "6" > "20" даст true (лексикографическое сравнение)
       
-      // Получаем исходные значения и преобразуем в числа
-      const vesselLength = Number(String(vessel.length).replace(',', '.'));
-      const berthLength = Number(String(berth.length).replace(',', '.'));
+      // Получаем исходные значения
+      const vesselLengthRaw = vessel.length;
+      const berthLengthRaw = berth.length;
+      
+      // ЯВНО преобразуем в числа через parseFloat для надежности
+      // Сначала преобразуем в строку, заменяем запятую на точку, затем в число
+      const vesselLength = parseFloat(String(vesselLengthRaw).replace(',', '.').trim());
+      const berthLength = parseFloat(String(berthLengthRaw).replace(',', '.').trim());
       
       // Проверка на валидность чисел
       if (isNaN(vesselLength) || isNaN(berthLength) || vesselLength <= 0 || berthLength <= 0) {
         throw new AppError(
-          `Ошибка при проверке размеров. Длина катера: ${vessel.length}, Длина места: ${berth.length}. Пожалуйста, обратитесь в поддержку.`,
+          `Ошибка при проверке размеров. Длина катера: ${vessel.length} (тип: ${typeof vessel.length}), Длина места: ${berth.length} (тип: ${typeof berth.length}). Пожалуйста, обратитесь в поддержку.`,
+          500
+        );
+      }
+      
+      // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: Убеждаемся, что это действительно числа
+      if (typeof vesselLength !== 'number' || typeof berthLength !== 'number') {
+        throw new AppError(
+          `Ошибка преобразования типов. vesselLength: ${vesselLength} (${typeof vesselLength}), berthLength: ${berthLength} (${typeof berthLength})`,
           500
         );
       }
       
       // ПРОВЕРКА: Катер должен быть меньше или равен длине места
-      // Если катер меньше места - это нормально, пропускаем
-      
-      // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: Если катер маленький, а место большое, но сравнение говорит обратное
-      // Это явная ошибка - пропускаем проверку
-      if (vesselLength < 15 && berthLength > vesselLength * 1.5) {
-        // Катер маленький, место большое - это нормально, пропускаем проверку
-        // Это защита от ошибок в данных
-      } else if (vesselLength <= berthLength) {
-        // Катер помещается - все ОК
-        // Ничего не делаем, продолжаем создание бронирования
-      } else {
+      // Сравниваем ЧИСЛА, а не строки!
+      if (vesselLength > berthLength) {
         // Катер больше места - это ошибка
-        // Но только если это действительно так (катер не маленький, место не большое)
-        if (vesselLength >= 15 || berthLength <= vesselLength * 1.5) {
-          // Нормальная ошибка - катер действительно больше места
-          throw new AppError(
-            `Длина катера (${vesselLength.toFixed(2)} м) превышает максимальную длину места (${berthLength.toFixed(2)} м). Бронирование невозможно.`,
-            400
-          );
-        }
+        throw new AppError(
+          `Длина катера (${vesselLength.toFixed(2)} м) превышает максимальную длину места (${berthLength.toFixed(2)} м). Бронирование невозможно.`,
+          400
+        );
       }
+      
+      // Если дошли сюда - катер помещается, все ОК
 
       // Загружаем клуб с месяцами навигации
       const clubRepository = AppDataSource.getRepository(Club);
