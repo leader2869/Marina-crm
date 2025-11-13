@@ -6,6 +6,9 @@ import { generateToken } from '../../utils/jwt';
 import { AppError } from '../../middleware/errorHandler';
 import { AuthRequest } from '../../middleware/auth';
 import { UserRole } from '../../types';
+import { ActivityLogService } from '../../services/activityLog.service';
+import { ActivityType, EntityType } from '../../entities/ActivityLog';
+import { generateActivityDescription } from '../../utils/activityLogDescription';
 
 export class AuthController {
   // Вспомогательный метод для нормализации номера телефона
@@ -214,6 +217,33 @@ export class AuthController {
         userId: user.id,
         email: user.email,
         role: user.role,
+      });
+
+      // Логируем вход в систему
+      const userName = `${user.firstName} ${user.lastName}`.trim();
+      const logDescription = generateActivityDescription(
+        ActivityType.LOGIN,
+        EntityType.USER,
+        user.id,
+        userName,
+        null,
+        null,
+        null
+      );
+
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.LOGIN,
+        entityType: EntityType.USER,
+        entityId: user.id,
+        userId: user.id,
+        description: logDescription,
+        oldValues: null,
+        newValues: null,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
+      }).catch((error) => {
+        console.error('Ошибка логирования входа:', error);
+        // Не прерываем процесс входа, если логирование не удалось
       });
 
       res.json({
