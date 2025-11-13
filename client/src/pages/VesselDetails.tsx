@@ -125,6 +125,11 @@ export default function VesselDetails() {
   const handleSave = async () => {
     if (!vessel) return
 
+    if (!editForm.name || !editForm.type || !editForm.length || !editForm.width) {
+      setError('Заполните все обязательные поля: Название, Тип, Длина, Ширина')
+      return
+    }
+
     setError('')
     setSaving(true)
 
@@ -133,7 +138,7 @@ export default function VesselDetails() {
         name: editForm.name,
         type: editForm.type,
         length: parseFloat(editForm.length),
-        width: editForm.width ? parseFloat(editForm.width) : null,
+        width: parseFloat(editForm.width),
         heightAboveWaterline: editForm.heightAboveWaterline ? parseFloat(editForm.heightAboveWaterline) : null,
         registrationNumber: editForm.registrationNumber || null,
         technicalSpecs: editForm.technicalSpecs || null,
@@ -275,12 +280,13 @@ export default function VesselDetails() {
               </div>
               <div>
                 <label htmlFor="edit-width" className="block text-sm font-medium text-gray-700 mb-1">
-                  Ширина (м)
+                  Ширина (м) *
                 </label>
                 <input
                   id="edit-width"
                   type="number"
                   step="0.01"
+                  required
                   value={editForm.width}
                   onChange={(e) => setEditForm({ ...editForm, width: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"

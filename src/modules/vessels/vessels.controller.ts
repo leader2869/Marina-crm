@@ -164,6 +164,20 @@ export class VesselsController {
       // Обновление остальных полей (исключая ownerId, который обработан выше)
       const { ownerId, technicalSpecs, ...otherFields } = req.body;
       
+      // Проверка обязательных полей
+      if (otherFields.name !== undefined && !otherFields.name) {
+        throw new AppError('Название судна обязательно', 400);
+      }
+      if (otherFields.type !== undefined && !otherFields.type) {
+        throw new AppError('Тип судна обязателен', 400);
+      }
+      if (otherFields.length !== undefined && !otherFields.length) {
+        throw new AppError('Длина судна обязательна', 400);
+      }
+      if (otherFields.width !== undefined && (otherFields.width === null || otherFields.width === '' || otherFields.width === undefined)) {
+        throw new AppError('Ширина судна обязательна', 400);
+      }
+      
       // Проверка: если судно скрыто, то оно не может быть опубликовано
       if (vessel.isActive === false) {
         // Если судно скрыто, сбрасываем статус публикации
@@ -182,6 +196,17 @@ export class VesselsController {
       if (otherFields.isActive !== undefined && otherFields.isActive === false && vessel.isActive === true) {
         vessel.isValidated = false;
         vessel.isSubmittedForValidation = false;
+      }
+      
+      // Парсим числовые поля
+      if (otherFields.length !== undefined) {
+        otherFields.length = parseFloat(otherFields.length as string);
+      }
+      if (otherFields.width !== undefined) {
+        otherFields.width = parseFloat(otherFields.width as string);
+      }
+      if (otherFields.heightAboveWaterline !== undefined && otherFields.heightAboveWaterline !== null && otherFields.heightAboveWaterline !== '') {
+        otherFields.heightAboveWaterline = parseFloat(otherFields.heightAboveWaterline as string);
       }
       
       Object.assign(vessel, otherFields);
