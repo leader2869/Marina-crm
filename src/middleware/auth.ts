@@ -4,6 +4,19 @@ import { UserRole } from '../types';
 import { AppDataSource } from '../config/database';
 import { User } from '../entities/User';
 
+// Расширяем Request из Express, сохраняя все его свойства (body, params, query, headers и т.д.)
+// Используем declaration merging для правильной работы типов
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User;
+      userId?: number;
+      userRole?: UserRole;
+    }
+  }
+}
+
+// Для обратной совместимости оставляем интерфейс
 export interface AuthRequest extends Request {
   user?: User;
   userId?: number;
