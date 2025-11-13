@@ -244,15 +244,33 @@ export default function ClubDetails() {
       return
     }
 
-    // Проверка длины катера относительно максимальной длины места
+    // Проверка длины и ширины катера относительно максимальных размеров места
     // ВАЖНО: Преобразуем в числа для корректного сравнения (избегаем лексикографического сравнения строк)
     const selectedVessel = userVessels.find(v => v.id.toString() === bookingForm.vesselId)
     if (selectedVessel && berthFromClub) {
+      // Проверка длины
       const vesselLength = parseFloat(String(selectedVessel.length).replace(',', '.'))
       const berthLength = parseFloat(String(berthFromClub.length).replace(',', '.'))
       
       if (!isNaN(vesselLength) && !isNaN(berthLength) && vesselLength > berthLength) {
         setError(`Длина катера (${vesselLength.toFixed(2)} м) превышает максимальную длину места (${berthLength.toFixed(2)} м). Бронирование невозможно.`)
+        return
+      }
+      
+      // Проверка ширины
+      if (selectedVessel.width && berthFromClub.width) {
+        const vesselWidth = parseFloat(String(selectedVessel.width).replace(',', '.'))
+        const berthWidth = parseFloat(String(berthFromClub.width).replace(',', '.'))
+        
+        if (!isNaN(vesselWidth) && !isNaN(berthWidth) && vesselWidth > berthWidth) {
+          setError(`Ширина катера (${vesselWidth.toFixed(2)} м) превышает максимальную ширину места (${berthWidth.toFixed(2)} м). Бронирование невозможно.`)
+          return
+        }
+      } else if (selectedVessel.width && !berthFromClub.width) {
+        setError('У места не указана максимальная ширина. Пожалуйста, обратитесь к администратору.')
+        return
+      } else if (!selectedVessel.width) {
+        setError('У катера не указана ширина. Пожалуйста, укажите ширину катера перед бронированием.')
         return
       }
     }

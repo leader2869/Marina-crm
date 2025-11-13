@@ -182,10 +182,14 @@ export class BookingsController {
         berthNumber: berth.number,
         berthLength: berth.length,
         berthLengthType: typeof berth.length,
+        berthWidth: berth.width,
+        berthWidthType: typeof berth.width,
         vesselId: vessel.id,
         vesselName: vessel.name,
         vesselLength: vessel.length,
         vesselLengthType: typeof vessel.length,
+        vesselWidth: vessel.width,
+        vesselWidthType: typeof vessel.width,
       });
 
       // Проверяем, что длина катера не превышает максимальную длину места
@@ -292,13 +296,101 @@ export class BookingsController {
         );
       }
       
-      console.log('✅ Проверка пройдена успешно:', {
+      console.log('✅ Проверка длины пройдена успешно:', {
         vesselLength: vesselLengthNum,
         berthLength: berthLengthNum,
         difference: berthLengthNum - vesselLengthNum,
       });
       
-      // Если дошли сюда - катер помещается, все ОК
+      // Если дошли сюда - катер помещается по длине, проверяем ширину
+      
+      // Проверка ширины катера относительно максимальной ширины места
+      // ВАЖНО: Ширина теперь обязательна, но проверяем на всякий случай
+      if (!vessel.width) {
+        throw new AppError('У катера не указана ширина. Пожалуйста, укажите ширину катера перед бронированием.', 400);
+      }
+      
+      if (!berth.width) {
+        throw new AppError('У места не указана максимальная ширина. Пожалуйста, обратитесь к администратору.', 400);
+      }
+      
+      // Получаем исходные значения ширины
+      let vesselWidthRaw: any = vessel.width;
+      let berthWidthRaw: any = berth.width;
+      
+      // Преобразуем vessel.width
+      let vesselWidth: number;
+      let berthWidth: number;
+      
+      if (typeof vesselWidthRaw === 'number' && !isNaN(vesselWidthRaw)) {
+        vesselWidth = vesselWidthRaw;
+      } else if (typeof vesselWidthRaw === 'string') {
+        const cleaned = vesselWidthRaw.trim().replace(',', '.');
+        vesselWidth = parseFloat(cleaned);
+      } else {
+        const str = String(vesselWidthRaw).trim().replace(',', '.');
+        vesselWidth = parseFloat(str);
+      }
+      
+      // Преобразуем berth.width
+      if (typeof berthWidthRaw === 'number' && !isNaN(berthWidthRaw)) {
+        berthWidth = berthWidthRaw;
+      } else if (typeof berthWidthRaw === 'string') {
+        const cleaned = berthWidthRaw.trim().replace(',', '.');
+        berthWidth = parseFloat(cleaned);
+      } else {
+        const str = String(berthWidthRaw).trim().replace(',', '.');
+        berthWidth = parseFloat(str);
+      }
+      
+      // Проверяем валидность чисел
+      if (isNaN(vesselWidth) || isNaN(berthWidth) || vesselWidth <= 0 || berthWidth <= 0) {
+        throw new AppError(
+          `Ошибка при проверке ширины. Ширина катера: ${vessel.width} (тип: ${typeof vessel.width}), Ширина места: ${berth.width} (тип: ${typeof berth.width}). Пожалуйста, обратитесь в поддержку.`,
+          500
+        );
+      }
+      
+      // Финальная проверка типов
+      if (typeof vesselWidth !== 'number' || typeof berthWidth !== 'number') {
+        throw new AppError(
+          `Ошибка преобразования типов ширины. vesselWidth: ${vesselWidth} (${typeof vesselWidth}), berthWidth: ${berthWidth} (${typeof berthWidth})`,
+          500
+        );
+      }
+      
+      // Преобразуем через Number() для строгого сравнения
+      const vesselWidthNum = Number(vesselWidth);
+      const berthWidthNum = Number(berthWidth);
+      
+      console.log('=== ПРОВЕРКА ШИРИНЫ ===');
+      console.log('  vessel.width:', vessel.width, 'тип:', typeof vessel.width);
+      console.log('  berth.width:', berth.width, 'тип:', typeof berth.width);
+      console.log('  vesselWidthNum:', vesselWidthNum, 'berthWidthNum:', berthWidthNum);
+      console.log('  vesselWidthNum > berthWidthNum:', vesselWidthNum > berthWidthNum);
+      
+      // Проверка: Катер должен быть уже или равен ширине места
+      const isVesselTooWide = vesselWidthNum > berthWidthNum;
+      
+      if (isVesselTooWide) {
+        console.error('ОШИБКА: Катер слишком широкий!', {
+          vesselWidth: vesselWidthNum,
+          berthWidth: berthWidthNum,
+          difference: vesselWidthNum - berthWidthNum,
+        });
+        throw new AppError(
+          `Ширина катера (${vesselWidthNum.toFixed(2)} м) превышает максимальную ширину места (${berthWidthNum.toFixed(2)} м). Бронирование невозможно.`,
+          400
+        );
+      }
+      
+      console.log('✅ Проверка ширины пройдена успешно:', {
+        vesselWidth: vesselWidthNum,
+        berthWidth: berthWidthNum,
+        difference: berthWidthNum - vesselWidthNum,
+      });
+      
+      // Если дошли сюда - катер помещается по длине и ширине, все ОК
 
       // Загружаем клуб с месяцами навигации
       const clubRepository = AppDataSource.getRepository(Club);
