@@ -135,7 +135,7 @@ export default function ActivityLogs() {
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Тип сущности
+              Вид пользователя
             </label>
             <select
               value={filters.entityType}
@@ -245,7 +245,7 @@ export default function ActivityLogs() {
                   Действие
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Сущность
+                  Пользователь
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Описание
