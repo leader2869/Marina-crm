@@ -82,8 +82,8 @@ export class VesselsController {
         photo,
       } = req.body;
 
-      if (!name || !type || !length) {
-        throw new AppError('Все обязательные поля должны быть заполнены', 400);
+      if (!name || !type || !length || !width) {
+        throw new AppError('Все обязательные поля должны быть заполнены (название, тип, длина, ширина)', 400);
       }
 
       if (!req.userId) {
@@ -95,7 +95,7 @@ export class VesselsController {
         name: name as string,
         type: type as string,
         length: parseFloat(length as string),
-        width: width ? parseFloat(width as string) : undefined,
+        width: parseFloat(width as string),
         heightAboveWaterline: heightAboveWaterline ? parseFloat(heightAboveWaterline as string) : undefined,
         registrationNumber: registrationNumber as string | undefined,
         documentPath: documentPath as string | undefined,

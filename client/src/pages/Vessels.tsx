@@ -94,8 +94,8 @@ export default function Vessels() {
   }
 
   const handleCreate = async () => {
-    if (!addForm.name || !addForm.type || !addForm.length) {
-      setError('Заполните все обязательные поля: Название, Тип, Длина')
+    if (!addForm.name || !addForm.type || !addForm.length || !addForm.width) {
+      setError('Заполните все обязательные поля: Название, Тип, Длина, Ширина')
       return
     }
 
@@ -107,7 +107,7 @@ export default function Vessels() {
         name: addForm.name,
         type: addForm.type,
         length: parseFloat(addForm.length),
-        width: addForm.width ? parseFloat(addForm.width) : null,
+        width: parseFloat(addForm.width),
         heightAboveWaterline: addForm.heightAboveWaterline ? parseFloat(addForm.heightAboveWaterline) : null,
         registrationNumber: addForm.registrationNumber || null,
         technicalSpecs: addForm.technicalSpecs || null,
@@ -447,12 +447,13 @@ export default function Vessels() {
 
                   <div>
                     <label htmlFor="add-width" className="block text-sm font-medium text-gray-700">
-                      Ширина (м)
+                      Ширина (м) *
                     </label>
                     <input
                       id="add-width"
                       type="number"
                       step="0.1"
+                      required
                       value={addForm.width}
                       onChange={(e) => setAddForm({ ...addForm, width: e.target.value })}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
