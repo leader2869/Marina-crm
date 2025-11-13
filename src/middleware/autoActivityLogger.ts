@@ -4,6 +4,15 @@ import { ActivityType, EntityType } from '../entities/ActivityLog';
 import { AuthRequest } from './auth';
 import { getEntityTypeFromPath } from './activityLogger';
 import { generateActivityDescription } from '../utils/activityLogDescription';
+import { AppDataSource } from '../config/database';
+import { User } from '../entities/User';
+import { Club } from '../entities/Club';
+import { Vessel } from '../entities/Vessel';
+import { Booking } from '../entities/Booking';
+import { Berth } from '../entities/Berth';
+import { Payment } from '../entities/Payment';
+import { Tariff } from '../entities/Tariff';
+import { BookingRule } from '../entities/BookingRule';
 
 /**
  * Универсальный middleware для автоматического логирования всех изменений
@@ -18,6 +27,67 @@ export const autoActivityLogger = async (
   const originalStatus = res.status.bind(res);
   
   let statusCode = 200;
+  let oldValues: Record<string, any> | null = null;
+  
+  // Для UPDATE операций загружаем старые значения перед обновлением
+  const method = req.method.toUpperCase();
+  if ((method === 'PUT' || method === 'PATCH') && req.params.id) {
+    try {
+      const entityType = getEntityTypeFromPath(req.path);
+      const entityId = parseInt(req.params.id);
+      
+      if (entityId && entityType !== EntityType.OTHER) {
+        let repository: any = null;
+        
+        switch (entityType) {
+          case EntityType.USER:
+            repository = AppDataSource.getRepository(User);
+            break;
+          case EntityType.CLUB:
+            repository = AppDataSource.getRepository(Club);
+            break;
+          case EntityType.VESSEL:
+            repository = AppDataSource.getRepository(Vessel);
+            break;
+          case EntityType.BOOKING:
+            repository = AppDataSource.getRepository(Booking);
+            break;
+          case EntityType.BERTH:
+            repository = AppDataSource.getRepository(Berth);
+            break;
+          case EntityType.PAYMENT:
+            repository = AppDataSource.getRepository(Payment);
+            break;
+          case EntityType.TARIFF:
+            repository = AppDataSource.getRepository(Tariff);
+            break;
+          case EntityType.BOOKING_RULE:
+            repository = AppDataSource.getRepository(BookingRule);
+            break;
+        }
+        
+        if (repository) {
+          const entity = await repository.findOne({ where: { id: entityId } });
+          if (entity) {
+            // Удаляем служебные поля и связи
+            const { password, ...entityData } = entity;
+            oldValues = { ...entityData };
+            // Удаляем вложенные объекты и функции
+            Object.keys(oldValues).forEach(key => {
+              if (typeof oldValues[key] === 'object' && oldValues[key] !== null && !Array.isArray(oldValues[key]) && !(oldValues[key] instanceof Date)) {
+                if (oldValues[key].constructor.name !== 'Object') {
+                  delete oldValues[key];
+                }
+              }
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки старых значений для логирования:', error);
+      // Продолжаем выполнение, даже если не удалось загрузить старые значения
+    }
+  }
   
   // Переопределяем res.status для перехвата статуса
   res.status = function (code: number) {
@@ -98,24 +168,55 @@ export const autoActivityLogger = async (
         entityName = body.vessel.name;
       }
       
-      const description = generateActivityDescription(
-        activityType,
-        entityType,
-        entityId,
-        userName,
-        entityName
-      );
+      // Для UPDATE формируем описание с изменениями, если есть oldValues и newValues
+      let description: string;
+      let finalOldValues: Record<string, any> | null = null;
+      let finalNewValues: Record<string, any> | null = null;
+      
+      if (activityType === ActivityType.UPDATE && oldValues && body) {
+        // Формируем newValues из ответа
+        const { password, ...newData } = body;
+        finalNewValues = { ...newData };
+        // Удаляем вложенные объекты и функции
+        Object.keys(finalNewValues).forEach(key => {
+          if (typeof finalNewValues[key] === 'object' && finalNewValues[key] !== null && !Array.isArray(finalNewValues[key]) && !(finalNewValues[key] instanceof Date)) {
+            if (finalNewValues[key].constructor.name !== 'Object') {
+              delete finalNewValues[key];
+            }
+          }
+        });
+        
+        finalOldValues = oldValues;
+        
+        // Генерируем описание с изменениями
+        description = generateActivityDescription(
+          activityType,
+          entityType,
+          entityId,
+          userName,
+          entityName,
+          finalOldValues,
+          finalNewValues
+        );
+      } else {
+        description = generateActivityDescription(
+          activityType,
+          entityType,
+          entityId,
+          userName,
+          entityName
+        );
+      }
       
       // Логируем действие (не ждем завершения, чтобы не замедлять ответ)
-      // Не сохраняем oldValues и newValues, так как описание уже содержит всю необходимую информацию
       ActivityLogService.logActivity({
         activityType,
         entityType,
         entityId,
         userId: req.userId || null,
         description,
-        oldValues: null, // Не сохраняем JSON, только понятное описание
-        newValues: null, // Не сохраняем JSON, только понятное описание
+        oldValues: finalOldValues,
+        newValues: finalNewValues,
         ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
         userAgent: req.headers['user-agent'] || null,
       }).catch((error) => {
