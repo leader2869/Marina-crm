@@ -344,12 +344,10 @@ export default function VesselDetails() {
                 <span className="text-gray-600">Длина:</span>
                 <span className="font-semibold text-gray-900">{vessel.length} м</span>
               </div>
-              {vessel.width && (
-                <div className="flex justify-between py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Ширина:</span>
-                  <span className="font-semibold text-gray-900">{vessel.width} м</span>
-                </div>
-              )}
+              <div className="flex justify-between py-2 border-b border-gray-200">
+                <span className="text-gray-600">Ширина *:</span>
+                <span className="font-semibold text-gray-900">{vessel.width} м</span>
+              </div>
               {vessel.heightAboveWaterline && (
                 <div className="flex justify-between py-2 border-b border-gray-200">
                   <span className="text-gray-600">Высота над ватерлинией:</span>
