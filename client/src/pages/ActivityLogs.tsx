@@ -78,7 +78,7 @@ export default function ActivityLogs() {
       if (filters.startDate) params.startDate = filters.startDate
       if (filters.endDate) params.endDate = filters.endDate
 
-      const response = await activityLogsService.getAll(params)
+      const response: any = await activityLogsService.getAll(params)
       console.log('Ответ от API логов:', response)
       
       // API interceptor уже возвращает response.data, поэтому обращаемся напрямую к полям
