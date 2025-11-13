@@ -73,13 +73,15 @@ export const autoActivityLogger = async (
             const { password, ...entityData } = entity;
             oldValues = { ...entityData };
             // Удаляем вложенные объекты и функции
-            Object.keys(oldValues).forEach(key => {
-              if (typeof oldValues[key] === 'object' && oldValues[key] !== null && !Array.isArray(oldValues[key]) && !(oldValues[key] instanceof Date)) {
-                if (oldValues[key].constructor.name !== 'Object') {
-                  delete oldValues[key];
+            if (oldValues) {
+              Object.keys(oldValues).forEach(key => {
+                if (typeof oldValues![key] === 'object' && oldValues![key] !== null && !Array.isArray(oldValues![key]) && !(oldValues![key] instanceof Date)) {
+                  if (oldValues![key].constructor.name !== 'Object') {
+                    delete oldValues![key];
+                  }
                 }
-              }
-            });
+              });
+            }
           }
         }
       }
@@ -178,13 +180,15 @@ export const autoActivityLogger = async (
         const { password, ...newData } = body;
         finalNewValues = { ...newData };
         // Удаляем вложенные объекты и функции
-        Object.keys(finalNewValues).forEach(key => {
-          if (typeof finalNewValues[key] === 'object' && finalNewValues[key] !== null && !Array.isArray(finalNewValues[key]) && !(finalNewValues[key] instanceof Date)) {
-            if (finalNewValues[key].constructor.name !== 'Object') {
-              delete finalNewValues[key];
+        if (finalNewValues) {
+          Object.keys(finalNewValues).forEach(key => {
+            if (typeof finalNewValues![key] === 'object' && finalNewValues![key] !== null && !Array.isArray(finalNewValues![key]) && !(finalNewValues![key] instanceof Date)) {
+              if (finalNewValues![key].constructor.name !== 'Object') {
+                delete finalNewValues![key];
+              }
             }
-          }
-        });
+          });
+        }
         
         finalOldValues = oldValues;
         

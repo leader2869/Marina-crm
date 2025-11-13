@@ -121,7 +121,7 @@ export class BookingRulesController {
       }
 
       const { id } = req.params;
-      const { clubId, tariffId, ruleType, description, parameters } = req.body;
+      const { clubId, tariffId, ruleType, description: ruleDescription, parameters } = req.body;
 
       const bookingRuleRepository = AppDataSource.getRepository(BookingRule);
       const rule = await bookingRuleRepository.findOne({
@@ -190,8 +190,8 @@ export class BookingRulesController {
         rule.ruleType = ruleType as BookingRuleType;
       }
 
-      if (description !== undefined) {
-        rule.description = description;
+      if (ruleDescription !== undefined) {
+        rule.description = ruleDescription;
       }
 
       if (parameters !== undefined) {
