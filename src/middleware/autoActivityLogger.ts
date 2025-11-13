@@ -30,14 +30,13 @@ export const autoActivityLogger = async (
     // Вызываем оригинальный метод
     const result = originalJson(body);
     
-    // Логируем только успешные изменения (POST, PUT, PATCH, DELETE)
+    // Логируем только успешные изменения (POST, PUT, PATCH)
+    // Для DELETE не логируем автоматически, так как логирование выполняется в контроллерах с детальной информацией
     if (statusCode >= 200 && statusCode < 300) {
       const method = req.method.toUpperCase();
       let activityType: ActivityType | null = null;
       
       // Определяем тип активности по методу
-      // Для DELETE не логируем автоматически, так как логирование выполняется в контроллерах с детальной информацией
-      let activityType: ActivityType | null = null;
       switch (method) {
         case 'POST':
           activityType = ActivityType.CREATE;
