@@ -20,7 +20,8 @@ import {
   FileText,
   Edit2,
   Check,
-  X as XIcon
+  X as XIcon,
+  Code
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -49,6 +50,7 @@ export default function Layout() {
       { name: 'Яхт-клубы', href: '/clubs', icon: Anchor, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Судна', href: '/vessels', icon: Ship, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER] },
       { name: 'Бронирования', href: '/bookings', icon: Calendar, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
+      { name: 'Виджет', href: '/widget', icon: Code, roles: [UserRole.VESSEL_OWNER] },
       { name: 'Тарифы', href: '/tariffs', icon: Receipt, roles: [UserRole.CLUB_OWNER] },
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
@@ -82,6 +84,9 @@ export default function Layout() {
       if (userRole === UserRole.CLUB_OWNER || String(userRole) === 'club_owner') {
         console.log(`Item "${item.name}": roles=${JSON.stringify(item.roles)}, hasAccess=${hasAccess}`)
       }
+      if (userRole === UserRole.VESSEL_OWNER || String(userRole) === 'vessel_owner') {
+        console.log(`Item "${item.name}": roles=${JSON.stringify(item.roles)}, hasAccess=${hasAccess}`)
+      }
       return hasAccess
     })
     
@@ -100,6 +105,24 @@ export default function Layout() {
       filteredItems.sort((a, b) => {
         const orderA = clubOwnerOrder[a.href] || 999
         const orderB = clubOwnerOrder[b.href] || 999
+        return orderA - orderB
+      })
+    }
+    
+    // Для судовладельца сортируем пункты меню в нужном порядке
+    if (userRole === UserRole.VESSEL_OWNER || String(userRole) === 'vessel_owner') {
+      const vesselOwnerOrder: { [key: string]: number } = {
+        '/dashboard': 1,
+        '/clubs': 2,
+        '/vessels': 3,
+        '/bookings': 4,
+        '/widget': 5,
+        '/payments': 6,
+      }
+      
+      filteredItems.sort((a, b) => {
+        const orderA = vesselOwnerOrder[a.href] || 999
+        const orderB = vesselOwnerOrder[b.href] || 999
         return orderA - orderB
       })
     }

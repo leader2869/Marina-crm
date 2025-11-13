@@ -20,6 +20,7 @@ import Users from './pages/Users'
 import UserDetails from './pages/UserDetails'
 import NewGuests from './pages/NewGuests'
 import Validation from './pages/Validation'
+import Widget from './pages/Widget'
 import { UserRole } from './types'
 
 // Компонент для редиректа на начальную страницу в зависимости от роли
@@ -74,6 +75,14 @@ function App() {
             <Route path="vessels" element={<Vessels />} />
             <Route path="vessels/:id" element={<VesselDetails />} />
             <Route path="bookings" element={<Bookings />} />
+            <Route 
+              path="widget" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.VESSEL_OWNER]}>
+                  <Widget />
+                </RoleProtectedRoute>
+              } 
+            />
             <Route 
               path="tariffs" 
               element={
