@@ -190,26 +190,51 @@ export class BookingsController {
 
       // Проверяем, что длина катера не превышает максимальную длину места
       // КРИТИЧЕСКИ ВАЖНО: TypeORM может возвращать decimal как строки
-      // Нужно явно преобразовать в числа, иначе сравнение "6" > "20" даст true (лексикографическое сравнение)
+      // Проблема: при сравнении строк "6" > "20" = true (лексикографическое сравнение по первой цифре)
+      // Решение: ЯВНО преобразуем в числа ПЕРЕД сравнением
       
       // Получаем исходные значения
-      const vesselLengthRaw = vessel.length;
-      const berthLengthRaw = berth.length;
+      let vesselLengthRaw: any = vessel.length;
+      let berthLengthRaw: any = berth.length;
       
-      // ЯВНО преобразуем в числа через parseFloat для надежности
-      // Сначала преобразуем в строку, заменяем запятую на точку, затем в число
-      const vesselLength = parseFloat(String(vesselLengthRaw).replace(',', '.').trim());
-      const berthLength = parseFloat(String(berthLengthRaw).replace(',', '.').trim());
+      // МНОГОУРОВНЕВОЕ преобразование в числа для максимальной надежности
+      // Обрабатываем разные форматы: number, string, Decimal объекты
+      let vesselLength: number;
+      let berthLength: number;
       
-      // Проверка на валидность чисел
+      // Преобразуем vessel.length
+      if (typeof vesselLengthRaw === 'number' && !isNaN(vesselLengthRaw)) {
+        vesselLength = vesselLengthRaw;
+      } else if (typeof vesselLengthRaw === 'string') {
+        const cleaned = vesselLengthRaw.trim().replace(',', '.');
+        vesselLength = parseFloat(cleaned);
+      } else {
+        // Для других типов (Decimal объекты и т.д.)
+        const str = String(vesselLengthRaw).trim().replace(',', '.');
+        vesselLength = parseFloat(str);
+      }
+      
+      // Преобразуем berth.length
+      if (typeof berthLengthRaw === 'number' && !isNaN(berthLengthRaw)) {
+        berthLength = berthLengthRaw;
+      } else if (typeof berthLengthRaw === 'string') {
+        const cleaned = berthLengthRaw.trim().replace(',', '.');
+        berthLength = parseFloat(cleaned);
+      } else {
+        // Для других типов (Decimal объекты и т.д.)
+        const str = String(berthLengthRaw).trim().replace(',', '.');
+        berthLength = parseFloat(str);
+      }
+      
+      // КРИТИЧЕСКАЯ ПРОВЕРКА: Убеждаемся, что получили валидные числа
       if (isNaN(vesselLength) || isNaN(berthLength) || vesselLength <= 0 || berthLength <= 0) {
         throw new AppError(
-          `Ошибка при проверке размеров. Длина катера: ${vessel.length} (тип: ${typeof vessel.length}), Длина места: ${berth.length} (тип: ${typeof berth.length}). Пожалуйста, обратитесь в поддержку.`,
+          `Ошибка при проверке размеров. Длина катера: ${vessel.length} (тип: ${typeof vessel.length}, значение: ${JSON.stringify(vessel.length)}), Длина места: ${berth.length} (тип: ${typeof berth.length}, значение: ${JSON.stringify(berth.length)}). Пожалуйста, обратитесь в поддержку.`,
           500
         );
       }
       
-      // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: Убеждаемся, что это действительно числа
+      // ФИНАЛЬНАЯ ПРОВЕРКА: Убеждаемся, что это действительно числа (не строки!)
       if (typeof vesselLength !== 'number' || typeof berthLength !== 'number') {
         throw new AppError(
           `Ошибка преобразования типов. vesselLength: ${vesselLength} (${typeof vesselLength}), berthLength: ${berthLength} (${typeof berthLength})`,
@@ -218,8 +243,11 @@ export class BookingsController {
       }
       
       // ПРОВЕРКА: Катер должен быть меньше или равен длине места
-      // Сравниваем ЧИСЛА, а не строки!
-      if (vesselLength > berthLength) {
+      // ВАЖНО: Сравниваем ТОЛЬКО числа, не строки!
+      // Используем строгое числовое сравнение
+      const isVesselTooLong = Number(vesselLength) > Number(berthLength);
+      
+      if (isVesselTooLong) {
         // Катер больше места - это ошибка
         throw new AppError(
           `Длина катера (${vesselLength.toFixed(2)} м) превышает максимальную длину места (${berthLength.toFixed(2)} м). Бронирование невозможно.`,
