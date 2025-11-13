@@ -244,16 +244,59 @@ export class BookingsController {
       
       // ПРОВЕРКА: Катер должен быть меньше или равен длине места
       // ВАЖНО: Сравниваем ТОЛЬКО числа, не строки!
+      
+      // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ ПЕРЕД СРАВНЕНИЕМ
+      console.log('=== ДЕТАЛЬНАЯ ПРОВЕРКА ПЕРЕД СРАВНЕНИЕМ ===');
+      console.log('Исходные значения из БД:');
+      console.log('  vessel.length:', vessel.length, 'тип:', typeof vessel.length, 'JSON:', JSON.stringify(vessel.length));
+      console.log('  berth.length:', berth.length, 'тип:', typeof berth.length, 'JSON:', JSON.stringify(berth.length));
+      console.log('После преобразования:');
+      console.log('  vesselLength:', vesselLength, 'тип:', typeof vesselLength, 'isNaN:', isNaN(vesselLength));
+      console.log('  berthLength:', berthLength, 'тип:', typeof berthLength, 'isNaN:', isNaN(berthLength));
+      console.log('Дополнительное преобразование через Number():');
+      const vesselLengthNum = Number(vesselLength);
+      const berthLengthNum = Number(berthLength);
+      console.log('  Number(vesselLength):', vesselLengthNum, 'тип:', typeof vesselLengthNum);
+      console.log('  Number(berthLength):', berthLengthNum, 'тип:', typeof berthLengthNum);
+      console.log('Сравнение:');
+      console.log('  vesselLength > berthLength:', vesselLength > berthLength);
+      console.log('  vesselLengthNum > berthLengthNum:', vesselLengthNum > berthLengthNum);
+      console.log('  vesselLength <= berthLength:', vesselLength <= berthLength);
+      console.log('  vesselLengthNum <= berthLengthNum:', vesselLengthNum <= berthLengthNum);
+      console.log('Прямое сравнение чисел:');
+      console.log('  6 > 20:', 6 > 20, '(ожидается false)');
+      console.log('  7 > 20:', 7 > 20, '(ожидается false)');
+      console.log('  Если vesselLength=6 и berthLength=20, то 6 > 20 должно быть false');
+      console.log('==========================================');
+      
       // Используем строгое числовое сравнение
-      const isVesselTooLong = Number(vesselLength) > Number(berthLength);
+      const isVesselTooLong = vesselLengthNum > berthLengthNum;
+      
+      console.log('РЕЗУЛЬТАТ СРАВНЕНИЯ:', {
+        isVesselTooLong,
+        vesselLength: vesselLengthNum,
+        berthLength: berthLengthNum,
+        'vesselLength > berthLength': vesselLengthNum > berthLengthNum,
+      });
       
       if (isVesselTooLong) {
         // Катер больше места - это ошибка
+        console.error('ОШИБКА: Катер слишком длинный!', {
+          vesselLength: vesselLengthNum,
+          berthLength: berthLengthNum,
+          difference: vesselLengthNum - berthLengthNum,
+        });
         throw new AppError(
-          `Длина катера (${vesselLength.toFixed(2)} м) превышает максимальную длину места (${berthLength.toFixed(2)} м). Бронирование невозможно.`,
+          `Длина катера (${vesselLengthNum.toFixed(2)} м) превышает максимальную длину места (${berthLengthNum.toFixed(2)} м). Бронирование невозможно.`,
           400
         );
       }
+      
+      console.log('✅ Проверка пройдена успешно:', {
+        vesselLength: vesselLengthNum,
+        berthLength: berthLengthNum,
+        difference: berthLengthNum - vesselLengthNum,
+      });
       
       // Если дошли сюда - катер помещается, все ОК
 
