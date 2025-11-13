@@ -314,22 +314,6 @@ export default function ActivityLogs() {
                   <td className="px-6 py-4 text-sm text-gray-900">
                     <div className="max-w-md">
                       {log.description || '-'}
-                      {log.oldValues && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          <div className="font-semibold">Было:</div>
-                          <pre className="whitespace-pre-wrap text-xs">
-                            {JSON.stringify(log.oldValues, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                      {log.newValues && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          <div className="font-semibold">Стало:</div>
-                          <pre className="whitespace-pre-wrap text-xs">
-                            {JSON.stringify(log.newValues, null, 2)}
-                          </pre>
-                        </div>
-                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
