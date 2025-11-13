@@ -77,7 +77,8 @@ export const autoActivityLogger = async (
       }
       
       // Формируем понятное описание на русском языке
-      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      // Убираем лишние пробелы и email из имени пользователя
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
       let entityName: string | null = null;
       
       // Пытаемся получить название сущности из ответа

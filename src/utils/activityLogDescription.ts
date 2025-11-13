@@ -12,12 +12,12 @@ export function generateActivityDescription(
 ): string {
   const userText = userName || 'Пользователь';
   
-  // Получаем названия сущностей на русском
+  // Получаем названия сущностей на русском (простые слова)
   const entityNames: Record<EntityType, string> = {
     [EntityType.USER]: 'пользователя',
-    [EntityType.CLUB]: 'яхт-клуб',
-    [EntityType.VESSEL]: 'судно',
-    [EntityType.BOOKING]: 'бронирование',
+    [EntityType.CLUB]: 'яхт клуб',
+    [EntityType.VESSEL]: 'катер',
+    [EntityType.BOOKING]: 'бронь',
     [EntityType.BERTH]: 'место',
     [EntityType.PAYMENT]: 'платеж',
     [EntityType.TARIFF]: 'тариф',
@@ -30,19 +30,19 @@ export function generateActivityDescription(
 
   switch (activityType) {
     case ActivityType.CREATE:
-      return `${userText} создал(а) ${entityNameText}${entityIdText}`;
+      return `${userText} создал ${entityNameText}${entityIdText}`;
     case ActivityType.UPDATE:
-      return `${userText} обновил(а) ${entityNameText}${entityIdText}`;
+      return `${userText} обновил ${entityNameText}${entityIdText}`;
     case ActivityType.DELETE:
-      return `${userText} удалил(а) ${entityNameText}${entityIdText}`;
+      return `${userText} удалил ${entityNameText}${entityIdText}`;
     case ActivityType.LOGIN:
-      return `${userText} вошел(а) в систему`;
+      return `${userText} вошел в систему`;
     case ActivityType.LOGOUT:
-      return `${userText} вышел(а) из системы`;
+      return `${userText} вышел из системы`;
     case ActivityType.VIEW:
-      return `${userText} просмотрел(а) ${entityNameText}${entityIdText}`;
+      return `${userText} просмотрел ${entityNameText}${entityIdText}`;
     default:
-      return `${userText} выполнил(а) действие с ${entityNameText}${entityIdText}`;
+      return `${userText} выполнил действие с ${entityNameText}${entityIdText}`;
   }
 }
 

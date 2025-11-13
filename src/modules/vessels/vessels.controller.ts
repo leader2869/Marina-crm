@@ -253,12 +253,12 @@ export class VesselsController {
       }
 
       // Формируем детальное описание перед удалением
-      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
       const vesselName = vessel.name || 'неизвестное судно';
       const vesselType = vessel.type || 'неизвестный тип';
       const vesselLength = vessel.length ? `${vessel.length} м` : 'неизвестная длина';
       const vesselWidth = vessel.width ? `${vessel.width} м` : '';
-      const description = `${userName || 'Пользователь'} удалил(а) судно "${vesselName}" (${vesselType}, длина: ${vesselLength}${vesselWidth ? `, ширина: ${vesselWidth}` : ''})`;
+      const description = `${userName || 'Пользователь'} удалил катер "${vesselName}" (${vesselType}, длина: ${vesselLength}${vesselWidth ? `, ширина: ${vesselWidth}` : ''})`;
 
       // Логируем удаление с детальным описанием
       await ActivityLogService.logActivity({

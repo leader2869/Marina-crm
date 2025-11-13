@@ -731,11 +731,11 @@ export class BookingsController {
       }
 
       // Формируем детальное описание перед удалением
-      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
       const clubName = booking.club?.name || 'неизвестный клуб';
       const vesselName = booking.vessel?.name || 'неизвестное судно';
       const berthNumber = booking.berth?.number || 'неизвестное место';
-      const description = `${userName || 'Пользователь'} удалил(а) бронирование #${booking.id}: судно "${vesselName}" на месте ${berthNumber} в яхт-клубе "${clubName}" (с ${booking.startDate ? new Date(booking.startDate).toLocaleDateString('ru-RU') : 'N/A'} по ${booking.endDate ? new Date(booking.endDate).toLocaleDateString('ru-RU') : 'N/A'})`;
+      const description = `${userName || 'Пользователь'} удалил бронь #${booking.id}: судно "${vesselName}" на месте ${berthNumber} в яхт-клубе "${clubName}" (с ${booking.startDate ? new Date(booking.startDate).toLocaleDateString('ru-RU') : 'N/A'} по ${booking.endDate ? new Date(booking.endDate).toLocaleDateString('ru-RU') : 'N/A'})`;
 
       // Логируем удаление с детальным описанием
       await ActivityLogService.logActivity({

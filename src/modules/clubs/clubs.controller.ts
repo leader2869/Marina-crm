@@ -635,10 +635,10 @@ export class ClubsController {
       }
 
       // Формируем детальное описание перед удалением
-      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
       const clubName = club.name || 'неизвестный клуб';
       const clubAddress = club.address || '';
-      const description = `${userName || 'Пользователь'} удалил(а) яхт-клуб "${clubName}"${clubAddress ? ` (${clubAddress})` : ''}`;
+      const description = `${userName || 'Пользователь'} удалил яхт клуб "${clubName}"${clubAddress ? ` (${clubAddress})` : ''}`;
 
       // Логируем удаление с детальным описанием
       await ActivityLogService.logActivity({

@@ -301,7 +301,7 @@ export class UsersController {
       });
 
       // Логируем создание пользователя
-      const currentUser = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      const currentUser = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
       const newUserName = `${createdUser!.firstName} ${createdUser!.lastName}`;
       await ActivityLogService.logActivity({
         activityType: ActivityType.CREATE,
