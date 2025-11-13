@@ -513,7 +513,7 @@ export class ClubsController {
 
       // Логируем обновление с детальным описанием изменений
       const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
-      const description = generateActivityDescription(
+      const logDescription = generateActivityDescription(
         ActivityType.UPDATE,
         EntityType.CLUB,
         club.id,
@@ -528,7 +528,7 @@ export class ClubsController {
         entityType: EntityType.CLUB,
         entityId: club.id,
         userId: req.userId || null,
-        description,
+        description: logDescription,
         oldValues,
         newValues,
         ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
@@ -709,7 +709,7 @@ export class ClubsController {
       const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
       const clubName = club.name || 'неизвестный клуб';
       const clubAddress = club.address || '';
-      const description = `${userName || 'Пользователь'} удалил яхт клуб "${clubName}"${clubAddress ? ` (${clubAddress})` : ''}`;
+      const logDescription = `${userName || 'Пользователь'} удалил яхт клуб "${clubName}"${clubAddress ? ` (${clubAddress})` : ''}`;
 
       // Логируем удаление с детальным описанием
       await ActivityLogService.logActivity({
@@ -717,7 +717,7 @@ export class ClubsController {
         entityType: EntityType.CLUB,
         entityId: club.id,
         userId: req.userId || null,
-        description,
+        description: logDescription,
         oldValues: null,
         newValues: null,
         ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
