@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { activityLogsService } from '../services/api'
-import { FileText, User, Calendar, Filter, Search } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
+import { FileText, Filter } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { format } from 'date-fns'
 
@@ -47,7 +46,6 @@ const entityTypeLabels: Record<string, string> = {
 }
 
 export default function ActivityLogs() {
-  const { user } = useAuth()
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -80,9 +78,9 @@ export default function ActivityLogs() {
       if (filters.endDate) params.endDate = filters.endDate
 
       const response = await activityLogsService.getAll(params)
-      setLogs(response.logs || [])
-      setTotalPages(response.totalPages || 1)
-      setTotal(response.total || 0)
+      setLogs(response.data?.logs || [])
+      setTotalPages(response.data?.totalPages || 1)
+      setTotal(response.data?.total || 0)
     } catch (error) {
       console.error('Ошибка загрузки логов:', error)
     } finally {
