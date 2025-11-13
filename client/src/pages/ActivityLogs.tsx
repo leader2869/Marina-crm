@@ -64,11 +64,6 @@ export default function ActivityLogs() {
     loadLogs()
   }, [page])
 
-  // Загружаем логи при первой загрузке страницы
-  useEffect(() => {
-    loadLogs()
-  }, [])
-
   const loadLogs = async () => {
     try {
       setLoading(true)
@@ -85,12 +80,11 @@ export default function ActivityLogs() {
 
       const response = await activityLogsService.getAll(params)
       console.log('Ответ от API логов:', response)
-      console.log('Данные:', response.data)
-      console.log('Логи:', response.data?.logs)
       
-      const logsData = response.data?.logs || response.logs || []
-      const totalPagesData = response.data?.totalPages || response.totalPages || 1
-      const totalData = response.data?.total || response.total || 0
+      // API interceptor уже возвращает response.data, поэтому обращаемся напрямую к полям
+      const logsData = response?.logs || []
+      const totalPagesData = response?.totalPages || 1
+      const totalData = response?.total || 0
       
       console.log('Обработанные данные:', { logsData, totalPagesData, totalData })
       
