@@ -67,7 +67,7 @@ export class Payment {
   @Column({ type: 'int', nullable: true })
   paymentMonth: number | null; // Номер месяца для помесячной оплаты (1-12)
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   refundedPaymentId: number | null; // Ссылка на исходный платеж при возврате
 
   @Column({ type: 'text', nullable: true })
