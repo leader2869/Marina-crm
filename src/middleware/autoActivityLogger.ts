@@ -43,8 +43,8 @@ export const autoActivityLogger = async (
           break;
         case 'PUT':
         case 'PATCH':
-          activityType = ActivityType.UPDATE;
-          break;
+          // Не логируем UPDATE автоматически - логирование выполняется в контроллерах с детальной информацией
+          return result;
         case 'DELETE':
           // Не логируем DELETE автоматически - логирование выполняется в контроллерах
           return result;
