@@ -96,7 +96,6 @@ export function generateActivityDescription(
             clubId: 'Яхт-клуб',
             tariffId: 'Тариф',
             ruleType: 'Тип правила',
-            description: 'Описание',
             parameters: 'Параметры',
           };
           
