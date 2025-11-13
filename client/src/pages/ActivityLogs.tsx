@@ -48,6 +48,7 @@ const entityTypeLabels: Record<string, string> = {
 export default function ActivityLogs() {
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
@@ -62,6 +63,11 @@ export default function ActivityLogs() {
   useEffect(() => {
     loadLogs()
   }, [page])
+
+  // Загружаем логи при первой загрузке страницы
+  useEffect(() => {
+    loadLogs()
+  }, [])
 
   const loadLogs = async () => {
     try {
@@ -78,11 +84,22 @@ export default function ActivityLogs() {
       if (filters.endDate) params.endDate = filters.endDate
 
       const response = await activityLogsService.getAll(params)
-      setLogs(response.data?.logs || [])
-      setTotalPages(response.data?.totalPages || 1)
-      setTotal(response.data?.total || 0)
+      console.log('Ответ от API логов:', response)
+      console.log('Данные:', response.data)
+      console.log('Логи:', response.data?.logs)
+      
+      const logsData = response.data?.logs || response.logs || []
+      const totalPagesData = response.data?.totalPages || response.totalPages || 1
+      const totalData = response.data?.total || response.total || 0
+      
+      console.log('Обработанные данные:', { logsData, totalPagesData, totalData })
+      
+      setLogs(logsData)
+      setTotalPages(totalPagesData)
+      setTotal(totalData)
     } catch (error) {
       console.error('Ошибка загрузки логов:', error)
+      setError('Ошибка загрузки логов. Проверьте консоль для деталей.')
     } finally {
       setLoading(false)
     }
@@ -124,6 +141,11 @@ export default function ActivityLogs() {
           Логи активности
         </h1>
         <p className="text-gray-600 mt-1">Все действия пользователей в системе</p>
+        {error && (
+          <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
       </div>
 
       {/* Фильтры */}
@@ -256,7 +278,14 @@ export default function ActivityLogs() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {logs.map((log) => (
+              {logs.length === 0 && !loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    Логи не найдены. Попробуйте изменить фильтры или выполните какое-либо действие в системе.
+                  </td>
+                </tr>
+              ) : (
+                logs.map((log) => (
                 <tr key={log.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm:ss')}
@@ -313,7 +342,8 @@ export default function ActivityLogs() {
                     {log.ipAddress || '-'}
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
