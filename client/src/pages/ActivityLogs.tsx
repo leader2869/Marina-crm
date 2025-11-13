@@ -61,7 +61,7 @@ export default function ActivityLogs() {
 
   useEffect(() => {
     loadLogs()
-  }, [page, filters])
+  }, [page])
 
   const loadLogs = async () => {
     try {
@@ -90,7 +90,11 @@ export default function ActivityLogs() {
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters({ ...filters, [key]: value })
+  }
+
+  const applyFilters = () => {
     setPage(1)
+    loadLogs()
   }
 
   const clearFilters = () => {
@@ -102,6 +106,10 @@ export default function ActivityLogs() {
       endDate: '',
     })
     setPage(1)
+    // Загружаем логи после сброса фильтров
+    setTimeout(() => {
+      loadLogs()
+    }, 0)
   }
 
   if (loading && logs.length === 0) {
@@ -198,7 +206,13 @@ export default function ActivityLogs() {
             />
           </div>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={applyFilters}
+            className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700 font-medium"
+          >
+            Применить фильтры
+          </button>
           <button
             onClick={clearFilters}
             className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
