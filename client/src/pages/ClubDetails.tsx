@@ -245,10 +245,14 @@ export default function ClubDetails() {
     }
 
     // Проверка длины катера относительно максимальной длины места
+    // ВАЖНО: Преобразуем в числа для корректного сравнения (избегаем лексикографического сравнения строк)
     const selectedVessel = userVessels.find(v => v.id.toString() === bookingForm.vesselId)
     if (selectedVessel && berthFromClub) {
-      if (selectedVessel.length > berthFromClub.length) {
-        setError(`Длина катера (${selectedVessel.length} м) превышает максимальную длину места (${berthFromClub.length} м). Бронирование невозможно.`)
+      const vesselLength = parseFloat(String(selectedVessel.length).replace(',', '.'))
+      const berthLength = parseFloat(String(berthFromClub.length).replace(',', '.'))
+      
+      if (!isNaN(vesselLength) && !isNaN(berthLength) && vesselLength > berthLength) {
+        setError(`Длина катера (${vesselLength.toFixed(2)} м) превышает максимальную длину места (${berthLength.toFixed(2)} м). Бронирование невозможно.`)
         return
       }
     }
