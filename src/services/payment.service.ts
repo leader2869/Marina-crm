@@ -6,6 +6,7 @@ import { BookingRule, BookingRuleType } from '../entities/BookingRule';
 import { Club } from '../entities/Club';
 import { PaymentType, PaymentMethod, PaymentStatus, Currency } from '../types';
 import { subDays } from 'date-fns';
+import { IsNull } from 'typeorm';
 
 interface PaymentScheduleItem {
   type: PaymentType;
@@ -34,7 +35,7 @@ export class PaymentService {
     const rules = await bookingRuleRepository.find({
       where: {
         clubId: club.id,
-        tariffId: tariff ? tariff.id : null,
+        tariffId: tariff ? tariff.id : IsNull(),
       },
     });
 
