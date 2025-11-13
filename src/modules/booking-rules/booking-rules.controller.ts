@@ -6,6 +6,9 @@ import { Tariff } from '../../entities/Tariff';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { UserRole } from '../../types';
+import { ActivityLogService } from '../../services/activityLog.service';
+import { ActivityType, EntityType } from '../../entities/ActivityLog';
+import { generateActivityDescription } from '../../utils/activityLogDescription';
 
 export class BookingRulesController {
   // Получить все правила клуба
@@ -135,6 +138,15 @@ export class BookingRulesController {
         throw new AppError('Доступ запрещен', 403);
       }
 
+      // Сохраняем старые значения для логирования
+      const oldValues = {
+        clubId: rule.clubId,
+        tariffId: rule.tariffId,
+        ruleType: rule.ruleType,
+        description: rule.description,
+        parameters: rule.parameters,
+      };
+
       // Обновляем поля
       if (clubId !== undefined) {
         const clubRepository = AppDataSource.getRepository(Club);
@@ -193,6 +205,42 @@ export class BookingRulesController {
         where: { id: rule.id },
         relations: ['club', 'tariff'],
       });
+
+      // Формируем новые значения для логирования
+      const newValues = {
+        clubId: updatedRule!.clubId,
+        tariffId: updatedRule!.tariffId,
+        ruleType: updatedRule!.ruleType,
+        description: updatedRule!.description,
+        parameters: updatedRule!.parameters,
+      };
+
+      // Логируем обновление с детальным описанием изменений
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
+      const description = generateActivityDescription(
+        ActivityType.UPDATE,
+        EntityType.BOOKING_RULE,
+        rule.id,
+        userName,
+        updatedRule!.description || `Правило #${rule.id}`,
+        oldValues,
+        newValues
+      );
+
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.UPDATE,
+        entityType: EntityType.BOOKING_RULE,
+        entityId: rule.id,
+        userId: req.userId || null,
+        description,
+        oldValues,
+        newValues,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
+
+      // Помечаем, что детальное логирование уже выполнено, чтобы избежать дублирования
+      (res as any).locals = { ...(res as any).locals, skipAutoLogging: true };
 
       res.json(updatedRule);
     } catch (error) {

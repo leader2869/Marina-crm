@@ -93,6 +93,11 @@ export function generateActivityDescription(
             rentalMonths: 'Месяца аренды',
             amount: 'Сумма',
             months: 'Месяца',
+            clubId: 'Яхт-клуб',
+            tariffId: 'Тариф',
+            ruleType: 'Тип правила',
+            description: 'Описание',
+            parameters: 'Параметры',
           };
           
           const fieldName = fieldNames[key] || key;
