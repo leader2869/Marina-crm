@@ -16,6 +16,8 @@ import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { UserRole, BookingStatus } from '../../types';
+import { ActivityLogService } from '../../services/activityLog.service';
+import { ActivityType, EntityType } from '../../entities/ActivityLog';
 
 export class ClubsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -618,6 +620,7 @@ export class ClubsController {
       const clubRepository = AppDataSource.getRepository(Club);
       const club = await clubRepository.findOne({
         where: { id: clubId },
+        relations: ['owner'],
       });
 
       if (!club) {
@@ -630,6 +633,25 @@ export class ClubsController {
       ) {
         throw new AppError('Недостаточно прав для удаления', 403);
       }
+
+      // Формируем детальное описание перед удалением
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      const clubName = club.name || 'неизвестный клуб';
+      const clubAddress = club.address || '';
+      const description = `${userName || 'Пользователь'} удалил(а) яхт-клуб "${clubName}"${clubAddress ? ` (${clubAddress})` : ''}`;
+
+      // Логируем удаление с детальным описанием
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.DELETE,
+        entityType: EntityType.CLUB,
+        entityId: club.id,
+        userId: req.userId || null,
+        description,
+        oldValues: null,
+        newValues: null,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
 
       // Для владельца клуба проверяем наличие связей
       const isClubOwner = req.userRole === UserRole.CLUB_OWNER && club.ownerId === req.userId;

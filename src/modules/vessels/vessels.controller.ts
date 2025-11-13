@@ -5,6 +5,8 @@ import { User } from '../../entities/User';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
+import { ActivityLogService } from '../../services/activityLog.service';
+import { ActivityType, EntityType } from '../../entities/ActivityLog';
 
 export class VesselsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -235,6 +237,7 @@ export class VesselsController {
       const vesselRepository = AppDataSource.getRepository(Vessel);
       const vessel = await vesselRepository.findOne({
         where: { id: parseInt(id) },
+        relations: ['owner'],
       });
 
       if (!vessel) {
@@ -248,6 +251,27 @@ export class VesselsController {
       ) {
         throw new AppError('Недостаточно прав для удаления', 403);
       }
+
+      // Формируем детальное описание перед удалением
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      const vesselName = vessel.name || 'неизвестное судно';
+      const vesselType = vessel.type || 'неизвестный тип';
+      const vesselLength = vessel.length ? `${vessel.length} м` : 'неизвестная длина';
+      const vesselWidth = vessel.width ? `${vessel.width} м` : '';
+      const description = `${userName || 'Пользователь'} удалил(а) судно "${vesselName}" (${vesselType}, длина: ${vesselLength}${vesselWidth ? `, ширина: ${vesselWidth}` : ''})`;
+
+      // Логируем удаление с детальным описанием
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.DELETE,
+        entityType: EntityType.VESSEL,
+        entityId: vessel.id,
+        userId: req.userId || null,
+        description,
+        oldValues: null,
+        newValues: null,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
 
       await vesselRepository.remove(vessel);
 

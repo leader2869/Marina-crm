@@ -13,6 +13,9 @@ import { BookingStatus } from '../../types';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { differenceInDays } from 'date-fns';
 import { PaymentService } from '../../services/payment.service';
+import { ActivityLogService } from '../../services/activityLog.service';
+import { ActivityType, EntityType } from '../../entities/ActivityLog';
+import { generateActivityDescription } from '../../utils/activityLogDescription';
 
 export class BookingsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -707,7 +710,7 @@ export class BookingsController {
       const bookingRepository = AppDataSource.getRepository(Booking);
       const booking = await bookingRepository.findOne({
         where: { id: parseInt(id) },
-        relations: ['club'],
+        relations: ['club', 'berth', 'vessel', 'vesselOwner'],
       });
 
       if (!booking) {
@@ -726,6 +729,26 @@ export class BookingsController {
       if (!canCancel) {
         throw new AppError('Недостаточно прав для отмены', 403);
       }
+
+      // Формируем детальное описание перед удалением
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : null;
+      const clubName = booking.club?.name || 'неизвестный клуб';
+      const vesselName = booking.vessel?.name || 'неизвестное судно';
+      const berthNumber = booking.berth?.number || 'неизвестное место';
+      const description = `${userName || 'Пользователь'} удалил(а) бронирование #${booking.id}: судно "${vesselName}" на месте ${berthNumber} в яхт-клубе "${clubName}" (с ${booking.startDate ? new Date(booking.startDate).toLocaleDateString('ru-RU') : 'N/A'} по ${booking.endDate ? new Date(booking.endDate).toLocaleDateString('ru-RU') : 'N/A'})`;
+
+      // Логируем удаление с детальным описанием
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.DELETE,
+        entityType: EntityType.BOOKING,
+        entityId: booking.id,
+        userId: req.userId || null,
+        description,
+        oldValues: null,
+        newValues: null,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
 
       booking.status = BookingStatus.CANCELLED;
       await bookingRepository.save(booking);

@@ -36,6 +36,8 @@ export const autoActivityLogger = async (
       let activityType: ActivityType | null = null;
       
       // Определяем тип активности по методу
+      // Для DELETE не логируем автоматически, так как логирование выполняется в контроллерах с детальной информацией
+      let activityType: ActivityType | null = null;
       switch (method) {
         case 'POST':
           activityType = ActivityType.CREATE;
@@ -45,8 +47,8 @@ export const autoActivityLogger = async (
           activityType = ActivityType.UPDATE;
           break;
         case 'DELETE':
-          activityType = ActivityType.DELETE;
-          break;
+          // Не логируем DELETE автоматически - логирование выполняется в контроллерах
+          return result;
         default:
           // Для GET и других методов не логируем
           return result;
