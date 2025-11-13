@@ -47,7 +47,7 @@ export class ActivityLog {
   })
   entityType: EntityType;
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   entityId: number | null; // ID измененной сущности
 
   @Column({ type: 'text', nullable: true })
@@ -73,7 +73,7 @@ export class ActivityLog {
   @JoinColumn({ name: 'userId' })
   user: User | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   userId: number | null; // ID пользователя, выполнившего действие
 }
 
