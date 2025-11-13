@@ -18,6 +18,7 @@ import { getPaginationParams, createPaginatedResponse } from '../../utils/pagina
 import { UserRole, BookingStatus } from '../../types';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
+import { generateActivityDescription } from '../../utils/activityLogDescription';
 
 export class ClubsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -365,6 +366,29 @@ export class ClubsController {
         throw new AppError('Недостаточно прав для редактирования', 403);
       }
 
+      // Сохраняем старые значения для логирования
+      const oldValues = {
+        name: club.name,
+        description: club.description,
+        address: club.address,
+        latitude: club.latitude,
+        longitude: club.longitude,
+        phone: club.phone,
+        email: club.email,
+        website: club.website,
+        minRentalPeriod: club.minRentalPeriod,
+        maxRentalPeriod: club.maxRentalPeriod,
+        basePrice: club.basePrice,
+        minPricePerMonth: club.minPricePerMonth,
+        season: club.season,
+        rentalMonths: club.rentalMonths,
+        bookingRulesText: club.bookingRulesText,
+        isActive: club.isActive,
+        isValidated: club.isValidated,
+        isSubmittedForValidation: club.isSubmittedForValidation,
+        rejectionComment: club.rejectionComment,
+      };
+
       // Обновляем поля клуба
       if (name !== undefined) club.name = name;
       if (description !== undefined) club.description = description;
@@ -463,6 +487,53 @@ export class ClubsController {
 
       // Добавляем отсортированные места к клубу
       updatedClub.berths = berths;
+
+      // Формируем новые значения для логирования
+      const newValues = {
+        name: updatedClub.name,
+        description: updatedClub.description,
+        address: updatedClub.address,
+        latitude: updatedClub.latitude,
+        longitude: updatedClub.longitude,
+        phone: updatedClub.phone,
+        email: updatedClub.email,
+        website: updatedClub.website,
+        minRentalPeriod: updatedClub.minRentalPeriod,
+        maxRentalPeriod: updatedClub.maxRentalPeriod,
+        basePrice: updatedClub.basePrice,
+        minPricePerMonth: updatedClub.minPricePerMonth,
+        season: updatedClub.season,
+        rentalMonths: updatedClub.rentalMonths,
+        bookingRulesText: updatedClub.bookingRulesText,
+        isActive: updatedClub.isActive,
+        isValidated: updatedClub.isValidated,
+        isSubmittedForValidation: updatedClub.isSubmittedForValidation,
+        rejectionComment: updatedClub.rejectionComment,
+      };
+
+      // Логируем обновление с детальным описанием изменений
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
+      const description = generateActivityDescription(
+        ActivityType.UPDATE,
+        EntityType.CLUB,
+        club.id,
+        userName,
+        updatedClub.name,
+        oldValues,
+        newValues
+      );
+
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.UPDATE,
+        entityType: EntityType.CLUB,
+        entityId: club.id,
+        userId: req.userId || null,
+        description,
+        oldValues,
+        newValues,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
 
       res.json(updatedClub);
     } catch (error) {

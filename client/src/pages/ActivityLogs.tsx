@@ -314,6 +314,64 @@ export default function ActivityLogs() {
                   <td className="px-6 py-4 text-sm text-gray-900">
                     <div className="max-w-md">
                       {log.description || '-'}
+                      {log.oldValues && log.newValues && (
+                        <div className="mt-2 space-y-1">
+                          <div className="text-xs font-semibold text-gray-700">Изменения:</div>
+                          {Object.keys(log.newValues).map((key) => {
+                            const oldVal = log.oldValues![key];
+                            const newVal = log.newValues![key];
+                            if (oldVal === newVal) return null;
+                            
+                            const formatValue = (val: any): string => {
+                              if (val === null || val === undefined) return 'не указано';
+                              if (typeof val === 'boolean') return val ? 'да' : 'нет';
+                              if (val instanceof Date) return new Date(val).toLocaleDateString('ru-RU');
+                              if (typeof val === 'object') return JSON.stringify(val);
+                              return String(val);
+                            };
+                            
+                            const fieldNames: Record<string, string> = {
+                              name: 'Название',
+                              description: 'Описание',
+                              address: 'Адрес',
+                              phone: 'Телефон',
+                              email: 'Email',
+                              website: 'Сайт',
+                              type: 'Тип',
+                              length: 'Длина',
+                              width: 'Ширина',
+                              heightAboveWaterline: 'Высота над ватерлинией',
+                              registrationNumber: 'Регистрационный номер',
+                              startDate: 'Дата начала',
+                              endDate: 'Дата окончания',
+                              totalPrice: 'Общая стоимость',
+                              status: 'Статус',
+                              autoRenewal: 'Автопродление',
+                              isActive: 'Активен',
+                              isValidated: 'Валидирован',
+                              isSubmittedForValidation: 'Отправлен на валидацию',
+                              rejectionComment: 'Комментарий отклонения',
+                              totalBerths: 'Количество мест',
+                              minRentalPeriod: 'Минимальный период аренды',
+                              maxRentalPeriod: 'Максимальный период аренды',
+                              basePrice: 'Базовая цена',
+                              minPricePerMonth: 'Минимальная цена за месяц',
+                              season: 'Сезон',
+                              rentalMonths: 'Месяца аренды',
+                            };
+                            
+                            const fieldName = fieldNames[key] || key;
+                            return (
+                              <div key={key} className="text-xs text-gray-600">
+                                <span className="font-medium">{fieldName}:</span>{' '}
+                                <span className="text-red-600">{formatValue(oldVal)}</span>
+                                {' → '}
+                                <span className="text-green-600">{formatValue(newVal)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

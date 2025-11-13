@@ -7,6 +7,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
+import { generateActivityDescription } from '../../utils/activityLogDescription';
 
 export class VesselsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -200,6 +201,21 @@ export class VesselsController {
         vessel.isSubmittedForValidation = false;
       }
       
+      // Сохраняем старые значения для логирования
+      const oldValues = {
+        name: vessel.name,
+        type: vessel.type,
+        length: vessel.length,
+        width: vessel.width,
+        heightAboveWaterline: vessel.heightAboveWaterline,
+        registrationNumber: vessel.registrationNumber,
+        technicalSpecs: vessel.technicalSpecs,
+        isActive: vessel.isActive,
+        isValidated: vessel.isValidated,
+        isSubmittedForValidation: vessel.isSubmittedForValidation,
+        ownerId: vessel.ownerId,
+      };
+
       // Парсим числовые поля
       if (otherFields.length !== undefined) {
         otherFields.length = parseFloat(otherFields.length as string);
@@ -222,6 +238,45 @@ export class VesselsController {
       const updatedVessel = await vesselRepository.findOne({
         where: { id: vessel.id },
         relations: ['owner'],
+      });
+
+      // Формируем новые значения для логирования
+      const newValues = {
+        name: updatedVessel!.name,
+        type: updatedVessel!.type,
+        length: updatedVessel!.length,
+        width: updatedVessel!.width,
+        heightAboveWaterline: updatedVessel!.heightAboveWaterline,
+        registrationNumber: updatedVessel!.registrationNumber,
+        technicalSpecs: updatedVessel!.technicalSpecs,
+        isActive: updatedVessel!.isActive,
+        isValidated: updatedVessel!.isValidated,
+        isSubmittedForValidation: updatedVessel!.isSubmittedForValidation,
+        ownerId: updatedVessel!.ownerId,
+      };
+
+      // Логируем обновление с детальным описанием изменений
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
+      const description = generateActivityDescription(
+        ActivityType.UPDATE,
+        EntityType.VESSEL,
+        vessel.id,
+        userName,
+        updatedVessel!.name,
+        oldValues,
+        newValues
+      );
+
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.UPDATE,
+        entityType: EntityType.VESSEL,
+        entityId: vessel.id,
+        userId: req.userId || null,
+        description,
+        oldValues,
+        newValues,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
       });
 
       res.json(updatedVessel);

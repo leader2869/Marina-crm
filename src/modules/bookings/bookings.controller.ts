@@ -689,12 +689,60 @@ export class BookingsController {
         throw new AppError('Недостаточно прав для редактирования', 403);
       }
 
+      // Сохраняем старые значения для логирования
+      const oldValues = {
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        totalPrice: booking.totalPrice,
+        status: booking.status,
+        autoRenewal: booking.autoRenewal,
+        vesselId: booking.vesselId,
+        berthId: booking.berthId,
+        clubId: booking.clubId,
+      };
+
       Object.assign(booking, req.body);
       await bookingRepository.save(booking);
 
       const updatedBooking = await bookingRepository.findOne({
         where: { id: booking.id },
         relations: ['club', 'berth', 'vessel', 'vesselOwner'],
+      });
+
+      // Формируем новые значения для логирования
+      const newValues = {
+        startDate: updatedBooking!.startDate,
+        endDate: updatedBooking!.endDate,
+        totalPrice: updatedBooking!.totalPrice,
+        status: updatedBooking!.status,
+        autoRenewal: updatedBooking!.autoRenewal,
+        vesselId: updatedBooking!.vesselId,
+        berthId: updatedBooking!.berthId,
+        clubId: updatedBooking!.clubId,
+      };
+
+      // Логируем обновление с детальным описанием изменений
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
+      const description = generateActivityDescription(
+        ActivityType.UPDATE,
+        EntityType.BOOKING,
+        booking.id,
+        userName,
+        `бронь #${booking.id}`,
+        oldValues,
+        newValues
+      );
+
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.UPDATE,
+        entityType: EntityType.BOOKING,
+        entityId: booking.id,
+        userId: req.userId || null,
+        description,
+        oldValues,
+        newValues,
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
       });
 
       res.json(updatedBooking);
