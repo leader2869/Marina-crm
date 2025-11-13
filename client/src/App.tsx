@@ -79,7 +79,7 @@ function App() {
             <Route 
               path="widget" 
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.VESSEL_OWNER]}>
+                <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
                   <Widget />
                 </RoleProtectedRoute>
               } 
