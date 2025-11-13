@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config/env';
 import { AppDataSource } from './config/database';
 import { errorHandler } from './middleware/errorHandler';
+import { autoActivityLogger } from './middleware/autoActivityLogger';
 
 // Routes
 import authRoutes from './modules/auth/auth.routes';
@@ -162,15 +163,16 @@ app.use('/api/auth', (req, res, next) => {
   console.log(`[Auth Route] ${req.method} ${req.path}`, { originalUrl: req.originalUrl });
   next();
 }, authRoutes);
-app.use('/api/clubs', clubsRoutes);
-app.use('/api/vessels', vesselsRoutes);
-app.use('/api/bookings', bookingsRoutes);
-app.use('/api/finances', financesRoutes);
-app.use('/api/payments', paymentsRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/berths', berthsRoutes);
-app.use('/api/tariffs', tariffsRoutes);
-app.use('/api/booking-rules', bookingRulesRoutes);
+// Применяем автоматическое логирование ко всем API роутам (кроме auth и activity-logs)
+app.use('/api/clubs', autoActivityLogger, clubsRoutes);
+app.use('/api/vessels', autoActivityLogger, vesselsRoutes);
+app.use('/api/bookings', autoActivityLogger, bookingsRoutes);
+app.use('/api/finances', autoActivityLogger, financesRoutes);
+app.use('/api/payments', autoActivityLogger, paymentsRoutes);
+app.use('/api/users', autoActivityLogger, usersRoutes);
+app.use('/api/berths', autoActivityLogger, berthsRoutes);
+app.use('/api/tariffs', autoActivityLogger, tariffsRoutes);
+app.use('/api/booking-rules', autoActivityLogger, bookingRulesRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
 
 // Error handler
