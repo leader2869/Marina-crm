@@ -573,7 +573,7 @@ export default function Clubs() {
                         </span>
                       )}
                       {!club.rejectionComment && club.isActive !== false && club.isSubmittedForValidation === true && club.isValidated === true && (
-                        <span className="text-xs bg-purple-500 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
+                        <span className="text-xs bg-lime-500 text-white px-2 py-1 rounded font-semibold whitespace-nowrap inline-block">
                           Опубликован
                         </span>
                       )}
