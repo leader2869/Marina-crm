@@ -36,6 +36,12 @@ export const autoActivityLogger = async (
       const method = req.method.toUpperCase();
       let activityType: ActivityType | null = null;
       
+      // Проверяем, не залогировал ли контроллер действие детально
+      // Если в res.locals есть флаг skipAutoLogging, пропускаем автоматическое логирование
+      if ((res as any).locals?.skipAutoLogging) {
+        return result;
+      }
+
       // Определяем тип активности по методу
       switch (method) {
         case 'POST':
@@ -43,8 +49,8 @@ export const autoActivityLogger = async (
           break;
         case 'PUT':
         case 'PATCH':
-          // Не логируем UPDATE автоматически - логирование выполняется в контроллерах с детальной информацией
-          return result;
+          activityType = ActivityType.UPDATE;
+          break;
         case 'DELETE':
           // Не логируем DELETE автоматически - логирование выполняется в контроллерах
           return result;

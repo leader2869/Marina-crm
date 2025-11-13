@@ -535,6 +535,9 @@ export class ClubsController {
         userAgent: req.headers['user-agent'] || null,
       });
 
+      // Помечаем, что детальное логирование уже выполнено, чтобы избежать дублирования
+      (res as any).locals = { ...(res as any).locals, skipAutoLogging: true };
+
       res.json(updatedClub);
     } catch (error) {
       next(error);

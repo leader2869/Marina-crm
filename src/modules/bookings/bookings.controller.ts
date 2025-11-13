@@ -745,6 +745,9 @@ export class BookingsController {
         userAgent: req.headers['user-agent'] || null,
       });
 
+      // Помечаем, что детальное логирование уже выполнено, чтобы избежать дублирования
+      (res as any).locals = { ...(res as any).locals, skipAutoLogging: true };
+
       res.json(updatedBooking);
     } catch (error) {
       next(error);
