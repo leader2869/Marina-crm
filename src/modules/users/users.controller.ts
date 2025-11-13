@@ -9,6 +9,8 @@ import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { PaymentStatus, UserRole } from '../../types';
 import { hashPassword } from '../../utils/password';
+import { ActivityLogService } from '../../services/activityLog.service';
+import { ActivityType, EntityType } from '../../entities/ActivityLog';
 
 export class UsersController {
   // Вспомогательный метод для нормализации номера телефона
@@ -295,6 +297,23 @@ export class UsersController {
       const createdUser = await userRepository.findOne({
         where: { id: user.id },
         relations: ['managedClub', 'managedClubs', 'managedClubs.club', 'ownedClubs'],
+      });
+
+      // Логируем создание пользователя
+      await ActivityLogService.logActivity({
+        activityType: ActivityType.CREATE,
+        entityType: EntityType.USER,
+        entityId: createdUser!.id,
+        userId: req.userId || null,
+        description: `Создан пользователь: ${createdUser!.firstName} ${createdUser!.lastName} (${createdUser!.email})`,
+        newValues: {
+          email: createdUser!.email,
+          firstName: createdUser!.firstName,
+          lastName: createdUser!.lastName,
+          role: createdUser!.role,
+        },
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+        userAgent: req.headers['user-agent'] || null,
       });
 
       res.status(201).json({

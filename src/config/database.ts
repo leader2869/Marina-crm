@@ -14,6 +14,7 @@ import { UserClub } from '../entities/UserClub';
 import { Tariff } from '../entities/Tariff';
 import { TariffBerth } from '../entities/TariffBerth';
 import { BookingRule } from '../entities/BookingRule';
+import { ActivityLog } from '../entities/ActivityLog';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -87,6 +88,7 @@ export const AppDataSource = new DataSource({
     Tariff,
     TariffBerth,
     BookingRule,
+    ActivityLog,
   ],
   migrations: ['src/database/migrations/**/*.ts'],
   subscribers: ['src/database/subscribers/**/*.ts'],

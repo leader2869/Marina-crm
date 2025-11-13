@@ -187,5 +187,9 @@ export const bookingRulesService = {
   delete: (id: number) => api.delete(`/booking-rules/${id}`),
 }
 
+export const activityLogsService = {
+  getAll: (params?: any) => api.get('/activity-logs', { params }),
+}
+
 export default api
 

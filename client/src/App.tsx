@@ -21,6 +21,7 @@ import UserDetails from './pages/UserDetails'
 import NewGuests from './pages/NewGuests'
 import Validation from './pages/Validation'
 import Widget from './pages/Widget'
+import ActivityLogs from './pages/ActivityLogs'
 import { UserRole } from './types'
 
 // Компонент для редиректа на начальную страницу в зависимости от роли
@@ -130,6 +131,14 @@ function App() {
               element={
                 <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
                   <Validation />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="activity-logs" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+                  <ActivityLogs />
                 </RoleProtectedRoute>
               } 
             />
