@@ -7,7 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { PaymentStatus, PaymentMethod, Currency } from '../types';
+import { PaymentStatus, PaymentMethod, Currency, PaymentType } from '../types';
 import { Booking } from './Booking';
 import { User } from './User';
 
@@ -53,6 +53,25 @@ export class Payment {
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   penalty: number; // пеня за просрочку
+
+  @Column({
+    type: 'enum',
+    enum: PaymentType,
+    nullable: true,
+  })
+  paymentType: PaymentType | null; // Тип платежа: залог, частичный, полный, помесячный и т.д.
+
+  @Column({ type: 'int', default: 0 })
+  paymentOrder: number; // Порядок платежа (0 для залога, 1, 2, 3... для основных)
+
+  @Column({ type: 'int', nullable: true })
+  paymentMonth: number | null; // Номер месяца для помесячной оплаты (1-12)
+
+  @Column({ nullable: true })
+  refundedPaymentId: number | null; // Ссылка на исходный платеж при возврате
+
+  @Column({ type: 'text', nullable: true })
+  externalTransactionId: string | null; // ID транзакции в платежной системе (улучшение существующего transactionId)
 
   @CreateDateColumn()
   createdAt: Date;

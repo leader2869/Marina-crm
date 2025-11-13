@@ -7,6 +7,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { PaymentStatus, PaymentMethod, Currency, BookingStatus } from '../../types';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { isAfter } from 'date-fns';
+import { PaymentService } from '../../services/payment.service';
 
 export class PaymentsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -160,7 +161,7 @@ export class PaymentsController {
 
       await paymentRepository.save(payment);
 
-      // Если платеж оплачен, обновляем статус бронирования
+      // Если платеж оплачен, проверяем, нужно ли подтверждать бронирование
       if (status === PaymentStatus.PAID) {
         const bookingRepository = AppDataSource.getRepository(Booking);
         const booking = await bookingRepository.findOne({
@@ -168,8 +169,13 @@ export class PaymentsController {
         });
 
         if (booking && booking.status === BookingStatus.PENDING) {
-          booking.status = BookingStatus.CONFIRMED;
-          await bookingRepository.save(booking);
+          // Проверяем, все ли обязательные платежи оплачены
+          const areRequiredPaid = await PaymentService.areRequiredPaymentsPaid(booking.id);
+          
+          if (areRequiredPaid) {
+            booking.status = BookingStatus.CONFIRMED;
+            await bookingRepository.save(booking);
+          }
         }
       }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { bookingsService } from '../services/api'
 import { Booking, UserRole, BookingStatus } from '../types'
 import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X } from 'lucide-react'
@@ -133,9 +133,8 @@ export default function Bookings() {
             {bookings.map((booking) => {
               const isExpanded = expandedBookings.has(booking.id)
               return (
-                <>
+                <Fragment key={booking.id}>
                   <tr
-                    key={booking.id}
                     className={`hover:bg-gray-50 ${canViewDetails ? 'cursor-pointer' : ''}`}
                     onClick={() => canViewDetails && toggleBookingDetails(booking.id)}
                   >
@@ -204,7 +203,7 @@ export default function Bookings() {
                     </td>
                   </tr>
                   {isExpanded && canViewDetails && (
-                    <tr key={`${booking.id}-details`}>
+                    <tr>
                       <td colSpan={6} className="px-6 py-4 bg-gray-50">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {/* Информация о пользователе */}
@@ -296,7 +295,7 @@ export default function Bookings() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
           </tbody>

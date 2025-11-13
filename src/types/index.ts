@@ -34,6 +34,15 @@ export enum PaymentMethod {
   ONLINE = 'online',
 }
 
+export enum PaymentType {
+  DEPOSIT = 'deposit',           // Залог
+  PARTIAL = 'partial',           // Частичный платеж
+  FULL = 'full',                 // Полная оплата
+  MONTHLY = 'monthly',           // Помесячный платеж
+  PENALTY = 'penalty',           // Пеня
+  REFUND = 'refund'              // Возврат средств
+}
+
 export enum IncomeType {
   RENTAL = 'rental',
   ADDITIONAL_SERVICES = 'additional_services',

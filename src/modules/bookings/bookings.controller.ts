@@ -12,6 +12,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { BookingStatus } from '../../types';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { differenceInDays } from 'date-fns';
+import { PaymentService } from '../../services/payment.service';
 
 export class BookingsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -153,7 +154,7 @@ export class BookingsController {
       // Проверка доступности места
       const berthRepository = AppDataSource.getRepository(Berth);
       const berth = await berthRepository.findOne({
-        where: { id: berthId },
+        where: { id: parseInt(berthId) },
         relations: ['club'],
       });
 
@@ -175,10 +176,54 @@ export class BookingsController {
         throw new AppError('Судно не найдено', 404);
       }
 
+      // Логируем загруженные данные для отладки
+      console.log('=== ЗАГРУЖЕННЫЕ ДАННЫЕ ===', {
+        berthId: berth.id,
+        berthNumber: berth.number,
+        berthLength: berth.length,
+        berthLengthType: typeof berth.length,
+        vesselId: vessel.id,
+        vesselName: vessel.name,
+        vesselLength: vessel.length,
+        vesselLengthType: typeof vessel.length,
+      });
+
       // Проверяем, что длина катера не превышает максимальную длину места
-      if (vessel.length > berth.length) {
+      // TypeORM с PostgreSQL возвращает decimal как строки, поэтому преобразуем их в числа
+      
+      // Получаем исходные значения и преобразуем в числа
+      const vesselLength = Number(String(vessel.length).replace(',', '.'));
+      const berthLength = Number(String(berth.length).replace(',', '.'));
+      
+      // Проверка на валидность чисел
+      if (isNaN(vesselLength) || isNaN(berthLength) || vesselLength <= 0 || berthLength <= 0) {
         throw new AppError(
-          `Длина катера (${vessel.length} м) превышает максимальную длину места (${berth.length} м). Бронирование невозможно.`,
+          `Ошибка при проверке размеров. Длина катера: ${vessel.length}, Длина места: ${berth.length}. Пожалуйста, обратитесь в поддержку.`,
+          500
+        );
+      }
+      
+      // КРИТИЧЕСКАЯ ПРОВЕРКА: Если значения явно перепутаны (катер маленький, место большое, но сравнение дает ошибку)
+      // Это может означать проблему в данных или логике
+      if (vesselLength < berthLength && vesselLength < 15 && berthLength > 10) {
+        // Катер меньше места - все ОК, пропускаем проверку
+        // Это нормальная ситуация
+      } else if (vesselLength > berthLength) {
+        // Катер больше места - это ошибка
+        // Но если значения выглядят перепутанными (катер маленький, место большое), 
+        // возможно проблема в данных
+        if (vesselLength < 15 && berthLength > vesselLength * 2) {
+          // Подозрительная ситуация: катер маленький, место большое, но сравнение говорит обратное
+          // Возможно, значения перепутаны в базе данных
+          throw new AppError(
+            `Обнаружена ошибка в данных: длина катера (${vesselLength.toFixed(2)} м) меньше длины места (${berthLength.toFixed(2)} м), но система считает иначе. Пожалуйста, проверьте данные в базе. Vessel ID: ${vessel.id}, Berth ID: ${berth.id}`,
+            500
+          );
+        }
+        
+        // Нормальная ошибка - катер действительно больше места
+        throw new AppError(
+          `Длина катера (${vesselLength.toFixed(2)} м) превышает максимальную длину места (${berthLength.toFixed(2)} м). Бронирование невозможно.`,
           400
         );
       }
@@ -412,6 +457,19 @@ export class BookingsController {
 
       await bookingRepository.save(booking);
 
+      // Автоматически создаем платежи для бронирования
+      try {
+        await PaymentService.createPaymentsForBooking(
+          booking,
+          club,
+          selectedTariff,
+          req.userId
+        );
+      } catch (paymentError) {
+        console.error('Ошибка создания платежей:', paymentError);
+        // Не прерываем создание бронирования, но логируем ошибку
+      }
+
       // Автоматически привязываем пользователя к клубу через UserClub
       const userClubRepository = AppDataSource.getRepository(UserClub);
       const existingUserClub = await userClubRepository.findOne({
@@ -431,7 +489,7 @@ export class BookingsController {
 
       const savedBooking = await bookingRepository.findOne({
         where: { id: booking.id },
-        relations: ['club', 'berth', 'vessel', 'vesselOwner'],
+        relations: ['club', 'berth', 'vessel', 'vesselOwner', 'payments'],
       });
 
       res.status(201).json(savedBooking);
@@ -509,6 +567,37 @@ export class BookingsController {
       await bookingRepository.save(booking);
 
       res.json({ message: 'Бронирование отменено', booking });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPaymentSchedule(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      const bookingRepository = AppDataSource.getRepository(Booking);
+      const booking = await bookingRepository.findOne({
+        where: { id: parseInt(id) },
+        relations: ['club'],
+      });
+
+      if (!booking) {
+        throw new AppError('Бронирование не найдено', 404);
+      }
+
+      // Проверка прав доступа
+      if (
+        booking.vesselOwnerId !== req.userId &&
+        booking.club.ownerId !== req.userId &&
+        req.userRole !== 'super_admin' &&
+        req.userRole !== 'admin'
+      ) {
+        throw new AppError('Недостаточно прав доступа', 403);
+      }
+
+      const schedule = await PaymentService.getPaymentSchedule(parseInt(id));
+      res.json(schedule);
     } catch (error) {
       next(error);
     }
