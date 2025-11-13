@@ -297,9 +297,32 @@ export default function ActivityLogs() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                      {activityTypeLabels[log.activityType] || log.activityType}
-                    </span>
+                    {(() => {
+                      const getActivityTypeStyle = (activityType: string) => {
+                        switch (activityType) {
+                          case 'create':
+                            return 'bg-green-100 text-green-800';
+                          case 'update':
+                            return 'bg-yellow-100 text-yellow-800';
+                          case 'delete':
+                            return 'bg-red-100 text-red-800';
+                          case 'login':
+                            return 'bg-blue-100 text-blue-800';
+                          case 'logout':
+                            return 'bg-gray-100 text-gray-800';
+                          case 'view':
+                            return 'bg-purple-100 text-purple-800';
+                          default:
+                            return 'bg-gray-100 text-gray-800';
+                        }
+                      };
+                      
+                      return (
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getActivityTypeStyle(log.activityType)}`}>
+                          {activityTypeLabels[log.activityType] || log.activityType}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div>
