@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { ActivityLogService } from '../services/activityLog.service';
-import { ActivityType, EntityType, getEntityTypeFromPath } from '../entities/ActivityLog';
+import { ActivityType, EntityType } from '../entities/ActivityLog';
 import { AuthRequest } from './auth';
+import { getEntityTypeFromPath } from './activityLogger';
 
 /**
  * Универсальный middleware для автоматического логирования всех изменений
