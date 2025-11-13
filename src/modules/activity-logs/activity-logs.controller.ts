@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/auth';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { EntityType, ActivityType } from '../../entities/ActivityLog';
-import { AppError } from '../../utils/AppError';
+import { AppError } from '../../middleware/errorHandler';
 
 export class ActivityLogsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
