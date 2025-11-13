@@ -25,7 +25,7 @@ interface ActivityLog {
 
 const activityTypeLabels: Record<string, string> = {
   create: 'Создание',
-  update: 'Обновление',
+  update: 'Редактирование',
   delete: 'Удаление',
   login: 'Вход',
   logout: 'Выход',
