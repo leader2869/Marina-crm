@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { activityLogsService } from '../services/api'
-import { FileText, Filter } from 'lucide-react'
+import { FileText, Filter, Download } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { format } from 'date-fns'
+import * as XLSX from 'xlsx'
 
 interface ActivityLog {
   id: number
@@ -20,6 +21,7 @@ interface ActivityLog {
     firstName: string
     lastName: string
     email: string
+    phone: string | null
   } | null
 }
 
@@ -123,6 +125,54 @@ export default function ActivityLogs() {
     }, 0)
   }
 
+  const exportLogs = () => {
+    try {
+      // Формируем данные для Excel
+      const headers = ['Дата/Время', 'Пользователь', 'Email', 'Телефон', 'Действие', 'Вид', 'ID сущности', 'Описание', 'IP адрес']
+      const rows = logs.map(log => {
+        const date = format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm:ss')
+        const userName = log.user ? `${log.user.firstName} ${log.user.lastName}` : 'Система'
+        const email = log.user?.email || '-'
+        const phone = log.user?.phone || '-'
+        const action = activityTypeLabels[log.activityType] || log.activityType
+        const entity = entityTypeLabels[log.entityType] || log.entityType
+        const entityId = log.entityId || '-'
+        const description = log.description || '-'
+        const ipAddress = log.ipAddress || '-'
+        
+        return [date, userName, email, phone, action, entity, entityId, description, ipAddress]
+      })
+
+      // Создаем рабочую книгу Excel
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      
+      // Настраиваем ширину колонок
+      const columnWidths = [
+        { wch: 20 }, // Дата/Время
+        { wch: 25 }, // Пользователь
+        { wch: 30 }, // Email
+        { wch: 15 }, // Телефон
+        { wch: 15 }, // Действие
+        { wch: 15 }, // Вид
+        { wch: 12 }, // ID сущности
+        { wch: 50 }, // Описание
+        { wch: 15 }, // IP адрес
+      ]
+      worksheet['!cols'] = columnWidths
+
+      // Создаем рабочую книгу
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Логи активности')
+
+      // Скачиваем файл
+      const fileName = `logs_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.xlsx`
+      XLSX.writeFile(workbook, fileName)
+    } catch (error) {
+      console.error('Ошибка экспорта логов:', error)
+      setError('Ошибка при экспорте логов')
+    }
+  }
+
   if (loading && logs.length === 0) {
     return <LoadingAnimation />
   }
@@ -151,7 +201,7 @@ export default function ActivityLogs() {
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Вид пользователя
+              Вид
             </label>
             <select
               value={filters.entityType}
@@ -238,11 +288,19 @@ export default function ActivityLogs() {
         </div>
       </div>
 
-      {/* Статистика */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
+      {/* Статистика и экспорт */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6 flex justify-between items-center">
         <div className="text-sm text-gray-600">
           Всего записей: <span className="font-semibold">{total}</span>
         </div>
+        <button
+          onClick={exportLogs}
+          disabled={logs.length === 0}
+          className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-md hover:bg-green-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+        >
+          <Download className="h-4 w-4" />
+          Экспортировать
+        </button>
       </div>
 
       {/* Таблица логов */}
@@ -291,6 +349,9 @@ export default function ActivityLogs() {
                           {log.user.firstName} {log.user.lastName}
                         </div>
                         <div className="text-gray-500 text-xs">{log.user.email}</div>
+                        {log.user.phone && (
+                          <div className="text-gray-500 text-xs">{log.user.phone}</div>
+                        )}
                       </div>
                     ) : (
                       <span className="text-gray-400">Система</span>
