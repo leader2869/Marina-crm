@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { activityLogsService } from '../services/api'
 import { FileText, Filter, Download } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -54,6 +54,8 @@ export default function ActivityLogs() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [pageInput, setPageInput] = useState('1')
+  const pageInputRef = useRef<HTMLInputElement>(null)
   const [filters, setFilters] = useState({
     entityType: '',
     activityType: '',
@@ -66,12 +68,19 @@ export default function ActivityLogs() {
     loadLogs()
   }, [page])
 
+  useEffect(() => {
+    // Прокручиваем страницу вверх при изменении страницы
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Обновляем значение в поле ввода
+    setPageInput(page.toString())
+  }, [page])
+
   const loadLogs = async () => {
     try {
       setLoading(true)
       const params: any = {
         page,
-        limit: 50,
+        limit: 30,
       }
 
       if (filters.entityType) params.entityType = filters.entityType
@@ -119,10 +128,16 @@ export default function ActivityLogs() {
       endDate: '',
     })
     setPage(1)
-    // Загружаем логи после сброса фильтров
-    setTimeout(() => {
-      loadLogs()
-    }, 0)
+  }
+
+  const handlePageJump = () => {
+    const pageNum = parseInt(pageInput)
+    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+      setPage(pageNum)
+    } else {
+      // Если введено неверное значение, возвращаем текущую страницу
+      setPageInput(page.toString())
+    }
   }
 
   const exportLogs = () => {
@@ -474,21 +489,48 @@ export default function ActivityLogs() {
             <div className="text-sm text-gray-700">
               Страница {page} из {totalPages}
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Назад
-              </button>
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={page === totalPages}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Вперед
-              </button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">Перейти на страницу:</span>
+                <input
+                  ref={pageInputRef}
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  value={pageInput}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handlePageJump()
+                    }
+                  }}
+                  onChange={(e) => {
+                    setPageInput(e.target.value)
+                  }}
+                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                />
+                <button
+                  onClick={handlePageJump}
+                  className="px-3 py-1 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                >
+                  Перейти
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                  className="px-4 py-2 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Назад
+                </button>
+                <button
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                  className="px-4 py-2 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Вперед
+                </button>
+              </div>
             </div>
           </div>
         )}
