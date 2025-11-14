@@ -25,6 +25,7 @@ export enum PaymentStatus {
   PAID = 'paid',
   OVERDUE = 'overdue',
   REFUNDED = 'refunded',
+  CANCELLED = 'cancelled',
 }
 
 export interface UserClub {

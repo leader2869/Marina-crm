@@ -2,12 +2,16 @@ import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
 import { Vessel } from '../../entities/Vessel';
 import { User } from '../../entities/User';
+import { Booking } from '../../entities/Booking';
+import { Payment } from '../../entities/Payment';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
+import { BookingStatus } from '../../types';
+import { In } from 'typeorm';
 
 export class VesselsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -289,11 +293,15 @@ export class VesselsController {
   }
 
   async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    const vesselRepository = AppDataSource.getRepository(Vessel);
+    const bookingRepository = AppDataSource.getRepository(Booking);
+    let vessel: Vessel | null = null;
+    let alreadyLogged = false; // Флаг, чтобы не логировать дважды
+
     try {
       const { id } = req.params;
 
-      const vesselRepository = AppDataSource.getRepository(Vessel);
-      const vessel = await vesselRepository.findOne({
+      vessel = await vesselRepository.findOne({
         where: { id: parseInt(id) },
         relations: ['owner'],
       });
@@ -310,32 +318,287 @@ export class VesselsController {
         throw new AppError('Недостаточно прав для удаления', 403);
       }
 
-      // Формируем детальное описание перед удалением
+      // Проверяем наличие связанных броней
+      // Сначала получаем все брони для этого катера
+      const allBookings = await bookingRepository.find({
+        where: { vesselId: vessel.id },
+        select: ['id', 'status'],
+      });
+
+      console.log(`[Vessel Delete] Всего броней для судна ${vessel.id}: ${allBookings.length}`);
+
+      // Разделяем на отмененные и активные
+      const cancelledBookings = allBookings.filter(b => b.status === BookingStatus.CANCELLED);
+      const activeBookings = allBookings.filter(b => b.status !== BookingStatus.CANCELLED);
+
+      console.log(`[Vessel Delete] Отмененных броней: ${cancelledBookings.length}, активных: ${activeBookings.length}`);
+
+      // Если есть активные брони - не удаляем катер
+      if (activeBookings.length > 0) {
+        const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
+        const vesselName = vessel.name || 'неизвестное судно';
+        const vesselType = vessel.type || 'неизвестный тип';
+        const vesselLength = vessel.length ? `${vessel.length} м` : 'неизвестная длина';
+        const vesselWidth = vessel.width ? `${vessel.width} м` : '';
+        const bookingsInfo = activeBookings.length > 0 
+          ? ` (примеры ID: ${activeBookings.slice(0, 5).map(b => b.id).join(', ')})`
+          : '';
+        const description = `${userName || 'Пользователь'} неудачная попытка удаления катера "${vesselName}" (${vesselType}, длина: ${vesselLength}${vesselWidth ? `, ширина: ${vesselWidth}` : ''}). Причина: на катер есть активные брони (${activeBookings.length} шт.)${bookingsInfo}`;
+
+        // Логируем неудачную попытку удаления
+        await ActivityLogService.logActivity({
+          activityType: ActivityType.OTHER,
+          entityType: EntityType.VESSEL,
+          entityId: vessel.id,
+          userId: req.userId || null,
+          description,
+          oldValues: null,
+          newValues: null,
+          ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+          userAgent: req.headers['user-agent'] || null,
+        });
+        alreadyLogged = true;
+
+        throw new AppError(`Нельзя удалить катер с активными бронями. Найдено активных броней: ${activeBookings.length}`, 400);
+      }
+
+      // Сохраняем данные для логирования перед удалением
       const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
       const vesselName = vessel.name || 'неизвестное судно';
       const vesselType = vessel.type || 'неизвестный тип';
       const vesselLength = vessel.length ? `${vessel.length} м` : 'неизвестная длина';
       const vesselWidth = vessel.width ? `${vessel.width} м` : '';
-      const description = `${userName || 'Пользователь'} удалил катер "${vesselName}" (${vesselType}, длина: ${vesselLength}${vesselWidth ? `, ширина: ${vesselWidth}` : ''})`;
+      const vesselId = vessel.id;
 
-      // Логируем удаление с детальным описанием
-      await ActivityLogService.logActivity({
-        activityType: ActivityType.DELETE,
-        entityType: EntityType.VESSEL,
-        entityId: vessel.id,
-        userId: req.userId || null,
-        description,
-        oldValues: null,
-        newValues: null,
-        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
-        userAgent: req.headers['user-agent'] || null,
-      });
+      // Используем транзакцию для атомарности операций
+      const queryRunner = AppDataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
 
-      await vesselRepository.remove(vessel);
+      try {
+        console.log(`[Vessel Delete] Начало транзакции для удаления судна ${vesselId}`);
 
-      res.json({ message: 'Судно удалено' });
-    } catch (error) {
-      next(error);
+        // Получаем репозитории в транзакции
+        const paymentRepositoryTransaction = queryRunner.manager.getRepository(Payment);
+        const bookingRepositoryTransaction = queryRunner.manager.getRepository(Booking);
+        const vesselRepositoryTransaction = queryRunner.manager.getRepository(Vessel);
+
+        // Если есть только отмененные брони - удаляем их перед удалением катера
+        if (cancelledBookings.length > 0) {
+          console.log(`[Vessel Delete] Удаляем ${cancelledBookings.length} отмененных броней перед удалением катера`);
+          
+          const cancelledBookingIds = cancelledBookings.map(b => b.id);
+
+          // Удаляем платежи, связанные с отмененными бронями
+          const deletedPayments = await paymentRepositoryTransaction.delete({
+            bookingId: In(cancelledBookingIds),
+          });
+          
+          console.log(`[Vessel Delete] Удалено платежей: ${deletedPayments.affected || 0}`);
+
+          // Удаляем отмененные брони
+          const deletedBookings = await bookingRepositoryTransaction.delete({
+            id: In(cancelledBookingIds),
+          });
+          
+          console.log(`[Vessel Delete] Удалено отмененных броней: ${deletedBookings.affected || 0}`);
+
+          // Проверяем, что все брони действительно удалены
+          const remainingBookings = await bookingRepositoryTransaction.count({
+            where: { vesselId: vesselId },
+          });
+          
+          if (remainingBookings > 0) {
+            console.error(`[Vessel Delete] ОШИБКА: После удаления осталось ${remainingBookings} броней для судна ${vesselId}`);
+            throw new AppError(`Не удалось удалить все брони. Осталось: ${remainingBookings}`, 500);
+          }
+          
+          console.log(`[Vessel Delete] Все отмененные брони успешно удалены`);
+        }
+
+        // Проверяем еще раз, что нет активных броней
+        const finalBookingsCheck = await bookingRepositoryTransaction.count({
+          where: { vesselId: vesselId },
+        });
+
+        if (finalBookingsCheck > 0) {
+          console.error(`[Vessel Delete] ОШИБКА: Найдено ${finalBookingsCheck} активных броней для судна ${vesselId}`);
+          throw new AppError(`Нельзя удалить катер с активными бронями. Найдено: ${finalBookingsCheck}`, 400);
+        }
+
+        console.log(`[Vessel Delete] Попытка удаления судна ${vesselId} в транзакции`);
+        // Удаляем катер в транзакции
+        const deleteResult = await vesselRepositoryTransaction.delete(vesselId);
+        console.log(`[Vessel Delete] Результат удаления:`, deleteResult);
+        
+        if (deleteResult.affected === 0) {
+          throw new AppError('Судно не было удалено из базы данных', 500);
+        }
+        
+        // Коммитим транзакцию
+        await queryRunner.commitTransaction();
+        console.log(`[Vessel Delete] Судно ${vesselId} успешно удалено, транзакция закоммичена`);
+
+        // Логируем успешное удаление ПОСЛЕ коммита транзакции
+        const description = `${userName || 'Пользователь'} удалил катер "${vesselName}" (${vesselType}, длина: ${vesselLength}${vesselWidth ? `, ширина: ${vesselWidth}` : ''})`;
+
+        await ActivityLogService.logActivity({
+          activityType: ActivityType.DELETE,
+          entityType: EntityType.VESSEL,
+          entityId: vesselId,
+          userId: req.userId || null,
+          description,
+          oldValues: null,
+          newValues: null,
+          ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+          userAgent: req.headers['user-agent'] || null,
+        });
+
+        res.json({ message: 'Судно удалено' });
+      } catch (removeError: any) {
+        // Откатываем транзакцию в случае ошибки
+        try {
+          await queryRunner.rollbackTransaction();
+          console.log(`[Vessel Delete] Транзакция откачена`);
+        } catch (rollbackError) {
+          console.error(`[Vessel Delete] Ошибка при откате транзакции:`, rollbackError);
+        }
+        console.error(`[Vessel Delete] Ошибка при удалении судна ${vesselId}:`, removeError);
+        console.error(`[Vessel Delete] Сообщение об ошибке:`, removeError?.message);
+        console.error(`[Vessel Delete] Код ошибки:`, removeError?.code);
+        
+        // Если удаление не удалось из-за внешних ключей или других причин
+        let errorMessage = removeError?.message || 'неизвестная ошибка при удалении';
+        const isForeignKeyError = 
+          errorMessage.includes('foreign key constraint') || 
+          errorMessage.includes('violates foreign key') ||
+          errorMessage.includes('FK_') ||
+          removeError?.code === '23503'; // PostgreSQL код ошибки для нарушения внешнего ключа
+        
+        if (isForeignKeyError) {
+          console.log(`[Vessel Delete] Обнаружена ошибка внешнего ключа, проверяем брони...`);
+          // Дополнительно проверяем наличие броней (на случай, если первая проверка не сработала)
+          const bookingsCountAfterError = await bookingRepository.count({
+            where: { vesselId: vesselId },
+          });
+          
+          console.log(`[Vessel Delete] После ошибки найдено броней: ${bookingsCountAfterError}`);
+          
+          if (bookingsCountAfterError > 0) {
+            errorMessage = `на катер есть брони (${bookingsCountAfterError} шт.)`;
+          } else {
+            errorMessage = 'есть связанные записи в базе данных (брони или платежи)';
+          }
+        }
+        
+        const description = `${userName || 'Пользователь'} неудачная попытка удаления катера "${vesselName}" (${vesselType}, длина: ${vesselLength}${vesselWidth ? `, ширина: ${vesselWidth}` : ''}). Причина: ${errorMessage}`;
+
+        // Логируем неудачную попытку удаления
+        await ActivityLogService.logActivity({
+          activityType: ActivityType.OTHER,
+          entityType: EntityType.VESSEL,
+          entityId: vesselId,
+          userId: req.userId || null,
+          description,
+          oldValues: null,
+          newValues: null,
+          ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+          userAgent: req.headers['user-agent'] || null,
+        }).catch((logError) => {
+          console.error('Ошибка логирования неудачной попытки удаления:', logError);
+        });
+        alreadyLogged = true;
+
+        // Формируем понятное сообщение об ошибке для пользователя
+        // ВСЕГДА заменяем техническое сообщение на понятное
+        let userFriendlyMessage = 'Не удалось удалить катер. ';
+        if (errorMessage.includes('брони')) {
+          userFriendlyMessage += errorMessage;
+        } else if (errorMessage.includes('связанные записи')) {
+          userFriendlyMessage += errorMessage;
+        } else if (isForeignKeyError) {
+          // Если это ошибка внешнего ключа, но мы не нашли брони, все равно говорим о связанных записях
+          userFriendlyMessage += 'Есть связанные записи в базе данных (брони или платежи).';
+        } else {
+          userFriendlyMessage += 'Возможно, есть связанные записи (брони или платежи).';
+        }
+
+        // ВАЖНО: Всегда выбрасываем AppError с понятным сообщением, никогда не пробрасываем техническую ошибку
+        throw new AppError(userFriendlyMessage, 400);
+      } finally {
+        // Освобождаем соединение
+        await queryRunner.release();
+      }
+    } catch (error: any) {
+      console.error(`[Vessel Delete] Внешний catch блок. Ошибка:`, error);
+      console.error(`[Vessel Delete] Тип ошибки:`, error?.constructor?.name);
+      console.error(`[Vessel Delete] Сообщение:`, error?.message);
+      console.error(`[Vessel Delete] Код:`, error?.code);
+      console.error(`[Vessel Delete] alreadyLogged:`, alreadyLogged);
+      
+      // Если это AppError, просто пробрасываем его дальше (он уже имеет понятное сообщение)
+      if (error instanceof AppError) {
+        console.log(`[Vessel Delete] Это AppError, пробрасываем дальше`);
+        return next(error);
+      }
+
+      // Если это не ошибка из-за броней и мы еще не залогировали, логируем неудачную попытку
+      if (vessel && error.message && !error.message.includes('бронями') && !alreadyLogged) {
+        const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
+        const vesselName = vessel.name || 'неизвестное судно';
+        const vesselType = vessel.type || 'неизвестный тип';
+        const vesselLength = vessel.length ? `${vessel.length} м` : 'неизвестная длина';
+        const vesselWidth = vessel.width ? `${vessel.width} м` : '';
+        
+        // Проверяем, является ли это ошибкой внешнего ключа
+        const isForeignKeyError = 
+          error.message?.includes('foreign key constraint') || 
+          error.message?.includes('violates foreign key') ||
+          error.message?.includes('FK_') ||
+          error.code === '23503';
+        
+        let errorMessage = 'неизвестная ошибка';
+        if (isForeignKeyError) {
+          errorMessage = 'есть связанные записи в базе данных (брони или платежи)';
+        } else {
+          errorMessage = error.message || 'неизвестная ошибка';
+        }
+        
+        const description = `${userName || 'Пользователь'} неудачная попытка удаления катера "${vesselName}" (${vesselType}, длина: ${vesselLength}${vesselWidth ? `, ширина: ${vesselWidth}` : ''}). Причина: ${errorMessage}`;
+
+        // Логируем неудачную попытку удаления
+        await ActivityLogService.logActivity({
+          activityType: ActivityType.OTHER,
+          entityType: EntityType.VESSEL,
+          entityId: vessel.id,
+          userId: req.userId || null,
+          description,
+          oldValues: null,
+          newValues: null,
+          ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+          userAgent: req.headers['user-agent'] || null,
+        }).catch((logError) => {
+          console.error('Ошибка логирования неудачной попытки удаления:', logError);
+        });
+        
+        // ВСЕГДА преобразуем техническую ошибку в понятное сообщение
+        const userFriendlyMessage = isForeignKeyError
+          ? 'Не удалось удалить катер. Есть связанные записи в базе данных (брони или платежи).'
+          : `Не удалось удалить катер. ${errorMessage}`;
+        
+        return next(new AppError(userFriendlyMessage, 400));
+      }
+
+      // Если это техническая ошибка, преобразуем ее в понятное сообщение
+      if (error.message?.includes('foreign key constraint') || 
+          error.message?.includes('violates foreign key') ||
+          error.message?.includes('FK_') ||
+          error.code === '23503') {
+        return next(new AppError('Не удалось удалить катер. Есть связанные записи в базе данных (брони или платежи).', 400));
+      }
+
+      // Для всех остальных ошибок также преобразуем в понятное сообщение
+      return next(new AppError('Не удалось удалить катер. Возможно, есть связанные записи.', 400));
     }
   }
 

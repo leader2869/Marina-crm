@@ -23,7 +23,8 @@
     "diagnose-supabase": "node diagnose-supabase-connection.js",
     "export-data": "ts-node src/database/export-data.ts",
     "import-data": "ts-node src/database/import-data.ts",
-    "check-data": "ts-node src/database/check-data.ts"
+    "check-data": "ts-node src/database/check-data.ts",
+    "add-payment-status-cancelled": "ts-node src/database/add-payment-status-cancelled.ts"
   },
   "keywords": [
     "crm",
