@@ -49,10 +49,15 @@ export class CashTransactionsController {
         .leftJoinAndSelect('transaction.cash', 'cash')
         .where('transaction.cashId = :cashId', { cashId: parseInt(cashId) });
 
-      if (startDate && endDate) {
-        queryBuilder.andWhere('transaction.date BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
+      // Фильтрация по периоду
+      if (startDate) {
+        queryBuilder.andWhere('transaction.date >= :startDate', {
+          startDate: new Date(startDate as string),
+        });
+      }
+      if (endDate) {
+        queryBuilder.andWhere('transaction.date <= :endDate', {
+          endDate: new Date(endDate as string),
         });
       }
 

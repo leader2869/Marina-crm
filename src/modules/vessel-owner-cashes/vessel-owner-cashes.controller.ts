@@ -31,6 +31,9 @@ export class VesselOwnerCashesController {
         queryBuilder.where('cash.vesselOwnerId = :vesselOwnerId', { vesselOwnerId: req.userId });
       }
 
+      // Показываем только активные кассы (isActive = true)
+      queryBuilder.andWhere('cash.isActive = :isActive', { isActive: true });
+
       const [cashes, total] = await queryBuilder
         .skip((page - 1) * limit)
         .take(limit)
@@ -164,6 +167,8 @@ export class VesselOwnerCashesController {
 
       const { id } = req.params;
       const cashRepository = AppDataSource.getRepository(VesselOwnerCash);
+      const transactionRepository = AppDataSource.getRepository(CashTransaction);
+      
       const cash = await cashRepository.findOne({
         where: { id: parseInt(id) },
       });
@@ -181,10 +186,53 @@ export class VesselOwnerCashesController {
         throw new AppError('Доступ запрещен', 403);
       }
 
+      // Проверяем наличие транзакций
+      const transactionsCount = await transactionRepository.count({
+        where: { cashId: cash.id },
+      });
+
+      if (transactionsCount > 0) {
+        throw new AppError(
+          `Невозможно удалить кассу: в ней есть ${transactionsCount} транзакций. Используйте функцию "Скрыть кассу" вместо удаления.`,
+          400
+        );
+      }
+
       await cashRepository.remove(cash);
 
       res.json({ message: 'Касса удалена' });
-    } catch (error) {
+    } catch (error: any) {
+      // Обрабатываем ошибку внешнего ключа
+      const errorMessage = error?.message || '';
+      const errorCode = error?.code || '';
+      
+      const isForeignKeyError = 
+        errorMessage.includes('foreign key constraint') ||
+        errorMessage.includes('violates foreign key') ||
+        errorMessage.includes('FK_') ||
+        errorMessage.includes('cash_transactions') ||
+        errorCode === '23503'; // PostgreSQL код ошибки для нарушения внешнего ключа
+      
+      if (isForeignKeyError) {
+        // Если возникла ошибка внешнего ключа, значит есть транзакции
+        try {
+          const transactionRepository = AppDataSource.getRepository(CashTransaction);
+          const transactionsCount = await transactionRepository.count({
+            where: { cashId: parseInt(req.params.id) },
+          });
+
+          throw new AppError(
+            `Невозможно удалить кассу: в ней есть ${transactionsCount > 0 ? transactionsCount : ''} транзакций. Используйте функцию "Скрыть кассу" вместо удаления.`,
+            400
+          );
+        } catch (countError: any) {
+          // Если не удалось посчитать транзакции, все равно показываем понятное сообщение
+          throw new AppError(
+            'Невозможно удалить кассу: в ней есть транзакции. Используйте функцию "Скрыть кассу" вместо удаления.',
+            400
+          );
+        }
+      }
       next(error);
     }
   }
@@ -215,10 +263,26 @@ export class VesselOwnerCashesController {
         throw new AppError('Доступ запрещен', 403);
       }
 
+      const { startDate, endDate } = req.query;
+      
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
-      const transactions = await transactionRepository.find({
-        where: { cashId: cash.id },
-      });
+      const queryBuilder = transactionRepository
+        .createQueryBuilder('transaction')
+        .where('transaction.cashId = :cashId', { cashId: cash.id });
+
+      // Фильтрация по периоду
+      if (startDate) {
+        queryBuilder.andWhere('transaction.date >= :startDate', { 
+          startDate: new Date(startDate as string) 
+        });
+      }
+      if (endDate) {
+        queryBuilder.andWhere('transaction.date <= :endDate', { 
+          endDate: new Date(endDate as string) 
+        });
+      }
+
+      const transactions = await queryBuilder.getMany();
 
       let totalIncome = 0;
       let totalExpense = 0;
@@ -260,6 +324,67 @@ export class VesselOwnerCashesController {
           cash: balanceCash,
           non_cash: balanceNonCash,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Получить общую сумму доходов по всем кассам судовладельца
+  async getTotalIncome(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
+      const { startDate, endDate } = req.query;
+
+      const cashRepository = AppDataSource.getRepository(VesselOwnerCash);
+      const queryBuilder = cashRepository
+        .createQueryBuilder('cash')
+        .where('cash.isActive = :isActive', { isActive: true });
+
+      // Если не суперадмин или админ, показываем только свои кассы
+      if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        queryBuilder.andWhere('cash.vesselOwnerId = :vesselOwnerId', { vesselOwnerId: req.userId });
+      }
+
+      const cashes = await queryBuilder.getMany();
+
+      const transactionRepository = AppDataSource.getRepository(CashTransaction);
+      let totalIncome = 0;
+
+      for (const cash of cashes) {
+        const transactionQueryBuilder = transactionRepository
+          .createQueryBuilder('transaction')
+          .where('transaction.cashId = :cashId', { cashId: cash.id })
+          .andWhere('transaction.transactionType = :transactionType', { 
+            transactionType: CashTransactionType.INCOME 
+          });
+
+        // Фильтрация по периоду
+        if (startDate) {
+          transactionQueryBuilder.andWhere('transaction.date >= :startDate', {
+            startDate: new Date(startDate as string),
+          });
+        }
+        if (endDate) {
+          transactionQueryBuilder.andWhere('transaction.date <= :endDate', {
+            endDate: new Date(endDate as string),
+          });
+        }
+
+        const transactions = await transactionQueryBuilder.getMany();
+
+        transactions.forEach((transaction) => {
+          const amount = parseFloat(transaction.amount.toString());
+          totalIncome += amount;
+        });
+      }
+
+      res.json({
+        totalIncome: parseFloat(totalIncome.toFixed(2)),
+        cashesCount: cashes.length,
       });
     } catch (error) {
       next(error);

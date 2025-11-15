@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X } from 'lucide-react'
+import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X, EyeOff } from 'lucide-react'
 import { vesselOwnerCashesService } from '../services/api'
 import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -19,6 +19,8 @@ export default function Cash() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('')
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('')
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
 
   const [cashForm, setCashForm] = useState({
     name: '',
@@ -44,7 +46,7 @@ export default function Cash() {
       loadTransactions()
       loadBalance()
     }
-  }, [selectedCash, filterType, filterPaymentMethod])
+  }, [selectedCash, filterType, filterPaymentMethod, dateFrom, dateTo])
 
   const loadCashes = async () => {
     try {
@@ -71,6 +73,8 @@ export default function Cash() {
       const params: any = { limit: 100 }
       if (filterType) params.transactionType = filterType
       if (filterPaymentMethod) params.paymentMethod = filterPaymentMethod
+      if (dateFrom) params.startDate = dateFrom
+      if (dateTo) params.endDate = dateTo
 
       const response = await vesselOwnerCashesService.getTransactions(selectedCash.id, params)
       const transactionsData = response.data || []
@@ -87,7 +91,10 @@ export default function Cash() {
     if (!selectedCash) return
 
     try {
-      const response: any = await vesselOwnerCashesService.getBalance(selectedCash.id)
+      const params: any = {}
+      if (dateFrom) params.startDate = dateFrom
+      if (dateTo) params.endDate = dateTo
+      const response: any = await vesselOwnerCashesService.getBalance(selectedCash.id, params)
       setBalance(response as CashBalance)
     } catch (error: any) {
       console.error('Ошибка загрузки баланса:', error)
@@ -141,7 +148,6 @@ export default function Cash() {
 
   const handleDeleteCash = async (cash: VesselOwnerCash) => {
     if (!confirm(`Вы уверены, что хотите удалить кассу "${cash.name}"?`)) return
-    if (!confirm('ВНИМАНИЕ! Это действие необратимо. Все транзакции этой кассы будут удалены. Продолжить?')) return
 
     try {
       await vesselOwnerCashesService.delete(cash.id)
@@ -152,7 +158,31 @@ export default function Cash() {
       }
       await loadCashes()
     } catch (error: any) {
-      alert(error.error || error.message || 'Ошибка удаления кассы')
+      const errorMessage = error.error || error.message || 'Ошибка удаления кассы'
+      // Если ошибка связана с наличием транзакций, предлагаем скрыть кассу
+      if (errorMessage.includes('транзакций')) {
+        if (confirm(`${errorMessage}\n\nСкрыть кассу вместо удаления?`)) {
+          await handleHideCash(cash)
+        }
+      } else {
+        alert(errorMessage)
+      }
+    }
+  }
+
+  const handleHideCash = async (cash: VesselOwnerCash) => {
+    if (!confirm(`Скрыть кассу "${cash.name}"? Кассу можно будет восстановить позже.`)) return
+
+    try {
+      await vesselOwnerCashesService.update(cash.id, { isActive: false })
+      if (selectedCash?.id === cash.id) {
+        setSelectedCash(null)
+        setTransactions([])
+        setBalance(null)
+      }
+      await loadCashes()
+    } catch (error: any) {
+      alert(error.error || error.message || 'Ошибка скрытия кассы')
     }
   }
 
@@ -263,74 +293,79 @@ export default function Cash() {
           <h1 className="text-3xl font-bold text-gray-900">Касса</h1>
           <p className="mt-2 text-gray-600">Управление кассами и транзакциями</p>
         </div>
-        <button
-          onClick={() => handleOpenCashModal()}
-          className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Создать кассу
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Список касс */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Мои кассы</h2>
-            <div className="space-y-2">
-              {cashes.length === 0 ? (
-                <p className="text-gray-500 text-sm">Нет касс. Создайте первую кассу.</p>
-              ) : (
-                cashes.map((cash) => (
-                  <div
-                    key={cash.id}
-                    onClick={() => setSelectedCash(cash)}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                      selectedCash?.id === cash.id
-                        ? 'bg-primary-50 border-2 border-primary-500'
-                        : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{cash.name}</h3>
-                        {cash.description && (
-                          <p className="text-sm text-gray-600 mt-1">{cash.description}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 ml-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleOpenCashModal(cash)
-                          }}
-                          className="p-1 text-gray-600 hover:text-primary-600"
-                          title="Редактировать"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteCash(cash)
-                          }}
-                          className="p-1 text-gray-600 hover:text-red-600"
-                          title="Удалить"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+      {/* Выбор кассы сверху */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Выбор кассы</h2>
+          <button
+            onClick={() => handleOpenCashModal()}
+            className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Создать кассу
+          </button>
         </div>
+        {cashes.length === 0 ? (
+          <p className="text-gray-500 text-sm">Нет касс. Создайте первую кассу.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {cashes.map((cash) => (
+              <div
+                key={cash.id}
+                onClick={() => setSelectedCash(cash)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
+                  selectedCash?.id === cash.id
+                    ? 'bg-primary-50 border-2 border-primary-500'
+                    : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                }`}
+              >
+                <Wallet className="h-4 w-4 text-gray-600" />
+                <span className="font-medium text-gray-900">{cash.name}</span>
+                {cash.description && (
+                  <span className="text-sm text-gray-600">({cash.description})</span>
+                )}
+                <div className="flex gap-1 ml-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOpenCashModal(cash)
+                    }}
+                    className="p-1 text-gray-600 hover:text-primary-600"
+                    title="Редактировать"
+                  >
+                    <Edit2 className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleHideCash(cash)
+                    }}
+                    className="p-1 text-gray-600 hover:text-orange-600"
+                    title="Скрыть кассу"
+                  >
+                    <EyeOff className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteCash(cash)
+                    }}
+                    className="p-1 text-gray-600 hover:text-red-600"
+                    title="Удалить кассу (только если нет транзакций)"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Детали кассы и транзакции */}
-        <div className="lg:col-span-2">
-          {selectedCash ? (
+      {/* Детали кассы и транзакции */}
+      {selectedCash ? (
             <div className="space-y-6">
               {/* Баланс кассы */}
               {balance && (
@@ -342,7 +377,7 @@ export default function Cash() {
                         onClick={() => handleOpenTransactionModal()}
                         className="flex items-center px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
                       >
-                        <ArrowUp className="h-4 w-4 mr-1" />
+                        <ArrowDown className="h-4 w-4 mr-1" />
                         Приход
                       </button>
                       <button
@@ -355,9 +390,45 @@ export default function Cash() {
                         }}
                         className="flex items-center px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
                       >
-                        <ArrowDown className="h-4 w-4 mr-1" />
+                        <ArrowUp className="h-4 w-4 mr-1" />
                         Расход
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Выбор периода */}
+                  <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <label className="text-sm font-medium text-gray-700">Период:</label>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">От:</label>
+                        <input
+                          type="date"
+                          value={dateFrom}
+                          onChange={(e) => setDateFrom(e.target.value)}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">До:</label>
+                        <input
+                          type="date"
+                          value={dateTo}
+                          onChange={(e) => setDateTo(e.target.value)}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+                        />
+                      </div>
+                      {(dateFrom || dateTo) && (
+                        <button
+                          onClick={() => {
+                            setDateFrom('')
+                            setDateTo('')
+                          }}
+                          className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          Сбросить
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -491,12 +562,12 @@ export default function Cash() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               {transaction.transactionType === CashTransactionType.INCOME ? (
                                 <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-800">
-                                  <ArrowUp className="h-3 w-3 mr-1" />
+                                  <ArrowDown className="h-3 w-3 mr-1" />
                                   Приход
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-red-100 text-red-800">
-                                  <ArrowDown className="h-3 w-3 mr-1" />
+                                  <ArrowUp className="h-3 w-3 mr-1" />
                                   Расход
                                 </span>
                               )}
@@ -542,13 +613,11 @@ export default function Cash() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow p-12 text-center">
-              <Wallet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Выберите кассу для просмотра транзакций</p>
-            </div>
-          )}
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <Wallet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Выберите кассу для просмотра транзакций</p>
         </div>
-      </div>
+      )}
 
       {/* Модальное окно создания/редактирования кассы */}
       {showCashModal && (
