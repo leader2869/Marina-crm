@@ -13,6 +13,7 @@ import { Club } from './Club';
 import { Vessel } from './Vessel';
 import { Booking } from './Booking';
 import { UserClub } from './UserClub';
+import { VesselOwnerCash } from './VesselOwnerCash';
 
 @Entity('users')
 export class User {
@@ -88,6 +89,9 @@ export class User {
   // Связь многие-ко-многим через промежуточную таблицу
   @OneToMany(() => UserClub, (userClub) => userClub.user)
   managedClubs: UserClub[];
+
+  @OneToMany(() => VesselOwnerCash, (cash) => cash.vesselOwner)
+  vesselOwnerCashes: VesselOwnerCash[];
 }
 
 

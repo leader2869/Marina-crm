@@ -178,6 +178,8 @@ function App() {
                 </RoleProtectedRoute>
               } 
             />
+            {/* Catch-all для несуществующих роутов */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Routes>
       </Router>

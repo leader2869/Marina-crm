@@ -147,6 +147,20 @@ export const financesService = {
   createBudget: (data: any) => api.post('/finances/budgets', data),
 }
 
+export const vesselOwnerCashesService = {
+  getAll: (params?: any) => api.get('/vessel-owner/cashes', { params }),
+  getById: (id: number) => api.get(`/vessel-owner/cashes/${id}`),
+  create: (data: any) => api.post('/vessel-owner/cashes', data),
+  update: (id: number, data: any) => api.put(`/vessel-owner/cashes/${id}`, data),
+  delete: (id: number) => api.delete(`/vessel-owner/cashes/${id}`),
+  getBalance: (id: number) => api.get(`/vessel-owner/cashes/${id}/balance`),
+  getTransactions: (cashId: number, params?: any) => api.get(`/vessel-owner/cashes/${cashId}/transactions`, { params }),
+  getTransaction: (cashId: number, id: number) => api.get(`/vessel-owner/cashes/${cashId}/transactions/${id}`),
+  createTransaction: (cashId: number, data: any) => api.post(`/vessel-owner/cashes/${cashId}/transactions`, data),
+  updateTransaction: (cashId: number, id: number, data: any) => api.put(`/vessel-owner/cashes/${cashId}/transactions/${id}`, data),
+  deleteTransaction: (cashId: number, id: number) => api.delete(`/vessel-owner/cashes/${cashId}/transactions/${id}`),
+}
+
 export const paymentsService = {
   getAll: (params?: any) => api.get('/payments', { params }),
   getById: (id: number) => api.get(`/payments/${id}`),

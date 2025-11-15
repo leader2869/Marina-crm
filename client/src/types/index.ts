@@ -28,6 +28,22 @@ export enum PaymentStatus {
   CANCELLED = 'cancelled',
 }
 
+export enum CashTransactionType {
+  INCOME = 'income',   // Приход
+  EXPENSE = 'expense', // Расход
+}
+
+export enum CashPaymentMethod {
+  CASH = 'cash',       // Наличные
+  NON_CASH = 'non_cash', // Безналичные
+}
+
+export enum Currency {
+  RUB = 'RUB',
+  USD = 'USD',
+  EUR = 'EUR',
+}
+
 export interface UserClub {
   id: number
   userId: number
@@ -256,5 +272,45 @@ export interface Budget {
   category?: ExpenseCategory
   createdAt: string
   updatedAt: string
+}
+
+export interface VesselOwnerCash {
+  id: number
+  name: string
+  description?: string
+  isActive: boolean
+  vesselOwnerId: number
+  vesselOwner?: User
+  transactions?: CashTransaction[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CashTransaction {
+  id: number
+  cashId: number
+  transactionType: CashTransactionType
+  amount: number
+  currency: string
+  paymentMethod: CashPaymentMethod
+  date: string
+  description?: string
+  counterparty?: string
+  documentPath?: string
+  cash?: VesselOwnerCash
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CashBalance {
+  cashId: number
+  cashName: string
+  totalIncome: number
+  totalExpense: number
+  balance: number
+  balanceByPaymentMethod: {
+    cash: number
+    non_cash: number
+  }
 }
 

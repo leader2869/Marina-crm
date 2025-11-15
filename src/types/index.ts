@@ -69,6 +69,16 @@ export enum Currency {
   EUR = 'EUR',
 }
 
+export enum CashTransactionType {
+  INCOME = 'income',   // Приход
+  EXPENSE = 'expense', // Расход
+}
+
+export enum CashPaymentMethod {
+  CASH = 'cash',       // Наличные
+  NON_CASH = 'non_cash', // Безналичные
+}
+
 export interface JwtPayload {
   userId: number;
   email: string;

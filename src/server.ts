@@ -17,6 +17,7 @@ import berthsRoutes from './modules/berths/berths.routes';
 import tariffsRoutes from './modules/tariffs/tariffs.routes';
 import bookingRulesRoutes from './modules/booking-rules/booking-rules.routes';
 import activityLogsRoutes from './modules/activity-logs/activity-logs.routes';
+import vesselOwnerCashesRoutes from './modules/vessel-owner-cashes/vessel-owner-cashes.routes';
 
 const app: Express = express();
 
@@ -174,6 +175,7 @@ app.use('/api/berths', autoActivityLogger, berthsRoutes);
 app.use('/api/tariffs', autoActivityLogger, tariffsRoutes);
 app.use('/api/booking-rules', autoActivityLogger, bookingRulesRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
+app.use('/api/vessel-owner/cashes', autoActivityLogger, vesselOwnerCashesRoutes);
 
 // Error handler
 app.use(errorHandler);
