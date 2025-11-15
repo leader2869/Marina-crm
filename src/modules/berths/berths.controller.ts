@@ -37,7 +37,7 @@ export class BerthsController {
       }
 
       // Загружаем места с сортировкой по номеру места
-      // Сначала места, начинающиеся с текста (алфавитно), потом с числа (от большего к меньшему)
+      // Сначала места, начинающиеся с текста (алфавитно), потом с числа (от меньшего к большему)
       const berthRepository = AppDataSource.getRepository(Berth);
       const berths = await berthRepository
         .createQueryBuilder('berth')
@@ -53,9 +53,9 @@ export class BerthsController {
               )
             ELSE 0 
           END`,
-          'DESC' // От большего к меньшему по числовому значению
+          'ASC' // От меньшего к большему по числовому значению
         )
-        .addOrderBy('berth.number', 'DESC') // От большего к меньшему по строке
+        .addOrderBy('berth.number', 'ASC') // От меньшего к большему по строке
         .getMany();
 
       res.json(berths);
