@@ -199,9 +199,27 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
       await AppDataSource.initialize();
       console.log('✅ База данных подключена');
 
+      // Запускаем периодическую проверку просроченных платежей с немедленной оплатой
+      const { ImmediatePaymentCheckService } = await import('./services/immediatePaymentCheck.service');
+      let checkInterval: NodeJS.Timeout | null = null;
+      
+      // Запускаем проверку каждые 30 секунд
+      checkInterval = ImmediatePaymentCheckService.startPeriodicCheck(30);
+      console.log('✅ Запущена периодическая проверка просроченных платежей с немедленной оплатой');
+
       app.listen(config.port, () => {
         console.log(`🚀 Сервер запущен на порту ${config.port}`);
         console.log(`📝 API доступен по адресу http://localhost:${config.port}/api`);
+      });
+
+      // Graceful shutdown
+      process.on('SIGTERM', async () => {
+        console.log('SIGTERM получен, закрытие соединений...');
+        if (checkInterval) {
+          clearInterval(checkInterval);
+        }
+        await AppDataSource.destroy();
+        process.exit(0);
       });
     } catch (error) {
       console.error('❌ Ошибка при запуске сервера:', error);
@@ -210,13 +228,6 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   };
 
   startServer();
-
-  // Graceful shutdown
-  process.on('SIGTERM', async () => {
-    console.log('SIGTERM получен, закрытие соединений...');
-    await AppDataSource.destroy();
-    process.exit(0);
-  });
 }
 
 
