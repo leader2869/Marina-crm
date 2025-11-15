@@ -56,9 +56,9 @@ export default function Dashboard() {
       icon: Anchor,
       color: 'bg-blue-500',
     },
-    // Судна не показываем для владельца яхт-клуба
+    // Катера не показываем для владельца яхт-клуба
     ...(user?.role !== UserRole.CLUB_OWNER ? [{
-      name: 'Судна',
+      name: 'Катера',
       value: stats.vessels,
       icon: Ship,
       color: 'bg-green-500',
@@ -125,14 +125,14 @@ export default function Dashboard() {
             <Anchor className="h-6 w-6 text-primary-600 mb-2" />
             <p className="font-medium text-gray-900">Управление клубами</p>
           </a>
-          {/* Мои суда не показываем для владельца яхт-клуба */}
+          {/* Мои катера не показываем для владельца яхт-клуба */}
           {user?.role !== UserRole.CLUB_OWNER && (
             <a
               href="/vessels"
               className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <Ship className="h-6 w-6 text-primary-600 mb-2" />
-              <p className="font-medium text-gray-900">Мои суда</p>
+              <p className="font-medium text-gray-900">Мои катера</p>
             </a>
           )}
           <a

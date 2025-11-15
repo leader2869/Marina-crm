@@ -41,7 +41,7 @@ export default function Vessels() {
       const response = await vesselsService.getAll({ limit: 100 })
       setVessels(response.data || [])
     } catch (error) {
-      console.error('Ошибка загрузки судов:', error)
+      console.error('Ошибка загрузки катеров:', error)
     } finally {
       setLoading(false)
     }
@@ -49,7 +49,7 @@ export default function Vessels() {
 
   const loadUsers = async () => {
     try {
-      // Загружаем пользователей для будущего использования (например, выбор владельца судна)
+      // Загружаем пользователей для будущего использования (например, выбор владельца катера)
       await usersService.getAll({ limit: 100 })
       // setUsers(response.data || []) // Пока не используется, но оставляем для будущего
     } catch (error) {
@@ -60,7 +60,7 @@ export default function Vessels() {
   const handleOpenAdd = () => {
     // Проверяем роль Guest
     if (user?.role === UserRole.GUEST) {
-      alert('Для добавления судна необходимо зарегистрироваться. Пожалуйста, зарегистрируйтесь как судовладелец.')
+      alert('Для добавления катера необходимо зарегистрироваться. Пожалуйста, зарегистрируйтесь как судовладелец.')
       return
     }
     
@@ -117,7 +117,7 @@ export default function Vessels() {
       await loadVessels()
       handleCloseAdd()
     } catch (err: any) {
-      setError(err.error || err.message || 'Ошибка создания судна')
+      setError(err.error || err.message || 'Ошибка создания катера')
     } finally {
       setCreating(false)
     }
@@ -125,7 +125,7 @@ export default function Vessels() {
 
   const handleDelete = async (vesselId: number) => {
     // Первое подтверждение
-    if (!confirm('Вы уверены, что хотите удалить это судно?')) return
+    if (!confirm('Вы уверены, что хотите удалить этот катер?')) return
 
     // Второе подтверждение
     if (!confirm('ВНИМАНИЕ! Это действие необратимо. Данные будут удалены из базы данных. Продолжить?')) return
@@ -136,7 +136,7 @@ export default function Vessels() {
       await vesselsService.delete(vesselId)
       await loadVessels()
     } catch (err: any) {
-      alert(err.error || err.message || 'Ошибка удаления судна')
+      alert(err.error || err.message || 'Ошибка удаления катера')
     } finally {
       setDeleting(false)
     }
@@ -144,7 +144,7 @@ export default function Vessels() {
 
   const exportToExcel = async () => {
     try {
-      // Загружаем все суда для экспорта
+      // Загружаем все катера для экспорта
       const response = await vesselsService.getAll({ limit: 10000 })
       const allVessels = response.data || []
 
@@ -170,7 +170,7 @@ export default function Vessels() {
       // Создаем рабочую книгу Excel
       const worksheet = XLSX.utils.json_to_sheet(excelData)
       const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Судна')
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Катера')
 
       // Настраиваем ширину столбцов
       const columnWidths = [
@@ -191,7 +191,7 @@ export default function Vessels() {
       worksheet['!cols'] = columnWidths
 
       // Генерируем имя файла с текущей датой
-      const fileName = `Судна_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.xlsx`
+      const fileName = `Катера_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.xlsx`
 
       // Сохраняем файл
       XLSX.writeFile(workbook, fileName)
@@ -207,7 +207,7 @@ export default function Vessels() {
     
     const searchLower = searchTerm.toLowerCase().trim()
     
-    // Поиск по названию судна
+    // Поиск по названию катера
     const vesselName = vessel.name?.toLowerCase() || ''
     if (vesselName.includes(searchLower)) return true
     
@@ -238,15 +238,15 @@ export default function Vessels() {
   })
 
   if (loading) {
-    return <LoadingAnimation message="Загрузка судов..." />
+    return <LoadingAnimation message="Загрузка катеров..." />
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Судна</h1>
-          <p className="mt-2 text-gray-600">Управление судами</p>
+          <h1 className="text-3xl font-bold text-gray-900">Катера</h1>
+          <p className="mt-2 text-gray-600">Управление катерами</p>
         </div>
         {isSuperAdmin && (
           <div className="flex gap-3">
@@ -263,7 +263,7 @@ export default function Vessels() {
               className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               <Plus className="h-5 w-5 mr-2" />
-              Добавить судно
+              Добавить катер
             </button>
           </div>
         )}
@@ -365,18 +365,18 @@ export default function Vessels() {
       {filteredVessels.length === 0 && vessels.length > 0 && (
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <Ship className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">Судна по запросу "{searchTerm}" не найдены</p>
+          <p className="text-gray-600">Катера по запросу "{searchTerm}" не найдены</p>
         </div>
       )}
 
       {vessels.length === 0 && (
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <Ship className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">Судна не найдены</p>
+          <p className="text-gray-600">Катера не найдены</p>
         </div>
       )}
 
-      {/* Модальное окно создания судна */}
+      {/* Модальное окно создания катера */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
@@ -385,7 +385,7 @@ export default function Vessels() {
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Создать новое судно</h3>
+                  <h3 className="text-lg font-medium text-gray-900">Создать новый катер</h3>
                   <button
                     onClick={handleCloseAdd}
                     className="text-gray-400 hover:text-gray-500"

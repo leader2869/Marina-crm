@@ -23,7 +23,9 @@ import {
   X as XIcon,
   Code,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -33,6 +35,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [newGuestsCount, setNewGuestsCount] = useState(0)
   const [pendingValidationCount, setPendingValidationCount] = useState(0)
+  const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({})
   // Загружаем сохраненную дату из localStorage или используем текущую
   const [currentDate, setCurrentDate] = useState(() => {
     const savedDate = localStorage.getItem('superAdminDate')
@@ -44,22 +47,37 @@ export default function Layout() {
 
   // Определяем доступные пункты меню в зависимости от роли
   const navigation = useMemo(() => {
-    const allItems = [
+    const allItems: Array<{
+      name: string
+      href?: string
+      icon: any
+      roles: UserRole[]
+      submenu?: Array<{ name: string; href: string; icon: any }>
+    }> = [
       { name: 'Дашборд', href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.PENDING_VALIDATION] },
       { name: 'Пользователи', href: '/users', icon: Users, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Новые гости', href: '/new-guests', icon: UserCheck, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Валидация', href: '/validation', icon: ShieldCheck, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Логи', href: '/activity-logs', icon: FileText, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Яхт-клубы', href: '/clubs', icon: Anchor, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
-      { name: 'Судна', href: '/vessels', icon: Ship, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER] },
+      { name: 'Катера', href: '/vessels', icon: Ship, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER] },
       { name: 'Бронирования', href: '/bookings', icon: Calendar, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
       { name: 'Виджет', href: '/widget', icon: Code, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Тарифы', href: '/tariffs', icon: Receipt, roles: [UserRole.CLUB_OWNER] },
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
-      { name: 'Доходы', href: '/incomes', icon: TrendingUp, roles: [UserRole.VESSEL_OWNER] },
-      { name: 'Расходы', href: '/expenses', icon: TrendingDown, roles: [UserRole.VESSEL_OWNER] },
-      { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
+      // Для судовладельца создаем подменю "Финансы"
+      {
+        name: 'Финансы',
+        icon: DollarSign,
+        roles: [UserRole.VESSEL_OWNER],
+        submenu: [
+          { name: 'Доходы', href: '/incomes', icon: TrendingUp },
+          { name: 'Расходы', href: '/expenses', icon: TrendingDown },
+          { name: 'Платежи', href: '/payments', icon: CreditCard },
+        ],
+      },
+      { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
       // Пункты регистрации для гостей
       { name: 'Зарегистрироваться как Владелец клуба', href: '/register?role=club_owner', icon: UserPlus, roles: [UserRole.GUEST] },
       { name: 'Зарегистрироваться как Судовладелец', href: '/register?role=vessel_owner', icon: UserPlus, roles: [UserRole.GUEST] },
@@ -108,8 +126,8 @@ export default function Layout() {
       }
       
       filteredItems.sort((a, b) => {
-        const orderA = clubOwnerOrder[a.href] || 999
-        const orderB = clubOwnerOrder[b.href] || 999
+        const orderA = (a.href && clubOwnerOrder[a.href]) ? clubOwnerOrder[a.href] : 999
+        const orderB = (b.href && clubOwnerOrder[b.href]) ? clubOwnerOrder[b.href] : 999
         return orderA - orderB
       })
     }
@@ -121,14 +139,16 @@ export default function Layout() {
         '/clubs': 2,
         '/vessels': 3,
         '/bookings': 4,
-        '/incomes': 5,
-        '/expenses': 6,
-        '/payments': 7,
+        'Финансы': 5, // Подменю "Финансы"
       }
       
       filteredItems.sort((a, b) => {
-        const orderA = vesselOwnerOrder[a.href] || 999
-        const orderB = vesselOwnerOrder[b.href] || 999
+        const orderA = (a.href && vesselOwnerOrder[a.href]) 
+          ? vesselOwnerOrder[a.href] 
+          : (vesselOwnerOrder[a.name] || 999)
+        const orderB = (b.href && vesselOwnerOrder[b.href]) 
+          ? vesselOwnerOrder[b.href] 
+          : (vesselOwnerOrder[b.name] || 999)
         return orderA - orderB
       })
     }
@@ -140,6 +160,32 @@ export default function Layout() {
   }, [user])
 
   const isActive = (path: string) => location.pathname === path
+
+  // Проверяем, активен ли какой-либо пункт подменю
+  const isSubmenuActive = (submenu?: Array<{ name: string; href: string; icon: any }>) => {
+    if (!submenu) return false
+    return submenu.some(item => location.pathname === item.href)
+  }
+
+  // Переключаем открытие/закрытие подменю
+  const toggleSubmenu = (menuName: string) => {
+    setOpenSubmenus(prev => ({
+      ...prev,
+      [menuName]: !prev[menuName]
+    }))
+  }
+
+  // Автоматически открываем подменю, если активен один из его пунктов
+  useEffect(() => {
+    navigation.forEach(item => {
+      if (item.submenu && isSubmenuActive(item.submenu)) {
+        setOpenSubmenus(prev => ({
+          ...prev,
+          [item.name]: true
+        }))
+      }
+    })
+  }, [location.pathname, navigation])
 
   // Загружаем счетчик новых гостей для суперадминистратора
   useEffect(() => {
@@ -279,13 +325,65 @@ export default function Layout() {
                 const displayName = item.href === '/clubs' && user?.role === UserRole.CLUB_OWNER 
                   ? 'Мои яхт-клубы' 
                   : item.name
+                
+                // Если есть подменю
+                if (item.submenu) {
+                  const isOpen = openSubmenus[item.name] || false
+                  const hasActiveSubmenu = isSubmenuActive(item.submenu)
+                  return (
+                    <div key={item.name}>
+                      <button
+                        onClick={() => toggleSubmenu(item.name)}
+                        className={`flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg ${
+                          hasActiveSubmenu
+                            ? 'bg-primary-50 text-primary-700'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <Icon className="mr-3 h-5 w-5" />
+                          {displayName}
+                        </div>
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                      {isOpen && (
+                        <div className="ml-4 mt-1 space-y-1">
+                          {item.submenu.map((subItem) => {
+                            const SubIcon = subItem.icon
+                            return (
+                              <Link
+                                key={subItem.name}
+                                to={subItem.href}
+                                onClick={() => setSidebarOpen(false)}
+                                className={`flex items-center px-4 py-2 text-sm rounded-lg ${
+                                  isActive(subItem.href)
+                                    ? 'bg-primary-50 text-primary-700'
+                                    : 'text-gray-600 hover:bg-gray-50'
+                                }`}
+                              >
+                                <SubIcon className="mr-3 h-4 w-4" />
+                                {subItem.name}
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+                
+                // Обычный пункт меню без подменю
                 return (
                   <Link
                     key={item.name}
-                    to={item.href}
+                    to={item.href || '#'}
                     onClick={() => setSidebarOpen(false)}
                     className={`flex items-center justify-between px-4 py-2 text-sm font-medium rounded-lg ${
-                      isActive(item.href)
+                      item.href && isActive(item.href)
                         ? 'bg-primary-50 text-primary-700'
                         : isValidation && pendingValidationCount > 0
                         ? 'text-red-600 hover:bg-red-50'
@@ -334,12 +432,63 @@ export default function Layout() {
                 const displayName = item.href === '/clubs' && user?.role === UserRole.CLUB_OWNER 
                   ? 'Мои яхт-клубы' 
                   : item.name
+                
+                // Если есть подменю
+                if (item.submenu) {
+                  const isOpen = openSubmenus[item.name] || false
+                  const hasActiveSubmenu = isSubmenuActive(item.submenu)
+                  return (
+                    <div key={item.name}>
+                      <button
+                        onClick={() => toggleSubmenu(item.name)}
+                        className={`flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg ${
+                          hasActiveSubmenu
+                            ? 'bg-primary-50 text-primary-700'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <Icon className="mr-3 h-5 w-5" />
+                          {displayName}
+                        </div>
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                      {isOpen && (
+                        <div className="ml-4 mt-1 space-y-1">
+                          {item.submenu.map((subItem) => {
+                            const SubIcon = subItem.icon
+                            return (
+                              <Link
+                                key={subItem.name}
+                                to={subItem.href}
+                                className={`flex items-center px-4 py-2 text-sm rounded-lg ${
+                                  isActive(subItem.href)
+                                    ? 'bg-primary-50 text-primary-700'
+                                    : 'text-gray-600 hover:bg-gray-50'
+                                }`}
+                              >
+                                <SubIcon className="mr-3 h-4 w-4" />
+                                {subItem.name}
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+                
+                // Обычный пункт меню без подменю
                 return (
                   <Link
                     key={item.name}
-                    to={item.href}
+                    to={item.href || '#'}
                     className={`flex items-center justify-between px-4 py-2 text-sm font-medium rounded-lg ${
-                      isActive(item.href)
+                      item.href && isActive(item.href)
                         ? 'bg-primary-50 text-primary-700'
                         : isValidation && pendingValidationCount > 0
                         ? 'text-red-600 hover:bg-red-50'
@@ -466,7 +615,17 @@ export default function Layout() {
           <div className="flex flex-1 items-center justify-between px-4">
             <h2 className="text-lg font-semibold text-gray-900">
               {(() => {
-                const activeItem = navigation.find((item) => isActive(item.href))
+                // Сначала проверяем, активен ли какой-либо пункт подменю
+                for (const item of navigation) {
+                  if (item.submenu) {
+                    const activeSubItem = item.submenu.find((subItem) => isActive(subItem.href))
+                    if (activeSubItem) {
+                      return activeSubItem.name
+                    }
+                  }
+                }
+                // Затем проверяем обычные пункты меню
+                const activeItem = navigation.find((item) => item.href && isActive(item.href))
                 if (activeItem) {
                   // Для владельца клуба меняем название "Яхт-клубы" на "Мои яхт-клубы"
                   return activeItem.href === '/clubs' && user?.role === UserRole.CLUB_OWNER 
