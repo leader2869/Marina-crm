@@ -301,7 +301,7 @@ export default function UsersPage() {
       const excelData = allUsers.map((user: UserData) => {
         const vessels = user.vessels && user.vessels.length > 0
           ? user.vessels.map(v => v.name).join(', ')
-          : 'Нет судов'
+          : 'Нет катеров'
 
         return {
           'ID': user.id,
@@ -310,7 +310,7 @@ export default function UsersPage() {
           'Email': user.email || '',
           'Телефон': user.phone || '-',
           'Роль': getRoleText(user.role),
-          'Закрепленные судна': vessels,
+          'Закрепленные катера': vessels,
           'Яхт-клуб': user.clubName || '-',
           'Задолженность (₽)': user.debt || 0,
           'Дата регистрации': user.createdAt ? format(new Date(user.createdAt), 'dd.MM.yyyy HH:mm') : '-',
@@ -330,7 +330,7 @@ export default function UsersPage() {
         { wch: 25 }, // Email
         { wch: 15 }, // Телефон
         { wch: 20 }, // Роль
-        { wch: 30 }, // Закрепленные судна
+        { wch: 30 }, // Закрепленные катера
         { wch: 20 }, // Яхт-клуб
         { wch: 15 }, // Задолженность
         { wch: 20 }, // Дата регистрации
@@ -527,7 +527,7 @@ export default function UsersPage() {
                   onClick={() => handleSort('vessels')}
                 >
                   <div className="flex items-center">
-                    Закрепленные судна
+                    Закрепленные катера
                     {getSortIcon('vessels')}
                   </div>
                 </th>
@@ -587,7 +587,7 @@ export default function UsersPage() {
                   const phone = user.phone?.toLowerCase() || ''
                   if (phone !== '-' && phone.includes(searchLower)) return true
                   
-                  // Поиск по названию катера (судна)
+                  // Поиск по названию катера
                   if (user.vessels && user.vessels.length > 0) {
                     const vesselNames = user.vessels
                       .map((vessel) => vessel.name?.toLowerCase() || '')
@@ -650,7 +650,7 @@ export default function UsersPage() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-500">Нет судов</span>
+                      <span className="text-sm text-gray-500">Нет катеров</span>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

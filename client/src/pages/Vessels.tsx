@@ -273,7 +273,7 @@ export default function Vessels() {
             className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <Plus className="h-5 w-5 mr-2" />
-            Добавить судно
+            Добавить катер
           </button>
         )}
       </div>

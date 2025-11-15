@@ -25,7 +25,8 @@ import {
   TrendingUp,
   TrendingDown,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Wallet
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -75,6 +76,7 @@ export default function Layout() {
           { name: 'Доходы', href: '/incomes', icon: TrendingUp },
           { name: 'Расходы', href: '/expenses', icon: TrendingDown },
           { name: 'Платежи', href: '/payments', icon: CreditCard },
+          { name: 'Касса', href: '/cash', icon: Wallet },
         ],
       },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },

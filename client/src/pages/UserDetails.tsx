@@ -334,12 +334,12 @@ export default function UserDetails() {
           )}
         </div>
 
-        {/* Судна */}
+        {/* Катера */}
         {user.vessels && user.vessels.length > 0 && (
           <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
               <Ship className="h-6 w-6 text-primary-600 mr-2" />
-              Судна ({user.vessels.length})
+              Катера ({user.vessels.length})
             </h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {user.vessels.map((vessel) => (

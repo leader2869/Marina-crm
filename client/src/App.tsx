@@ -18,6 +18,7 @@ import Finances from './pages/Finances'
 import Incomes from './pages/Incomes'
 import Expenses from './pages/Expenses'
 import Payments from './pages/Payments'
+import Cash from './pages/Cash'
 import Users from './pages/Users'
 import UserDetails from './pages/UserDetails'
 import NewGuests from './pages/NewGuests'
@@ -112,10 +113,18 @@ function App() {
               } 
             />
             <Route 
-              path="expenses" 
+              path="expenses"
               element={
                 <RoleProtectedRoute allowedRoles={[UserRole.VESSEL_OWNER]}>
                   <Expenses />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="cash"
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.VESSEL_OWNER]}>
+                  <Cash />
                 </RoleProtectedRoute>
               } 
             />
