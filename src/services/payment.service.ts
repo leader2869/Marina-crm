@@ -59,6 +59,17 @@ export class PaymentService {
       parameters: depositRule.parameters
     } : 'не найдено');
 
+    // Проверяем правило REQUIRE_PAYMENT_MONTHS (для помесячной оплаты)
+    const paymentMonthsRule = rules.find(
+      (rule) => rule.ruleType === BookingRuleType.REQUIRE_PAYMENT_MONTHS
+    );
+    console.log('[PaymentService] Правило REQUIRE_PAYMENT_MONTHS:', paymentMonthsRule ? {
+      id: paymentMonthsRule.id,
+      ruleType: paymentMonthsRule.ruleType,
+      parameters: paymentMonthsRule.parameters,
+      months: paymentMonthsRule.parameters?.months
+    } : 'не найдено');
+
     let schedule: PaymentScheduleItem[] = [];
 
     if (tariff) {
@@ -74,7 +85,8 @@ export class PaymentService {
         booking,
         club,
         tariff,
-        depositRule
+        depositRule,
+        paymentMonthsRule
       );
       console.log('[PaymentService] Создан график платежей:', schedule.length, 'платежей');
     } else {
@@ -128,7 +140,8 @@ export class PaymentService {
     booking: Booking,
     club: Club,
     tariff: Tariff,
-    depositRule: BookingRule | undefined
+    depositRule: BookingRule | undefined,
+    paymentMonthsRule: BookingRule | undefined
   ): Promise<PaymentScheduleItem[]> {
     const schedule: PaymentScheduleItem[] = [];
     const totalPrice = parseFloat(String(booking.totalPrice));
@@ -181,12 +194,23 @@ export class PaymentService {
       const tariffMonths = tariff.months || [];
       const monthlyAmount = parseFloat(String(tariff.amount));
 
+      // Получаем месяцы, которые нужно оплатить сразу (из правила REQUIRE_PAYMENT_MONTHS)
+      const immediatePaymentMonths: number[] = [];
+      if (paymentMonthsRule && paymentMonthsRule.parameters?.months) {
+        const ruleMonths = paymentMonthsRule.parameters.months as number[];
+        // Берем только те месяцы из правила, которые есть в тарифе
+        immediatePaymentMonths.push(...ruleMonths.filter(month => tariffMonths.includes(month)));
+        console.log('[PaymentService] Месяцы для немедленной оплаты (из правила):', immediatePaymentMonths);
+      }
+
       if (depositAmount > 0) {
-        // Залог
+        // Залог - сразу при бронировании (в течение 15 минут)
+        const dueDate = new Date();
+        console.log('[PaymentService] ✅ Создаем залог с dueDate:', dueDate.toISOString());
         schedule.push({
           type: PaymentType.DEPOSIT,
           amount: depositAmount,
-          dueDate: new Date(),
+          dueDate: dueDate, // Сразу при бронировании (15 минут на оплату)
           paymentOrder: 0,
         });
       }
@@ -197,10 +221,18 @@ export class PaymentService {
         const seasonYear = club.season || new Date().getFullYear();
         const monthStartDate = new Date(seasonYear, month - 1, 1);
 
+        // Если месяц указан в правиле REQUIRE_PAYMENT_MONTHS - оплата сразу
+        const isImmediatePayment = immediatePaymentMonths.includes(month);
+        const dueDate = isImmediatePayment 
+          ? new Date() // Сразу при бронировании (15 минут на оплату)
+          : subDays(monthStartDate, 7); // За 7 дней до начала месяца
+
+        console.log(`[PaymentService] Месяц ${month}: ${isImmediatePayment ? 'немедленная оплата' : 'за 7 дней до начала'}, dueDate:`, dueDate.toISOString());
+
         schedule.push({
           type: PaymentType.MONTHLY,
           amount: monthlyAmount,
-          dueDate: subDays(monthStartDate, 7), // За 7 дней до начала месяца
+          dueDate: dueDate,
           paymentOrder: paymentOrder++,
           month,
         });
