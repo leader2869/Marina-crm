@@ -15,6 +15,8 @@ import Bookings from './pages/Bookings'
 import Tariffs from './pages/Tariffs'
 import BookingRules from './pages/BookingRules'
 import Finances from './pages/Finances'
+import Incomes from './pages/Incomes'
+import Expenses from './pages/Expenses'
 import Payments from './pages/Payments'
 import Users from './pages/Users'
 import UserDetails from './pages/UserDetails'
@@ -101,6 +103,22 @@ function App() {
               } 
             />
             <Route path="finances" element={<Finances />} />
+            <Route 
+              path="incomes" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.VESSEL_OWNER]}>
+                  <Incomes />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="expenses" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.VESSEL_OWNER]}>
+                  <Expenses />
+                </RoleProtectedRoute>
+              } 
+            />
             <Route path="payments" element={<Payments />} />
             <Route 
               path="users" 

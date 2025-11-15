@@ -21,7 +21,9 @@ import {
   Edit2,
   Check,
   X as XIcon,
-  Code
+  Code,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -55,6 +57,8 @@ export default function Layout() {
       { name: 'Тарифы', href: '/tariffs', icon: Receipt, roles: [UserRole.CLUB_OWNER] },
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
+      { name: 'Доходы', href: '/incomes', icon: TrendingUp, roles: [UserRole.VESSEL_OWNER] },
+      { name: 'Расходы', href: '/expenses', icon: TrendingDown, roles: [UserRole.VESSEL_OWNER] },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
       // Пункты регистрации для гостей
       { name: 'Зарегистрироваться как Владелец клуба', href: '/register?role=club_owner', icon: UserPlus, roles: [UserRole.GUEST] },
@@ -117,7 +121,9 @@ export default function Layout() {
         '/clubs': 2,
         '/vessels': 3,
         '/bookings': 4,
-        '/payments': 5,
+        '/incomes': 5,
+        '/expenses': 6,
+        '/payments': 7,
       }
       
       filteredItems.sort((a, b) => {
