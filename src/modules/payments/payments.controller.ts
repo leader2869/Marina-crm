@@ -40,7 +40,7 @@ export class PaymentsController {
       const [payments, total] = await queryBuilder
         .skip((page - 1) * limit)
         .take(limit)
-        .orderBy('payment.dueDate', 'DESC')
+        .orderBy('payment.dueDate', 'ASC') // Сначала ближайший платеж, в конце последний
         .getManyAndCount();
 
       res.json(createPaginatedResponse(payments, total, page, limit));
