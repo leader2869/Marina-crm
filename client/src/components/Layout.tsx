@@ -68,19 +68,6 @@ export default function Layout() {
       { name: 'Тарифы', href: '/tariffs', icon: Receipt, roles: [UserRole.CLUB_OWNER] },
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
-      // Для судовладельца создаем подменю "Финансы" с дополнительными ссылками
-      {
-        name: 'Финансы',
-        icon: DollarSign,
-        roles: [UserRole.VESSEL_OWNER],
-        submenu: [
-          { name: 'Платежи', href: '/payments', icon: CreditCard },
-          { name: 'Касса', href: '/cash', icon: Wallet },
-          { name: 'Доходы', href: '/incomes', icon: TrendingUp },
-          { name: 'Расходы', href: '/expenses', icon: TrendingDown },
-          { name: 'Аналитика', href: '/analytics', icon: BarChart },
-        ],
-      },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
       // Пункты регистрации для гостей
       { name: 'Зарегистрироваться как Владелец клуба', href: '/register?role=club_owner', icon: UserPlus, roles: [UserRole.GUEST] },
