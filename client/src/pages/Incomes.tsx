@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, Plus, Edit2, Trash2, X, Ship, Wallet, Tag } from 'lucide-react'
+import { TrendingUp, Plus, Edit2, Trash2, X, Tag } from 'lucide-react'
 import { 
   incomeCategoriesService, 
   incomesService, 
