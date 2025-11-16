@@ -825,209 +825,65 @@ export class BookingsController {
       // Если все платежи имеют статус PENDING (или платежей нет вообще), можно отменить бронь
       if (allPayments.length > 0) {
         console.log(
-          `[Booking Cancel] ✅ Все платежи имеют статус PENDING. Обновляем статус на CANCELLED для ${allPayments.length} платежей...`
-        );
-        console.log(
-          `[Booking Cancel] PaymentStatus.CANCELLED = "${PaymentStatus.CANCELLED}"`
+          `[Booking Cancel] ✅ Все платежи имеют статус PENDING. Удаляем ${allPayments.length} платежей из БД...`
         );
 
-        // Обновляем каждый платеж отдельно через save() для максимальной надежности
-        console.log(`[Booking Cancel] Обновляем платежи через save()...`);
-        let successCount = 0;
-        for (const payment of allPayments) {
-          try {
-            console.log(`[Booking Cancel] Обновляем платеж ID ${payment.id} со статусом ${payment.status}...`);
-            payment.status = PaymentStatus.CANCELLED;
-            const savedPayment = await paymentRepository.save(payment);
-            console.log(`[Booking Cancel] ✅ Платеж ${payment.id} обновлен, новый статус: ${savedPayment.status}`);
-            successCount++;
-          } catch (error: any) {
-            console.error(
-              `[Booking Cancel] ❌ Ошибка обновления платежа ${payment.id}:`,
-              error.message,
-              error.code,
-              error.stack
-            );
-            // Если ошибка связана с enum, выводим подробную информацию
-            if (error.message?.includes('cancelled') || error.message?.includes('enum')) {
-              console.error(
-                `[Booking Cancel] ⚠️ Возможно, значение 'cancelled' отсутствует в enum. Проверьте миграцию.`
-              );
-            }
-          }
-        }
-        console.log(
-          `[Booking Cancel] Обновлено через save(): ${successCount} из ${allPayments.length}`
-        );
+        // Удаляем все платежи бронирования из БД
+        const paymentIds = allPayments.map((p) => p.id);
+        console.log(`[Booking Cancel] ID платежей для удаления:`, paymentIds);
 
-        // Если не все платежи обновлены, пробуем через SQL как резервный вариант
-        if (successCount < allPayments.length) {
-          console.log(`[Booking Cancel] Не все платежи обновлены через save(), пробуем через SQL...`);
-          const paymentIds = allPayments.map((p) => p.id);
-          console.log(`[Booking Cancel] ID платежей для обновления:`, paymentIds);
+        try {
+          // Используем delete с условием для удаления всех платежей бронирования
+          const deleteResult = await paymentRepository.delete({
+            id: In(paymentIds),
+            bookingId: booking.id,
+          });
 
-          // Используем прямое SQL обновление для гарантии работы с enum
-          // Сначала определяем имя enum типа динамически и проверяем наличие 'cancelled'
-          const queryRunner = paymentRepository.manager.connection.createQueryRunner();
-          await queryRunner.connect();
-          
-          let updateSuccess = false;
-          let affectedRows = 0;
-          
-          try {
-            // Определяем имя enum типа для колонки status
-            const enumNameQuery = `
-              SELECT t.typname as enum_name
-              FROM pg_type t
-              JOIN pg_attribute a ON a.atttypid = t.oid
-              JOIN pg_class c ON c.oid = a.attrelid
-              WHERE c.relname = 'payments' 
-              AND a.attname = 'status'
-              AND t.typtype = 'e'
-              LIMIT 1
-            `;
-            
-            const enumResult = await queryRunner.query(enumNameQuery);
-            const enumName = enumResult[0]?.enum_name || 'payment_status_enum';
-            console.log(`[Booking Cancel] Найден enum тип: ${enumName}`);
-            
-            // Проверяем, существует ли значение 'cancelled' в enum
-            const checkCancelledQuery = `
-              SELECT COUNT(*) as count
-              FROM pg_enum 
-              WHERE enumlabel = 'cancelled' 
-              AND enumtypid = (
-                  SELECT oid 
-                  FROM pg_type 
-                  WHERE typname = $1
-              )
-            `;
-            
-            const cancelledCheck = await queryRunner.query(checkCancelledQuery, [enumName]);
-            const hasCancelled = parseInt(cancelledCheck[0]?.count || '0') > 0;
-            
-            console.log(`[Booking Cancel] Проверка enum: значение 'cancelled' ${hasCancelled ? 'существует' : 'НЕ СУЩЕСТВУЕТ'} в ${enumName}`);
-            
-            if (!hasCancelled) {
-              console.error(
-                `[Booking Cancel] ❌ КРИТИЧЕСКАЯ ОШИБКА: Значение 'cancelled' отсутствует в enum ${enumName}!`
-              );
-              console.error(
-                `[Booking Cancel] Необходимо выполнить миграцию: src/database/add-payment-status-cancelled-simple.sql`
-              );
-              throw new AppError(
-                'Невозможно отменить платежи: статус "cancelled" не добавлен в базу данных. Обратитесь к администратору для применения миграции.',
-                500
-              );
-            }
-            
-            // Обновляем через raw SQL с правильным именем enum
-            // Используем RETURNING для получения количества обновленных строк
-            const updateSql = `
-              UPDATE payments 
-              SET status = $1::${enumName},
-                  "updatedAt" = NOW()
-              WHERE id = ANY($2::int[])
-              AND "bookingId" = $3
-              RETURNING id
-            `;
-            
-            const updateResult = await queryRunner.query(updateSql, [
-              PaymentStatus.CANCELLED,
-              paymentIds,
-              booking.id,
-            ]);
-            
-            // В PostgreSQL UPDATE с RETURNING возвращает массив обновленных строк
-            affectedRows = Array.isArray(updateResult) ? updateResult.length : 0;
-            updateSuccess = affectedRows > 0;
-            
-            console.log(
-              `[Booking Cancel] ✅ Raw SQL обновление выполнено, обновлено строк: ${affectedRows} из ${allPayments.length}`
-            );
-          } catch (sqlError: any) {
-            // Если это AppError, пробрасываем дальше
-            if (sqlError instanceof AppError) {
-              throw sqlError;
-            }
-            
-            console.error(
-              `[Booking Cancel] ❌ Ошибка raw SQL обновления:`,
-              sqlError.message,
-              sqlError.code,
-              sqlError.stack
-            );
-            
-            // Fallback 1: используем query builder
-            try {
-              const updateResult = await paymentRepository
-                .createQueryBuilder()
-                .update(Payment)
-                .set({ status: PaymentStatus.CANCELLED })
-                .where('id IN (:...ids)', { ids: paymentIds })
-                .andWhere('bookingId = :bookingId', { bookingId: booking.id })
-                .execute();
-              
-              affectedRows = updateResult.affected || 0;
-              updateSuccess = affectedRows > 0;
-              console.log(
-                `[Booking Cancel] ✅ Query builder обновление (fallback): affected = ${affectedRows}`
-              );
-            } catch (qbError: any) {
-              console.error(
-                `[Booking Cancel] ❌ Ошибка query builder обновления:`,
-                qbError.message,
-                qbError.code
-              );
-            }
-          } finally {
-            await queryRunner.release();
-          }
-          
-          // Fallback 2: если ничего не сработало, обновляем через стандартный update
-          if (!updateSuccess || affectedRows !== allPayments.length) {
-            console.log(`[Booking Cancel] Пробуем стандартный update()...`);
-            try {
-              const updateResult = await paymentRepository.update(
-                { id: In(paymentIds), bookingId: booking.id },
-                { status: PaymentStatus.CANCELLED }
-              );
-              affectedRows = updateResult.affected || 0;
-              console.log(
-                `[Booking Cancel] ✅ Стандартный update(): affected = ${affectedRows}`
-              );
-            } catch (updateError: any) {
-              console.error(
-                `[Booking Cancel] ❌ Ошибка стандартного update():`,
-                updateError.message
-              );
-            }
-          }
-        } else {
-          console.log(`[Booking Cancel] ✅ Все платежи успешно обновлены через save(), SQL методы не требуются.`);
-        }
-
-        // Дополнительная проверка: загружаем обновленные платежи
-        const updatedPayments = await paymentRepository.find({
-          where: { bookingId: booking.id },
-        });
-        const cancelledCount = updatedPayments.filter(
-          (p) => p.status === PaymentStatus.CANCELLED
-        ).length;
-        const pendingCount = updatedPayments.filter(
-          (p) => p.status === PaymentStatus.PENDING
-        ).length;
-        console.log(
-          `[Booking Cancel] 🔍 Финальная проверка: всего платежей ${updatedPayments.length}, CANCELLED: ${cancelledCount}, PENDING: ${pendingCount}`
-        );
-        
-        if (pendingCount > 0) {
-          console.error(
-            `[Booking Cancel] ❌ КРИТИЧЕСКАЯ ОШИБКА: ${pendingCount} платежей все еще имеют статус PENDING!`
+          const deletedCount = deleteResult.affected || 0;
+          console.log(
+            `[Booking Cancel] ✅ Удалено платежей: ${deletedCount} из ${allPayments.length}`
           );
+
+          if (deletedCount !== allPayments.length) {
+            console.warn(
+              `[Booking Cancel] ⚠️ Предупреждение: удалено ${deletedCount} платежей, ожидалось ${allPayments.length}`
+            );
+          }
+
+          // Проверяем, что все платежи действительно удалены
+          const remainingPayments = await paymentRepository.find({
+            where: { bookingId: booking.id },
+          });
+
+          if (remainingPayments.length > 0) {
+            console.error(
+              `[Booking Cancel] ❌ ОШИБКА: После удаления осталось ${remainingPayments.length} платежей для бронирования ${booking.id}`
+            );
+            console.error(
+              `[Booking Cancel] Оставшиеся платежи:`,
+              remainingPayments.map((p) => `ID ${p.id}`).join(', ')
+            );
+            // Пытаемся удалить оставшиеся платежи еще раз
+            const remainingIds = remainingPayments.map((p) => p.id);
+            await paymentRepository.delete({ id: In(remainingIds) });
+            console.log(
+              `[Booking Cancel] ✅ Повторное удаление: удалено ${remainingIds.length} оставшихся платежей`
+            );
+          } else {
+            console.log(
+              `[Booking Cancel] ✅ Все платежи успешно удалены из БД.`
+            );
+          }
+        } catch (deleteError: any) {
           console.error(
-            `[Booking Cancel] Детали платежей:`,
-            updatedPayments.map((p) => `ID ${p.id}: status="${p.status}"`).join(', ')
+            `[Booking Cancel] ❌ Ошибка удаления платежей:`,
+            deleteError.message,
+            deleteError.code,
+            deleteError.stack
+          );
+          throw new AppError(
+            `Ошибка при удалении платежей: ${deleteError.message}`,
+            500
           );
         }
       } else {
