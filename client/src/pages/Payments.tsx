@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { paymentsService } from '../services/api'
-import { Payment } from '../types'
+import { Payment, UserRole } from '../types'
 import { CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Payments() {
+  const { user } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
+  
+  const isVesselOwner = user?.role === UserRole.VESSEL_OWNER
 
   useEffect(() => {
     loadPayments()
@@ -59,8 +63,15 @@ export default function Payments() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Платежи</h1>
-        <p className="mt-2 text-gray-600">Управление платежами</p>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {isVesselOwner ? 'Платежи за яхт клуб' : 'Платежи'}
+        </h1>
+        <p className="mt-2 text-gray-600">
+          {isVesselOwner 
+            ? 'Здесь отображаются все платежи за стоянку в яхт-клубе'
+            : 'Управление платежами'
+          }
+        </p>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">

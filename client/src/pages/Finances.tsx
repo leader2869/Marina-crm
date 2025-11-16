@@ -43,7 +43,15 @@ export default function Finances() {
       icon: CreditCard,
       description: 'Управление платежами и оплатами',
       color: 'bg-blue-500',
-      availableFor: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER],
+      availableFor: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER],
+    },
+    {
+      name: 'Платежи за яхт клуб',
+      href: '/payments',
+      icon: CreditCard,
+      description: 'Здесь отображаются все платежи за стоянку в яхт-клубе',
+      color: 'bg-blue-500',
+      availableFor: [UserRole.VESSEL_OWNER],
     },
     {
       name: 'Касса',
