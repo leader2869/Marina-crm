@@ -87,17 +87,8 @@ export default function Bookings() {
       })
       const allPayments: Payment[] = response.data || []
       
-      // Фильтруем предстоящие платежи: pending или overdue, у которых dueDate >= сегодня
-      const today = startOfDay(new Date())
-      const upcomingPayments = allPayments.filter((payment: Payment) => {
-        const dueDate = startOfDay(new Date(payment.dueDate))
-        const isUpcoming = isAfter(dueDate, today) || isToday(dueDate)
-        const isPendingOrOverdue = payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.OVERDUE
-        return isUpcoming && isPendingOrOverdue
-      })
-      
-      // Сортируем по dueDate (ближайшие первыми)
-      upcomingPayments.sort((a, b) => {
+      // Показываем все платежи бронирования, сортируем по dueDate (ближайшие первыми)
+      allPayments.sort((a, b) => {
         const dateA = new Date(a.dueDate).getTime()
         const dateB = new Date(b.dueDate).getTime()
         return dateA - dateB
@@ -105,7 +96,7 @@ export default function Bookings() {
       
       setBookingPayments(prev => {
         const newMap = new Map(prev)
-        newMap.set(bookingId, upcomingPayments)
+        newMap.set(bookingId, allPayments)
         return newMap
       })
     } catch (error) {
@@ -262,12 +253,12 @@ export default function Bookings() {
                     <tr>
                       <td colSpan={6} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-6">
-                          {/* Предстоящие платежи для VESSEL_OWNER */}
+                          {/* Платежи для VESSEL_OWNER */}
                           {isVesselOwner && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING) && (
                             <div className="bg-white rounded-lg p-4 shadow-sm">
                               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                                 <CreditCard className="h-5 w-5 mr-2 text-primary-600" />
-                                Предстоящие платежи
+                                Платежи по бронированию
                               </h3>
                               {loadingPayments.has(booking.id) ? (
                                 <div className="text-center py-4">
@@ -278,7 +269,7 @@ export default function Bookings() {
                                   const payments = bookingPayments.get(booking.id) || []
                                   if (payments.length === 0) {
                                     return (
-                                      <p className="text-sm text-gray-500">Нет предстоящих платежей</p>
+                                      <p className="text-sm text-gray-500">Нет платежей</p>
                                     )
                                   }
                                   return (
@@ -317,6 +308,12 @@ export default function Bookings() {
                                                       ? 'bg-yellow-100 text-yellow-800'
                                                       : payment.status === PaymentStatus.OVERDUE
                                                       ? 'bg-red-100 text-red-800'
+                                                      : payment.status === PaymentStatus.PAID
+                                                      ? 'bg-green-100 text-green-800'
+                                                      : payment.status === PaymentStatus.CANCELLED
+                                                      ? 'bg-red-100 text-red-800'
+                                                      : payment.status === PaymentStatus.REFUNDED
+                                                      ? 'bg-gray-100 text-gray-800'
                                                       : 'bg-gray-100 text-gray-800'
                                                   }`}
                                                 >
@@ -324,6 +321,12 @@ export default function Bookings() {
                                                     ? 'Ожидает оплаты'
                                                     : payment.status === PaymentStatus.OVERDUE
                                                     ? 'Просрочено'
+                                                    : payment.status === PaymentStatus.PAID
+                                                    ? 'Оплачено'
+                                                    : payment.status === PaymentStatus.CANCELLED
+                                                    ? 'Отменен'
+                                                    : payment.status === PaymentStatus.REFUNDED
+                                                    ? 'Возвращено'
                                                     : payment.status}
                                                 </span>
                                               </td>
