@@ -167,13 +167,30 @@ const createIncomeTables = async (): Promise<void> => {
         console.log('✅ Колонка documentPath добавлена');
       }
       
-      // Удаляем старую колонку type, если она существует (она не нужна в новой структуре)
+      // Удаляем старые колонки, которые не нужны в новой структуре
       if (columnNames.includes('type')) {
         await queryRunner.query(`
           ALTER TABLE incomes 
           DROP COLUMN IF EXISTS type;
         `);
         console.log('✅ Старая колонка type удалена');
+      }
+      
+      if (columnNames.includes('clubId')) {
+        // Сначала проверяем, есть ли NOT NULL ограничение
+        const constraints = await queryRunner.query(`
+          SELECT constraint_name, constraint_type
+          FROM information_schema.table_constraints
+          WHERE table_name = 'incomes'
+          AND constraint_type = 'CHECK';
+        `);
+        
+        // Удаляем колонку clubId, так как она не используется в новой структуре
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          DROP COLUMN IF EXISTS "clubId" CASCADE;
+        `);
+        console.log('✅ Старая колонка clubId удалена');
       }
     }
 
