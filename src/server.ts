@@ -35,17 +35,35 @@ const initializeApp = async (): Promise<void> => {
   
   if (!isInitialized && !initializationError) {
     try {
-      await AppDataSource.initialize();
+      console.log('[DB Init] Начинаем инициализацию БД...');
+      console.log('[DB Init] DATABASE_URL:', process.env.DATABASE_URL ? '✅ установлен' : '❌ отсутствует');
+      console.log('[DB Init] DB_HOST:', process.env.DB_HOST || 'не установлен');
+      console.log('[DB Init] DB_NAME:', process.env.DB_NAME || 'не установлен');
+      console.log('[DB Init] DB_USER:', process.env.DB_USER || 'не установлен');
+      console.log('[DB Init] DB_PASSWORD:', process.env.DB_PASSWORD ? '✅ установлен' : '❌ отсутствует');
+      
+      // Добавляем таймаут для инициализации (30 секунд)
+      const initPromise = AppDataSource.initialize();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Таймаут инициализации БД (30 секунд)')), 30000);
+      });
+      
+      await Promise.race([initPromise, timeoutPromise]);
+      
       console.log('✅ База данных подключена');
       isInitialized = true;
+      initializationError = null;
     } catch (error: any) {
       // Проверяем, не связана ли ошибка с тем, что БД уже подключена
       if (error.message && error.message.includes('already established')) {
         console.log('✅ База данных уже подключена (обнаружено существующее соединение)');
         isInitialized = true;
+        initializationError = null;
         return;
       }
-      console.error('❌ Ошибка при подключении к базе данных:', error);
+      console.error('❌ Ошибка при подключении к базе данных:', error.message);
+      console.error('❌ Stack:', error.stack);
+      console.error('❌ Code:', error.code);
       initializationError = error;
       // Не блокируем запуск приложения, но логируем ошибку
     }
@@ -115,6 +133,11 @@ if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
 
 // Initialize on first request (for Vercel) - ДО маршрутов!
 app.use(async (req: Request, res: Response, next: NextFunction) => {
+  // Пропускаем health check без инициализации БД
+  if (req.path === '/health') {
+    return next();
+  }
+  
   console.log(`[DB Init] ${req.method} ${req.url} - инициализация БД`);
   
   // Проверяем наличие переменных окружения
@@ -123,6 +146,9 @@ app.use(async (req: Request, res: Response, next: NextFunction) => {
   
   if (!hasDatabaseUrl && !hasDbConfig) {
     console.error(`[DB Init] ❌ Переменные окружения не настроены!`);
+    console.error(`[DB Init] DATABASE_URL: ${hasDatabaseUrl ? '✅ установлен' : '❌ отсутствует'}`);
+    console.error(`[DB Init] DB_HOST: ${process.env.DB_HOST ? '✅ установлен' : '❌ отсутствует'}`);
+    console.error(`[DB Init] DB_PASSWORD: ${process.env.DB_PASSWORD ? '✅ установлен' : '❌ отсутствует'}`);
     console.error(`[DB Init] Нужно установить DATABASE_URL или DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD`);
     return res.status(503).json({ 
       error: 'Сервис временно недоступен',
@@ -132,9 +158,24 @@ app.use(async (req: Request, res: Response, next: NextFunction) => {
   }
   
   try {
+    // Сбрасываем ошибку перед новой попыткой инициализации
+    if (AppDataSource.isInitialized) {
+      console.log(`[DB Init] ✅ БД уже инициализирована`);
+      return next();
+    }
+    
+    // Если была ошибка, но БД не инициализирована, сбрасываем ошибку и пробуем снова
+    if (initializationError && !AppDataSource.isInitialized) {
+      console.log(`[DB Init] 🔄 Повторная попытка инициализации после ошибки`);
+      initializationError = null;
+      isInitialized = false;
+    }
+    
     await initializeApp();
+    
     if (initializationError) {
       console.error(`[DB Init] ❌ Ошибка инициализации БД:`, initializationError.message);
+      console.error(`[DB Init] Stack:`, initializationError.stack);
       console.error(`[DB Init] Проверьте: 1) Переменные окружения, 2) Connection string, 3) Пароль, 4) Статус проекта Supabase`);
       // Если есть ошибка инициализации, возвращаем 503 вместо 500
       return res.status(503).json({ 
@@ -143,13 +184,26 @@ app.use(async (req: Request, res: Response, next: NextFunction) => {
         details: process.env.NODE_ENV === 'development' ? initializationError.message : 'Проверьте логи в Vercel Dashboard. См. VERCEL_DATABASE_SETUP.md'
       });
     }
+    
+    if (!AppDataSource.isInitialized) {
+      console.error(`[DB Init] ❌ БД не инициализирована после вызова initializeApp()`);
+      return res.status(503).json({ 
+        error: 'Сервис временно недоступен',
+        message: 'База данных не подключена',
+        details: 'Ошибка инициализации базы данных. Проверьте логи.'
+      });
+    }
+    
     console.log(`[DB Init] ✅ БД инициализирована, продолжаем запрос`);
     next();
   } catch (error: any) {
     console.error('❌ Ошибка при инициализации:', error);
+    console.error('❌ Stack:', error.stack);
+    initializationError = error;
     return res.status(503).json({ 
       error: 'Сервис временно недоступен',
-      message: error.message
+      message: error.message || 'Ошибка подключения к базе данных',
+      details: process.env.NODE_ENV === 'development' ? error.stack : 'Проверьте логи в Vercel Dashboard'
     });
   }
 });
