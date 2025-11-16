@@ -65,7 +65,7 @@ export default function Dashboard() {
           clubsCount = (clubsRes as any)?.data?.total || (clubsRes as any)?.total || 0
         }
 
-        // Для судовладельца загружаем доходы и расходы из касс
+        // Для судовладельца загружаем приходы и расходы из касс
         let totalIncome = 0
         let totalExpense = 0
         
@@ -131,7 +131,7 @@ export default function Dashboard() {
       color: 'bg-yellow-500',
     },
     {
-      name: 'Доходы',
+      name: 'Приходы',
       value: `${stats.totalIncome.toLocaleString()} ₽`,
       icon: TrendingUp,
       color: 'bg-emerald-500',

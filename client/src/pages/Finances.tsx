@@ -62,10 +62,10 @@ export default function Finances() {
       availableFor: [UserRole.VESSEL_OWNER],
     },
     {
-      name: 'Доходы',
+      name: 'Приходы',
       href: '/incomes',
       icon: TrendingUp,
-      description: 'Просмотр доходов',
+      description: 'Просмотр приходов',
       color: 'bg-green-500',
       availableFor: [UserRole.VESSEL_OWNER],
       value: totalIncome,
