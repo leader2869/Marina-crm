@@ -4,6 +4,7 @@ import { UserCheck, Phone, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 interface GuestData {
   id: number
@@ -42,8 +43,10 @@ export default function NewGuests() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Новые гости</h1>
+      <div className="flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Новые гости</h1>
         <p className="mt-2 text-gray-600">Список всех пользователей, которые зашли в систему как гости</p>
       </div>
 

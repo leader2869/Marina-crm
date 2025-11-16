@@ -5,6 +5,7 @@ import { UserRole } from '../types'
 import { useState, useEffect } from 'react'
 import { vesselOwnerCashesService } from '../services/api'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 export default function Finances() {
   const { user } = useAuth()
@@ -101,8 +102,10 @@ export default function Finances() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+      <div className="flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
           <DollarSign className="h-8 w-8 text-primary-600 mr-3" />
           Финансы
         </h1>

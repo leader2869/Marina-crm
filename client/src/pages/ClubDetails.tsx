@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
 import { MapPin, Phone, Mail, Globe, Anchor, Edit2, X, Plus, Trash2, Calendar, UserPlus, ShieldCheck } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 export default function ClubDetails() {
   const { id } = useParams<{ id: string }>()
@@ -634,8 +635,10 @@ export default function ClubDetails() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{club.name}</h1>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{club.name}</h1>
           {club.description && <p className="mt-2 text-gray-600">{club.description}</p>}
         </div>
         <div className="flex items-center space-x-2">

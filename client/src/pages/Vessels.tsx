@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 export default function Vessels() {
   const { user } = useAuth()
@@ -294,8 +295,10 @@ export default function Vessels() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Катера</h1>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Катера</h1>
           <p className="mt-2 text-gray-600">Управление катерами</p>
         </div>
         <div className="flex gap-2">

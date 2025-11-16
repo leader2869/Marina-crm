@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 // Компонент для подсчета свободных мест с учетом бронирований
 function FreeBerthsCount({ club, user }: { club: Club; user: any }) {
@@ -464,9 +465,12 @@ export default function Clubs() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Яхт-клубы</h1>
-          <p className="mt-2 text-gray-600">Управление яхт-клубами</p>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Яхт-клубы</h1>
+            <p className="mt-2 text-gray-600">Управление яхт-клубами</p>
+          </div>
         </div>
         {isSuperAdmin && (
           <div className="flex gap-3">

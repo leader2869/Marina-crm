@@ -4,6 +4,7 @@ import { Payment, UserRole } from '../types'
 import { CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Payments() {
@@ -62,8 +63,10 @@ export default function Payments() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
+      <div className="flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
           {isVesselOwner ? 'Платежи за яхт клуб' : 'Платежи'}
         </h1>
         <p className="mt-2 text-gray-600">

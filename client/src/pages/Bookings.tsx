@@ -5,6 +5,7 @@ import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCar
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 export default function Bookings() {
   const { user } = useAuth()
@@ -168,8 +169,10 @@ export default function Bookings() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Бронирования</h1>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Бронирования</h1>
           <p className="mt-2 text-gray-600">Управление бронированиями</p>
         </div>
       </div>

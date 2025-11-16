@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Code, Copy, Check, ExternalLink } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import BackButton from '../components/BackButton'
 
 export default function Widget() {
   const { user } = useAuth()
@@ -25,8 +26,10 @@ export default function Widget() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Виджет для бронирования</h1>
+      <div className="flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Виджет для бронирования</h1>
         <p className="mt-2 text-gray-600">Встройте виджет бронирования на ваш сайт</p>
       </div>
 

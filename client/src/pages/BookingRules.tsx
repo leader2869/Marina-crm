@@ -4,6 +4,7 @@ import { Club, Tariff } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { Anchor, Save, X, Plus, Trash2, Edit2 } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 export enum BookingRuleType {
   REQUIRE_PAYMENT_MONTHS = 'require_payment_months',
@@ -282,7 +283,10 @@ export default function BookingRules() {
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Правила бронирования</h1>
+          <div className="flex items-center gap-4">
+            <BackButton />
+            <h1 className="text-2xl font-bold text-gray-900">Правила бронирования</h1>
+          </div>
           <button
             onClick={handleOpenAdd}
             className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 flex items-center"

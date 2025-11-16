@@ -1,10 +1,13 @@
 import { TrendingDown } from 'lucide-react'
+import BackButton from '../components/BackButton'
 
 export default function Expenses() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Расходы</h1>
+      <div className="flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Расходы</h1>
         <p className="mt-2 text-gray-600">Управление расходами</p>
       </div>
 

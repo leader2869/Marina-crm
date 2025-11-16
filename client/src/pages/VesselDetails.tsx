@@ -7,6 +7,7 @@ import { UserRole } from '../types'
 import { Ship, ArrowLeft, User as UserIcon, Calendar, FileText, Edit2, X, Save, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 export default function VesselDetails() {
   const { id } = useParams<{ id: string }>()
@@ -178,10 +179,7 @@ export default function VesselDetails() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigate('/vessels')}
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-            title="Назад"
+          <BackButton />
           >
             <ArrowLeft className="h-5 w-5" />
           </button>

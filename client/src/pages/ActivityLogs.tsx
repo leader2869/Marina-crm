@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { activityLogsService } from '../services/api'
 import { FileText, Filter, Download } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 
@@ -194,11 +195,13 @@ export default function ActivityLogs() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <FileText className="h-6 w-6" />
-          Логи активности
-        </h1>
+      <div className="mb-6 flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <FileText className="h-6 w-6" />
+            Логи активности
+          </h1>
         <p className="text-gray-600 mt-1">Все действия пользователей в системе</p>
         {error && (
           <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">

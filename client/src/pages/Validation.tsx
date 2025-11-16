@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, User as UserIcon, Phone, Mail, Calendar, ArrowLef
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 interface PendingUser {
   id: number
@@ -185,10 +186,7 @@ export default function Validation() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigate('/users')}
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-            title="Назад"
+          <BackButton />
           >
             <ArrowLeft className="h-5 w-5" />
           </button>

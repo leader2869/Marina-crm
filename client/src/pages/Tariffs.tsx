@@ -4,6 +4,7 @@ import { Club, Berth, Tariff, TariffType } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { Anchor, Edit2, Plus, Trash2 } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 export default function Tariffs() {
   const { user } = useAuth()
@@ -236,8 +237,10 @@ export default function Tariffs() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Тарифы</h1>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Тарифы</h1>
           <p className="mt-2 text-gray-600">Управление тарифами на места в ваших яхт-клубах</p>
         </div>
         {selectedClub && (

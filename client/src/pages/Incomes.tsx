@@ -12,6 +12,7 @@ import {
 } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { format } from 'date-fns'
+import BackButton from '../components/BackButton'
 
 export default function Incomes() {
   const [categories, setCategories] = useState<IncomeCategory[]>([])
@@ -224,9 +225,12 @@ export default function Incomes() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Приходы</h1>
-          <p className="mt-2 text-gray-600">Управление категориями приходов и просмотр приходов из касс</p>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Приходы</h1>
+            <p className="mt-2 text-gray-600">Управление категориями приходов и просмотр приходов из касс</p>
+          </div>
         </div>
         <button
           onClick={() => handleOpenCategoryModal()}

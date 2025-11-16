@@ -3,6 +3,7 @@ import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X, EyeOff, Eye
 import { vesselOwnerCashesService, vesselsService } from '../services/api'
 import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency, Vessel } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -368,8 +369,10 @@ export default function Cash() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Касса</h1>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Касса</h1>
           <p className="mt-2 text-gray-600">Управление кассами и транзакциями</p>
         </div>
       </div>

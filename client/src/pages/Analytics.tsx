@@ -1,10 +1,13 @@
 import { BarChart } from 'lucide-react'
+import BackButton from '../components/BackButton'
 
 export default function Analytics() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Аналитика</h1>
+      <div className="flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Аналитика</h1>
         <p className="mt-2 text-gray-600">Финансовая аналитика и отчеты</p>
       </div>
 

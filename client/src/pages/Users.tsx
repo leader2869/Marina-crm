@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import * as XLSX from 'xlsx'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 interface UserData {
   id: number
@@ -454,8 +455,10 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Пользователи</h1>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Пользователи</h1>
           <p className="mt-2 text-gray-600">Список всех зарегистрированных пользователей</p>
         </div>
         <div className="flex gap-3">

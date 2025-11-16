@@ -4,6 +4,7 @@ import { clubsService, bookingsService, vesselsService, vesselOwnerCashesService
 import { UserRole, BookingStatus } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import BackButton from '../components/BackButton'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -150,11 +151,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Дашборд</h1>
-        <p className="mt-2 text-gray-600">
-          Добро пожаловать, {user?.firstName} {user?.lastName}!
-        </p>
+      <div className="flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Дашборд</h1>
+          <p className="mt-2 text-gray-600">
+            Добро пожаловать, {user?.firstName} {user?.lastName}!
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
