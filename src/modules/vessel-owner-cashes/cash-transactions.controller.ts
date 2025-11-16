@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
 import { VesselOwnerCash } from '../../entities/VesselOwnerCash';
 import { CashTransaction } from '../../entities/CashTransaction';
+import { IncomeCategory } from '../../entities/IncomeCategory';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -17,7 +18,7 @@ export class CashTransactionsController {
       }
 
       const { cashId } = req.params;
-      const { page, limit, startDate, endDate, transactionType, paymentMethod } = req.query;
+      const { page, limit } = req.query;
 
       // Проверяем существование кассы и права доступа
       const cashRepository = AppDataSource.getRepository(VesselOwnerCash);
@@ -43,10 +44,13 @@ export class CashTransactionsController {
         parseInt(limit as string)
       );
 
+      const { startDate, endDate, transactionType, paymentMethod, categoryId } = req.query;
+
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
       const queryBuilder = transactionRepository
         .createQueryBuilder('transaction')
         .leftJoinAndSelect('transaction.cash', 'cash')
+        .leftJoinAndSelect('transaction.incomeCategory', 'incomeCategory')
         .where('transaction.cashId = :cashId', { cashId: parseInt(cashId) });
 
       // Фильтрация по периоду
@@ -70,6 +74,12 @@ export class CashTransactionsController {
       if (paymentMethod) {
         queryBuilder.andWhere('transaction.paymentMethod = :paymentMethod', {
           paymentMethod,
+        });
+      }
+
+      if (categoryId) {
+        queryBuilder.andWhere('transaction.categoryId = :categoryId', {
+          categoryId: parseInt(categoryId as string),
         });
       }
 
@@ -117,7 +127,7 @@ export class CashTransactionsController {
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
       const transaction = await transactionRepository.findOne({
         where: { id: parseInt(id), cashId: parseInt(cashId) },
-        relations: ['cash'],
+        relations: ['cash', 'incomeCategory'],
       });
 
       if (!transaction) {
@@ -215,6 +225,7 @@ export class CashTransactionsController {
         description,
         counterparty,
         documentPath,
+        categoryId,
       } = req.body;
 
       // Проверяем существование кассы и права доступа
@@ -256,12 +267,34 @@ export class CashTransactionsController {
       if (counterparty !== undefined) transaction.counterparty = counterparty || undefined;
       if (documentPath !== undefined)
         transaction.documentPath = documentPath || undefined;
+      if (categoryId !== undefined) {
+        if (categoryId === null || categoryId === '') {
+          transaction.categoryId = null;
+        } else {
+          // Проверяем существование категории и права доступа
+          const categoryRepository = AppDataSource.getRepository(IncomeCategory);
+          const category = await categoryRepository.findOne({
+            where: { id: parseInt(categoryId as string) },
+          });
+          if (!category) {
+            throw new AppError('Категория не найдена', 404);
+          }
+          if (
+            req.userRole !== UserRole.SUPER_ADMIN &&
+            req.userRole !== UserRole.ADMIN &&
+            category.vesselOwnerId !== req.userId
+          ) {
+            throw new AppError('Категория не принадлежит вам', 403);
+          }
+          transaction.categoryId = parseInt(categoryId as string);
+        }
+      }
 
       await transactionRepository.save(transaction);
 
       const updatedTransaction = await transactionRepository.findOne({
         where: { id: transaction.id },
-        relations: ['cash'],
+        relations: ['cash', 'incomeCategory'],
       });
 
       res.json(updatedTransaction);

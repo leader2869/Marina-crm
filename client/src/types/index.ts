@@ -300,6 +300,8 @@ export interface CashTransaction {
   counterparty?: string
   documentPath?: string
   cash?: VesselOwnerCash
+  categoryId?: number
+  incomeCategory?: IncomeCategory
   createdAt: string
   updatedAt: string
 }

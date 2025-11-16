@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { CashTransactionType, CashPaymentMethod, Currency } from '../types';
 import { VesselOwnerCash } from './VesselOwnerCash';
+import { IncomeCategory } from './IncomeCategory';
 
 @Entity('cash_transactions')
 export class CashTransaction {
@@ -62,5 +63,12 @@ export class CashTransaction {
 
   @Column()
   cashId: number;
+
+  @ManyToOne(() => IncomeCategory, { nullable: true })
+  @JoinColumn({ name: 'categoryId' })
+  incomeCategory: IncomeCategory | null;
+
+  @Column({ nullable: true })
+  categoryId: number | null;
 }
 

@@ -1,18 +1,14 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, Plus, Edit2, Trash2, X, Tag } from 'lucide-react'
+import { TrendingUp, Plus, Edit2, Trash2, X, Tag, Wallet } from 'lucide-react'
 import { 
   incomeCategoriesService, 
-  incomesService, 
-  vesselsService, 
   vesselOwnerCashesService 
 } from '../services/api'
 import { 
   IncomeCategory, 
-  Income, 
-  Vessel, 
-  VesselOwnerCash, 
-  CashPaymentMethod, 
-  Currency 
+  CashTransaction,
+  CashTransactionType,
+  CashPaymentMethod
 } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { format } from 'date-fns'
@@ -21,40 +17,24 @@ import { useAuth } from '../contexts/AuthContext'
 export default function Incomes() {
   const { user } = useAuth()
   const [categories, setCategories] = useState<IncomeCategory[]>([])
-  const [incomes, setIncomes] = useState<Income[]>([])
-  const [vessels, setVessels] = useState<Vessel[]>([])
-  const [cashes, setCashes] = useState<VesselOwnerCash[]>([])
+  const [transactions, setTransactions] = useState<CashTransaction[]>([])
   const [loading, setLoading] = useState(true)
   const [categoriesLoading, setCategoriesLoading] = useState(false)
-  const [incomesLoading, setIncomesLoading] = useState(false)
+  const [transactionsLoading, setTransactionsLoading] = useState(false)
   
   // Модальные окна
   const [showCategoryModal, setShowCategoryModal] = useState(false)
-  const [showIncomeModal, setShowIncomeModal] = useState(false)
+  const [showAssignCategoryModal, setShowAssignCategoryModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<IncomeCategory | null>(null)
-  const [editingIncome, setEditingIncome] = useState<Income | null>(null)
+  const [selectedTransaction, setSelectedTransaction] = useState<CashTransaction | null>(null)
   
   // Фильтры
   const [selectedCategory, setSelectedCategory] = useState<number | ''>('')
-  const [selectedVessel, setSelectedVessel] = useState<number | ''>('')
-  const [selectedCash, setSelectedCash] = useState<number | ''>('')
   
   // Формы
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     description: '',
-  })
-  
-  const [incomeForm, setIncomeForm] = useState({
-    categoryId: '',
-    vesselId: '',
-    cashId: '',
-    amount: '',
-    currency: Currency.RUB,
-    paymentMethod: CashPaymentMethod.CASH,
-    date: format(new Date(), 'yyyy-MM-dd'),
-    description: '',
-    counterparty: '',
   })
 
   useEffect(() => {
@@ -62,25 +42,15 @@ export default function Incomes() {
   }, [])
 
   useEffect(() => {
-    loadIncomes()
-  }, [selectedCategory, selectedVessel, selectedCash])
-
-  useEffect(() => {
-    if (incomeForm.vesselId) {
-      loadCashesForVessel(parseInt(incomeForm.vesselId))
-    } else {
-      setCashes([])
-      setIncomeForm({ ...incomeForm, cashId: '' })
-    }
-  }, [incomeForm.vesselId])
+    loadTransactions()
+  }, [selectedCategory])
 
   const loadData = async () => {
     try {
       setLoading(true)
       await Promise.all([
         loadCategories(),
-        loadVessels(),
-        loadIncomes(),
+        loadTransactions(),
       ])
     } catch (error) {
       console.error('Ошибка загрузки данных:', error)
@@ -102,49 +72,45 @@ export default function Incomes() {
     }
   }
 
-  const loadVessels = async () => {
+  const loadTransactions = async () => {
     try {
-      const response = await vesselsService.getAll({ limit: 100 })
-      const vesselsData = response.data || []
-      const userVessels = vesselsData.filter((vessel: Vessel) => vessel.ownerId === user?.id)
-      setVessels(userVessels)
-    } catch (error: any) {
-      console.error('Ошибка загрузки катеров:', error)
-    }
-  }
-
-  const loadCashesForVessel = async (vesselId: number) => {
-    try {
-      const response = await vesselOwnerCashesService.getAll({ 
-        limit: 100, 
-        vesselId 
+      setTransactionsLoading(true)
+      // Загружаем все кассы пользователя
+      const cashesResponse = await vesselOwnerCashesService.getAll({ limit: 100 })
+      const cashes = cashesResponse.data || []
+      
+      // Загружаем все транзакции типа INCOME из всех касс
+      const allTransactions: CashTransaction[] = []
+      for (const cash of cashes) {
+        try {
+          const transactionsResponse = await vesselOwnerCashesService.getTransactions(
+            cash.id,
+            { 
+              limit: 1000,
+              transactionType: CashTransactionType.INCOME,
+              ...(selectedCategory ? { categoryId: selectedCategory } : {})
+            }
+          )
+          const cashTransactions = transactionsResponse.data || []
+          allTransactions.push(...cashTransactions)
+        } catch (error) {
+          console.error(`Ошибка загрузки транзакций для кассы ${cash.id}:`, error)
+        }
+      }
+      
+      // Сортируем по дате (новые сначала)
+      allTransactions.sort((a, b) => {
+        const dateA = new Date(a.date).getTime()
+        const dateB = new Date(b.date).getTime()
+        return dateB - dateA
       })
-      setCashes(response.data || [])
+      
+      setTransactions(allTransactions)
     } catch (error: any) {
-      console.error('Ошибка загрузки касс:', error)
-    }
-  }
-
-  const loadIncomes = async () => {
-    try {
-      setIncomesLoading(true)
-      const params: any = { limit: 1000 }
-      if (selectedCategory) {
-        params.categoryId = selectedCategory
-      }
-      if (selectedVessel) {
-        params.vesselId = selectedVessel
-      }
-      if (selectedCash) {
-        params.cashId = selectedCash
-      }
-      const response = await incomesService.getAll(params)
-      setIncomes(response.data || [])
-    } catch (error: any) {
-      console.error('Ошибка загрузки приходов:', error)
-      alert(error.error || error.message || 'Ошибка загрузки приходов')
+      console.error('Ошибка загрузки транзакций:', error)
+      alert(error.error || error.message || 'Ошибка загрузки транзакций')
     } finally {
-      setIncomesLoading(false)
+      setTransactionsLoading(false)
     }
   }
 
@@ -205,108 +171,53 @@ export default function Incomes() {
     }
   }
 
-  const handleOpenIncomeModal = (income?: Income) => {
-    if (income) {
-      setEditingIncome(income)
-      setIncomeForm({
-        categoryId: income.categoryId.toString(),
-        vesselId: income.vesselId.toString(),
-        cashId: income.cashId.toString(),
-        amount: income.amount.toString(),
-        currency: income.currency as Currency,
-        paymentMethod: income.paymentMethod as CashPaymentMethod,
-        date: format(new Date(income.date), 'yyyy-MM-dd'),
-        description: income.description || '',
-        counterparty: income.counterparty || '',
-      })
-      loadCashesForVessel(income.vesselId)
-    } else {
-      setEditingIncome(null)
-      setIncomeForm({
-        categoryId: '',
-        vesselId: '',
-        cashId: '',
-        amount: '',
-        currency: Currency.RUB,
-        paymentMethod: CashPaymentMethod.CASH,
-        date: format(new Date(), 'yyyy-MM-dd'),
-        description: '',
-        counterparty: '',
-      })
-      setCashes([])
-    }
-    setShowIncomeModal(true)
+  const handleOpenAssignCategoryModal = (transaction: CashTransaction) => {
+    setSelectedTransaction(transaction)
+    setShowAssignCategoryModal(true)
   }
 
-  const handleCloseIncomeModal = () => {
-    setShowIncomeModal(false)
-    setEditingIncome(null)
-    setIncomeForm({
-      categoryId: '',
-      vesselId: '',
-      cashId: '',
-      amount: '',
-      currency: Currency.RUB,
-      paymentMethod: CashPaymentMethod.CASH,
-      date: format(new Date(), 'yyyy-MM-dd'),
-      description: '',
-      counterparty: '',
-    })
-    setCashes([])
+  const handleCloseAssignCategoryModal = () => {
+    setShowAssignCategoryModal(false)
+    setSelectedTransaction(null)
   }
 
-  const handleSaveIncome = async () => {
-    try {
-      if (!incomeForm.categoryId) {
-        alert('Выберите категорию прихода')
-        return
-      }
-      if (!incomeForm.vesselId) {
-        alert('Выберите катер')
-        return
-      }
-      if (!incomeForm.cashId) {
-        alert('Выберите кассу')
-        return
-      }
-      if (!incomeForm.amount || parseFloat(incomeForm.amount) <= 0) {
-        alert('Введите корректную сумму')
-        return
-      }
-
-      const incomeData = {
-        ...incomeForm,
-        amount: parseFloat(incomeForm.amount),
-        categoryId: parseInt(incomeForm.categoryId),
-        vesselId: parseInt(incomeForm.vesselId),
-        cashId: parseInt(incomeForm.cashId),
-      }
-
-      if (editingIncome) {
-        await incomesService.update(editingIncome.id, incomeData)
-      } else {
-        await incomesService.create(incomeData)
-      }
-      
-      await loadIncomes()
-      handleCloseIncomeModal()
-    } catch (error: any) {
-      alert(error.error || error.message || 'Ошибка сохранения прихода')
-    }
-  }
-
-  const handleDeleteIncome = async (incomeId: number) => {
-    if (!confirm('Вы уверены, что хотите удалить этот приход?')) return
+  const handleAssignCategory = async (categoryId: number | null) => {
+    if (!selectedTransaction) return
 
     try {
-      await incomesService.delete(incomeId)
-      await loadIncomes()
+      await vesselOwnerCashesService.updateTransaction(
+        selectedTransaction.cashId,
+        selectedTransaction.id,
+        { categoryId: categoryId || null }
+      )
+      await loadTransactions()
+      handleCloseAssignCategoryModal()
     } catch (error: any) {
-      alert(error.error || error.message || 'Ошибка удаления прихода')
+      alert(error.error || error.message || 'Ошибка привязки категории')
     }
   }
 
-  const totalIncome = incomes.reduce((sum, income) => sum + income.amount, 0)
+  // Группируем транзакции по категориям для статистики
+  const transactionsByCategory = transactions.reduce((acc, transaction) => {
+    const categoryId = transaction.categoryId || 0
+    const categoryName = transaction.incomeCategory?.name || 'Без категории'
+    if (!acc[categoryId]) {
+      acc[categoryId] = {
+        categoryId,
+        categoryName,
+        transactions: [],
+        total: 0,
+      }
+    }
+    acc[categoryId].transactions.push(transaction)
+    acc[categoryId].total += transaction.amount
+    return acc
+  }, {} as Record<number, { categoryId: number; categoryName: string; transactions: CashTransaction[]; total: number }>)
+
+  const totalIncome = transactions.reduce((sum, transaction) => sum + transaction.amount, 0)
+  const uncategorizedTotal = transactions
+    .filter(t => !t.categoryId)
+    .reduce((sum, t) => sum + t.amount, 0)
 
   if (loading) {
     return <LoadingAnimation message="Загрузка приходов..." />
@@ -317,24 +228,15 @@ export default function Incomes() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Приходы</h1>
-          <p className="mt-2 text-gray-600">Управление категориями и приходами</p>
+          <p className="mt-2 text-gray-600">Управление категориями приходов и просмотр приходов из касс</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleOpenCategoryModal()}
-            className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Создать категорию
-          </button>
-          <button
-            onClick={() => handleOpenIncomeModal()}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Добавить приход
-          </button>
-        </div>
+        <button
+          onClick={() => handleOpenCategoryModal()}
+          className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+        >
+          <Plus className="h-5 w-5 mr-2" />
+          Создать категорию
+        </button>
       </div>
 
       {/* Статистика */}
@@ -343,14 +245,34 @@ export default function Incomes() {
           <TrendingUp className="h-6 w-6 text-green-600 mr-2" />
           <h2 className="text-xl font-semibold text-gray-900">Общие приходы</h2>
         </div>
-        <div className="bg-green-50 p-6 rounded-lg">
-          <p className="text-sm text-gray-600 mb-2">Сумма приходов</p>
-          <p className="text-4xl font-bold text-green-600">
-            {totalIncome.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Всего приходов: {incomes.length}
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-green-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2">Общая сумма приходов</p>
+            <p className="text-3xl font-bold text-green-600">
+              {totalIncome.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Всего транзакций: {transactions.length}
+            </p>
+          </div>
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2">С категориями</p>
+            <p className="text-3xl font-bold text-blue-600">
+              {(totalIncome - uncategorizedTotal).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              {Object.keys(transactionsByCategory).filter(k => k !== '0').length} категорий
+            </p>
+          </div>
+          <div className="bg-yellow-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2">Без категорий</p>
+            <p className="text-3xl font-bold text-yellow-600">
+              {uncategorizedTotal.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              {transactions.filter(t => !t.categoryId).length} транзакций
+            </p>
+          </div>
         </div>
       </div>
 
@@ -368,37 +290,47 @@ export default function Incomes() {
           <p className="text-gray-500 text-sm">Нет категорий. Создайте первую категорию.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">{category.name}</h3>
-                    {category.description && (
-                      <p className="text-sm text-gray-600 mt-1">{category.description}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-1 ml-2">
-                    <button
-                      onClick={() => handleOpenCategoryModal(category)}
-                      className="p-1 text-gray-600 hover:text-primary-600"
-                      title="Редактировать"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCategory(category.id)}
-                      className="p-1 text-gray-600 hover:text-red-600"
-                      title="Удалить"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+            {categories.map((category) => {
+              const categoryTransactions = transactions.filter(t => t.categoryId === category.id)
+              const categoryTotal = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
+              return (
+                <div
+                  key={category.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{category.name}</h3>
+                      {category.description && (
+                        <p className="text-sm text-gray-600 mt-1">{category.description}</p>
+                      )}
+                      <p className="text-sm text-green-600 font-semibold mt-2">
+                        {categoryTotal.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {categoryTransactions.length} транзакций
+                      </p>
+                    </div>
+                    <div className="flex gap-1 ml-2">
+                      <button
+                        onClick={() => handleOpenCategoryModal(category)}
+                        className="p-1 text-gray-600 hover:text-primary-600"
+                        title="Редактировать"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(category.id)}
+                        className="p-1 text-gray-600 hover:text-red-600"
+                        title="Удалить"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -424,59 +356,19 @@ export default function Incomes() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Катер
-            </label>
-            <select
-              value={selectedVessel}
-              onChange={(e) => setSelectedVessel(e.target.value ? parseInt(e.target.value) : '')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">Все катера</option>
-              {vessels.map((vessel) => (
-                <option key={vessel.id} value={vessel.id}>
-                  {vessel.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Касса
-            </label>
-            <select
-              value={selectedCash}
-              onChange={(e) => setSelectedCash(e.target.value ? parseInt(e.target.value) : '')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">Все кассы</option>
-              {vessels.flatMap((vessel) => {
-                // Здесь нужно загрузить кассы для каждого катера, но для упрощения показываем только выбранный катер
-                if (selectedVessel && vessel.id === selectedVessel) {
-                  return cashes.map((cash) => (
-                    <option key={cash.id} value={cash.id}>
-                      {cash.name} ({vessel.name})
-                    </option>
-                  ))
-                }
-                return []
-              })}
-            </select>
-          </div>
         </div>
       </div>
 
-      {/* Список приходов */}
+      {/* Список транзакций */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Список приходов</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Приходы из касс</h2>
         </div>
-        {incomesLoading ? (
+        {transactionsLoading ? (
           <div className="p-12 text-center">
             <LoadingAnimation message="Загрузка приходов..." />
           </div>
-        ) : incomes.length === 0 ? (
+        ) : transactions.length === 0 ? (
           <div className="p-12 text-center">
             <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">Приходы не найдены</p>
@@ -490,13 +382,10 @@ export default function Incomes() {
                     Дата
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Категория
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Катер
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Касса
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Категория
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Сумма
@@ -513,44 +402,43 @@ export default function Incomes() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {incomes.map((income) => (
-                  <tr key={income.id} className="hover:bg-gray-50">
+                {transactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {format(new Date(income.date), 'dd.MM.yyyy')}
+                      {format(new Date(transaction.date), 'dd.MM.yyyy')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {income.category?.name || 'Не указана'}
+                      <div className="flex items-center">
+                        <Wallet className="h-4 w-4 mr-1 text-gray-400" />
+                        {transaction.cash?.name || 'Не указана'}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {income.vessel?.name || 'Не указан'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {income.cash?.name || 'Не указана'}
+                      {transaction.incomeCategory ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {transaction.incomeCategory.name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">Без категории</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      {income.amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {income.currency}
+                      {transaction.amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {transaction.currency}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {income.paymentMethod === CashPaymentMethod.CASH ? 'Наличные' : 'Безналичные'}
+                      {transaction.paymentMethod === CashPaymentMethod.CASH ? 'Наличные' : 'Безналичные'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {income.description || '-'}
+                      {transaction.description || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleOpenIncomeModal(income)}
-                          className="text-primary-600 hover:text-primary-900"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteIncome(income.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleOpenAssignCategoryModal(transaction)}
+                        className="text-primary-600 hover:text-primary-900"
+                        title="Привязать категорию"
+                      >
+                        <Tag className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -624,35 +512,46 @@ export default function Incomes() {
         </div>
       )}
 
-      {/* Модальное окно прихода */}
-      {showIncomeModal && (
+      {/* Модальное окно привязки категории */}
+      {showAssignCategoryModal && selectedTransaction && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div
               className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
-              onClick={handleCloseIncomeModal}
+              onClick={handleCloseAssignCategoryModal}
             />
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium text-gray-900">
-                    {editingIncome ? 'Редактировать приход' : 'Добавить приход'}
+                    Привязать категорию к приходу
                   </h3>
-                  <button onClick={handleCloseIncomeModal} className="text-gray-400 hover:text-gray-500">
+                  <button onClick={handleCloseAssignCategoryModal} className="text-gray-400 hover:text-gray-500">
                     <X className="h-6 w-6" />
                   </button>
                 </div>
                 <div className="space-y-4">
                   <div>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Сумма: <span className="font-semibold">{selectedTransaction.amount.toLocaleString('ru-RU')} {selectedTransaction.currency}</span>
+                    </p>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Дата: <span className="font-semibold">{format(new Date(selectedTransaction.date), 'dd.MM.yyyy')}</span>
+                    </p>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Категория прихода *
+                      Категория
                     </label>
                     <select
-                      value={incomeForm.categoryId}
-                      onChange={(e) => setIncomeForm({ ...incomeForm, categoryId: e.target.value })}
+                      value={selectedTransaction.categoryId || ''}
+                      onChange={(e) => {
+                        const newCategoryId = e.target.value ? parseInt(e.target.value) : null
+                        handleAssignCategory(newCategoryId)
+                      }}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     >
-                      <option value="">Выберите категорию</option>
+                      <option value="">Без категории</option>
                       {categories.map((cat) => (
                         <option key={cat.id} value={cat.id}>
                           {cat.name}
@@ -660,139 +559,15 @@ export default function Incomes() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Катер *
-                    </label>
-                    <select
-                      value={incomeForm.vesselId}
-                      onChange={(e) => setIncomeForm({ ...incomeForm, vesselId: e.target.value, cashId: '' })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="">Выберите катер</option>
-                      {vessels.map((vessel) => (
-                        <option key={vessel.id} value={vessel.id}>
-                          {vessel.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Касса *
-                    </label>
-                    <select
-                      value={incomeForm.cashId}
-                      onChange={(e) => setIncomeForm({ ...incomeForm, cashId: e.target.value })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      disabled={!incomeForm.vesselId}
-                    >
-                      <option value="">Выберите кассу</option>
-                      {cashes.map((cash) => (
-                        <option key={cash.id} value={cash.id}>
-                          {cash.name}
-                        </option>
-                      ))}
-                    </select>
-                    {!incomeForm.vesselId && (
-                      <p className="mt-1 text-sm text-gray-500">Сначала выберите катер</p>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Сумма *
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={incomeForm.amount}
-                        onChange={(e) => setIncomeForm({ ...incomeForm, amount: e.target.value })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Валюта
-                      </label>
-                      <select
-                        value={incomeForm.currency}
-                        onChange={(e) => setIncomeForm({ ...incomeForm, currency: e.target.value as Currency })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value={Currency.RUB}>RUB</option>
-                        <option value={Currency.USD}>USD</option>
-                        <option value={Currency.EUR}>EUR</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Способ оплаты *
-                      </label>
-                      <select
-                        value={incomeForm.paymentMethod}
-                        onChange={(e) => setIncomeForm({ ...incomeForm, paymentMethod: e.target.value as CashPaymentMethod })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value={CashPaymentMethod.CASH}>Наличные</option>
-                        <option value={CashPaymentMethod.NON_CASH}>Безналичные</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Дата *
-                      </label>
-                      <input
-                        type="date"
-                        value={incomeForm.date}
-                        onChange={(e) => setIncomeForm({ ...incomeForm, date: e.target.value })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Описание
-                    </label>
-                    <textarea
-                      value={incomeForm.description}
-                      onChange={(e) => setIncomeForm({ ...incomeForm, description: e.target.value })}
-                      rows={3}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="Описание прихода (необязательно)"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Контрагент
-                    </label>
-                    <input
-                      type="text"
-                      value={incomeForm.counterparty}
-                      onChange={(e) => setIncomeForm({ ...incomeForm, counterparty: e.target.value })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="Контрагент (необязательно)"
-                    />
-                  </div>
                 </div>
               </div>
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
-                  onClick={handleSaveIncome}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleCloseAssignCategoryModal}
+                  className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
                 >
-                  {editingIncome ? 'Сохранить' : 'Добавить'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseIncomeModal}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Отмена
+                  Закрыть
                 </button>
               </div>
             </div>
