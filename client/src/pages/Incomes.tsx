@@ -12,10 +12,8 @@ import {
 } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { format } from 'date-fns'
-import { useAuth } from '../contexts/AuthContext'
 
 export default function Incomes() {
-  const { user } = useAuth()
   const [categories, setCategories] = useState<IncomeCategory[]>([])
   const [transactions, setTransactions] = useState<CashTransaction[]>([])
   const [loading, setLoading] = useState(true)
