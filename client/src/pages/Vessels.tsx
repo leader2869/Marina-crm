@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { vesselsService, usersService } from '../services/api'
 import { Vessel, UserRole } from '../types'
-import { Ship, Plus, Trash2, Search, Download, X } from 'lucide-react'
+import { Ship, Plus, Trash2, Search, Download, X, EyeOff, Eye } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
@@ -13,10 +13,13 @@ export default function Vessels() {
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  const [hiding, setHiding] = useState<number | null>(null)
+  const [restoring, setRestoring] = useState<number | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [showHiddenVessels, setShowHiddenVessels] = useState(false)
   const [addForm, setAddForm] = useState({
     name: '',
     type: '',
@@ -34,12 +37,26 @@ export default function Vessels() {
     if (isSuperAdmin) {
       loadUsers()
     }
-  }, [isSuperAdmin])
+  }, [isSuperAdmin, showHiddenVessels])
 
   const loadVessels = async () => {
     try {
       const response = await vesselsService.getAll({ limit: 100 })
-      setVessels(response.data || [])
+      let vesselsData = response.data || []
+      
+      // Фильтруем скрытые катера на фронтенде, если не включен показ скрытых
+      if (!showHiddenVessels) {
+        vesselsData = vesselsData.filter((v: Vessel) => v.isActive !== false)
+      }
+      
+      // Сортируем: сначала активные, потом скрытые
+      vesselsData.sort((a: Vessel, b: Vessel) => {
+        if (a.isActive && !b.isActive) return -1
+        if (!a.isActive && b.isActive) return 1
+        return 0
+      })
+      
+      setVessels(vesselsData)
     } catch (error) {
       console.error('Ошибка загрузки катеров:', error)
     } finally {
@@ -140,6 +157,39 @@ export default function Vessels() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  const handleHide = async (vesselId: number) => {
+    if (!confirm('Вы уверены, что хотите скрыть этот катер?')) return
+
+    setHiding(vesselId)
+    try {
+      await vesselsService.hide(vesselId)
+      await loadVessels()
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка скрытия катера')
+    } finally {
+      setHiding(null)
+    }
+  }
+
+  const handleRestore = async (vesselId: number) => {
+    setRestoring(vesselId)
+    try {
+      await vesselsService.restore(vesselId)
+      await loadVessels()
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка восстановления катера')
+    } finally {
+      setRestoring(null)
+    }
+  }
+
+  // Проверяем, может ли пользователь редактировать/удалять катер
+  const canManageVessel = (vessel: Vessel) => {
+    if (isSuperAdmin) return true
+    if (user?.role === UserRole.VESSEL_OWNER && vessel.ownerId === user.id) return true
+    return false
   }
 
   const exportToExcel = async () => {
@@ -313,19 +363,48 @@ export default function Vessels() {
                   </h3>
                 </div>
               </Link>
-              {isSuperAdmin && (
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    handleDelete(vessel.id)
-                  }}
-                  disabled={deleting}
-                  className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
-                  title="Удалить"
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
+              {canManageVessel(vessel) && (
+                <div className="flex gap-1">
+                  {vessel.isActive ? (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleHide(vessel.id)
+                      }}
+                      disabled={hiding === vessel.id}
+                      className="p-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded disabled:opacity-50"
+                      title="Скрыть катер"
+                    >
+                      <EyeOff className="h-5 w-5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleRestore(vessel.id)
+                      }}
+                      disabled={restoring === vessel.id}
+                      className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
+                      title="Восстановить катер"
+                    >
+                      <Eye className="h-5 w-5" />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleDelete(vessel.id)
+                    }}
+                    disabled={deleting}
+                    className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                    title="Удалить катер"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
               )}
             </div>
             <Link to={`/vessels/${vessel.id}`} className="block">
