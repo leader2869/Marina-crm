@@ -2,7 +2,7 @@ import { useEffect, useState, Fragment } from 'react'
 import { bookingsService, paymentsService } from '../services/api'
 import { Booking, UserRole, BookingStatus, Payment, PaymentStatus } from '../types'
 import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard } from 'lucide-react'
-import { format, isAfter, isToday, startOfDay } from 'date-fns'
+import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 
