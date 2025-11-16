@@ -15,7 +15,8 @@ export default function BackButton({ className = '' }: BackButtonProps) {
   return (
     <button
       onClick={handleBack}
-      className={`flex items-center px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors ${className}`}
+      className={`flex items-center px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm ${className}`}
+      type="button"
     >
       <ArrowLeft className="h-4 w-4 mr-2" />
       Назад
