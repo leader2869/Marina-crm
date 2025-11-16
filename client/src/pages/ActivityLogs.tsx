@@ -205,12 +205,11 @@ export default function ActivityLogs() {
           <p className="text-gray-600 mt-1">Все действия пользователей в системе</p>
         </div>
       </div>
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
-      </div>
+      {error && (
+        <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
 
       {/* Фильтры */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
