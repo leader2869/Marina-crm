@@ -44,7 +44,7 @@ export class VesselOwnerCash {
   @JoinColumn({ name: 'vesselId' })
   vessel: Vessel;
 
-  @Column()
+  @Column({ nullable: true })
   vesselId: number;
 
   @OneToMany(() => CashTransaction, (transaction) => transaction.cash)

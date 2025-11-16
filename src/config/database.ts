@@ -69,7 +69,9 @@ const isSupabase =
   process.env.DB_HOST?.includes('supabase.co') ||
   process.env.DB_HOST?.includes('pooler.supabase.com');
 
-const shouldSynchronize = isSupabase || process.env.NODE_ENV !== 'production';
+// Отключаем synchronize на production для безопасности
+// Используем миграции вместо synchronize
+const shouldSynchronize = process.env.NODE_ENV === 'development' && !process.env.VERCEL;
 
 export const AppDataSource = new DataSource({
   ...getDatabaseConfig(),
