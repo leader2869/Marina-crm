@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
 import { VesselOwnerCash } from '../../entities/VesselOwnerCash';
+import { Vessel } from '../../entities/Vessel';
 import { CashTransaction } from '../../entities/CashTransaction';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
@@ -21,16 +22,22 @@ export class VesselOwnerCashesController {
         parseInt(req.query.limit as string)
       );
 
-      const { includeHidden } = req.query;
+      const { includeHidden, vesselId } = req.query;
 
       const cashRepository = AppDataSource.getRepository(VesselOwnerCash);
       const queryBuilder = cashRepository
         .createQueryBuilder('cash')
-        .leftJoinAndSelect('cash.vesselOwner', 'vesselOwner');
+        .leftJoinAndSelect('cash.vesselOwner', 'vesselOwner')
+        .leftJoinAndSelect('cash.vessel', 'vessel');
 
       // Если не суперадмин или админ, показываем только свои кассы
       if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
         queryBuilder.where('cash.vesselOwnerId = :vesselOwnerId', { vesselOwnerId: req.userId });
+      }
+
+      // Фильтрация по катеру
+      if (vesselId) {
+        queryBuilder.andWhere('cash.vesselId = :vesselId', { vesselId: parseInt(vesselId as string) });
       }
 
       // Показываем только активные кассы (isActive = true), если не запрошены скрытые
@@ -90,10 +97,32 @@ export class VesselOwnerCashesController {
         throw new AppError('Требуется аутентификация', 401);
       }
 
-      const { name, description } = req.body;
+      const { name, description, vesselId } = req.body;
 
       if (!name) {
         throw new AppError('Название кассы обязательно', 400);
+      }
+
+      if (!vesselId) {
+        throw new AppError('Необходимо указать катер', 400);
+      }
+
+      // Проверяем, что катер принадлежит судовладельцу
+      const vesselRepository = AppDataSource.getRepository(Vessel);
+      const vessel = await vesselRepository.findOne({
+        where: { id: parseInt(vesselId as string) },
+      });
+
+      if (!vessel) {
+        throw new AppError('Катер не найден', 404);
+      }
+
+      if (
+        req.userRole !== UserRole.SUPER_ADMIN &&
+        req.userRole !== UserRole.ADMIN &&
+        vessel.ownerId !== req.userId
+      ) {
+        throw new AppError('Катер не принадлежит вам', 403);
       }
 
       const cashRepository = AppDataSource.getRepository(VesselOwnerCash);
@@ -101,6 +130,7 @@ export class VesselOwnerCashesController {
         name: name as string,
         description: description as string | undefined,
         vesselOwnerId: req.userId,
+        vesselId: parseInt(vesselId as string),
         isActive: true,
       });
 
@@ -125,7 +155,7 @@ export class VesselOwnerCashesController {
       }
 
       const { id } = req.params;
-      const { name, description, isActive } = req.body;
+      const { name, description, isActive, vesselId } = req.body;
 
       const cashRepository = AppDataSource.getRepository(VesselOwnerCash);
       const cash = await cashRepository.findOne({
@@ -148,12 +178,35 @@ export class VesselOwnerCashesController {
       if (name !== undefined) cash.name = name as string;
       if (description !== undefined) cash.description = description || undefined;
       if (isActive !== undefined) cash.isActive = isActive as boolean;
+      
+      if (vesselId !== undefined) {
+        const vesselIdNum = parseInt(vesselId as string);
+        // Проверяем, что катер принадлежит судовладельцу
+        const vesselRepository = AppDataSource.getRepository(Vessel);
+        const vessel = await vesselRepository.findOne({
+          where: { id: vesselIdNum },
+        });
+
+        if (!vessel) {
+          throw new AppError('Катер не найден', 404);
+        }
+
+        if (
+          req.userRole !== UserRole.SUPER_ADMIN &&
+          req.userRole !== UserRole.ADMIN &&
+          vessel.ownerId !== req.userId
+        ) {
+          throw new AppError('Катер не принадлежит вам', 403);
+        }
+
+        cash.vesselId = vesselIdNum;
+      }
 
       await cashRepository.save(cash);
 
       const updatedCash = await cashRepository.findOne({
         where: { id: cash.id },
-        relations: ['vesselOwner'],
+        relations: ['vesselOwner', 'vessel'],
       });
 
       res.json(updatedCash);

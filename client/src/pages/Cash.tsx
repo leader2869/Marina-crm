@@ -6,11 +6,15 @@ import { LoadingAnimation } from '../components/LoadingAnimation'
 import { format } from 'date-fns'
 
 export default function Cash() {
+  const { user } = useAuth()
+  const [vessels, setVessels] = useState<Vessel[]>([])
+  const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
   const [cashes, setCashes] = useState<VesselOwnerCash[]>([])
   const [selectedCash, setSelectedCash] = useState<VesselOwnerCash | null>(null)
   const [transactions, setTransactions] = useState<CashTransaction[]>([])
   const [balance, setBalance] = useState<CashBalance | null>(null)
   const [loading, setLoading] = useState(true)
+  const [vesselsLoading, setVesselsLoading] = useState(true)
   const [transactionsLoading, setTransactionsLoading] = useState(false)
   const [showCashModal, setShowCashModal] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
@@ -26,6 +30,7 @@ export default function Cash() {
   const [cashForm, setCashForm] = useState({
     name: '',
     description: '',
+    vesselId: '',
   })
 
   const [transactionForm, setTransactionForm] = useState({
@@ -39,8 +44,19 @@ export default function Cash() {
   })
 
   useEffect(() => {
-    loadCashes()
+    loadVessels()
   }, [])
+
+  useEffect(() => {
+    if (selectedVessel) {
+      loadCashes()
+    } else {
+      setCashes([])
+      setSelectedCash(null)
+      setTransactions([])
+      setBalance(null)
+    }
+  }, [selectedVessel, showHiddenCashes])
 
   useEffect(() => {
     if (selectedCash) {
@@ -49,10 +65,32 @@ export default function Cash() {
     }
   }, [selectedCash, filterType, filterPaymentMethod, dateFrom, dateTo])
 
+  const loadVessels = async () => {
+    try {
+      setVesselsLoading(true)
+      const response = await vesselsService.getAll({ limit: 100 })
+      const vesselsData = response.data || []
+      // Фильтруем только катера текущего пользователя
+      const userVessels = vesselsData.filter((vessel: Vessel) => vessel.ownerId === user?.id)
+      setVessels(userVessels)
+      if (userVessels.length > 0 && !selectedVessel) {
+        setSelectedVessel(userVessels[0])
+      }
+    } catch (error: any) {
+      console.error('Ошибка загрузки катеров:', error)
+      alert(error.error || error.message || 'Ошибка загрузки катеров')
+    } finally {
+      setVesselsLoading(false)
+      setLoading(false)
+    }
+  }
+
   const loadCashes = async () => {
+    if (!selectedVessel) return
+
     try {
       setLoading(true)
-      const params: any = { limit: 100 }
+      const params: any = { limit: 100, vesselId: selectedVessel.id }
       if (showHiddenCashes) {
         params.includeHidden = true
       }
@@ -69,6 +107,10 @@ export default function Cash() {
         // Выбираем первую активную кассу, если есть
         const activeCash = sortedCashes.find((c: VesselOwnerCash) => c.isActive) || sortedCashes[0]
         setSelectedCash(activeCash)
+      } else if (sortedCashes.length === 0) {
+        setSelectedCash(null)
+        setTransactions([])
+        setBalance(null)
       }
     } catch (error: any) {
       console.error('Ошибка загрузки касс:', error)
@@ -120,12 +162,14 @@ export default function Cash() {
       setCashForm({
         name: cash.name,
         description: cash.description || '',
+        vesselId: cash.vesselId?.toString() || selectedVessel?.id?.toString() || '',
       })
     } else {
       setEditingCash(null)
       setCashForm({
         name: '',
         description: '',
+        vesselId: selectedVessel?.id?.toString() || '',
       })
     }
     setShowCashModal(true)
@@ -137,6 +181,7 @@ export default function Cash() {
     setCashForm({
       name: '',
       description: '',
+      vesselId: selectedVessel?.id?.toString() || '',
     })
   }
 
@@ -146,11 +191,20 @@ export default function Cash() {
       return
     }
 
+    if (!cashForm.vesselId) {
+      alert('Необходимо выбрать катер')
+      return
+    }
+
     try {
+      const cashData = {
+        ...cashForm,
+        vesselId: parseInt(cashForm.vesselId),
+      }
       if (editingCash) {
-        await vesselOwnerCashesService.update(editingCash.id, cashForm)
+        await vesselOwnerCashesService.update(editingCash.id, cashData)
       } else {
-        await vesselOwnerCashesService.create(cashForm)
+        await vesselOwnerCashesService.create(cashData)
       }
       await loadCashes()
       handleCloseCashModal()
@@ -306,8 +360,8 @@ export default function Cash() {
     return true
   })
 
-  if (loading) {
-    return <LoadingAnimation message="Загрузка касс..." />
+  if (vesselsLoading || (loading && !selectedVessel)) {
+    return <LoadingAnimation message={vesselsLoading ? "Загрузка катеров..." : "Загрузка касс..."} />
   }
 
   return (
@@ -319,114 +373,143 @@ export default function Cash() {
         </div>
       </div>
 
-      {/* Выбор кассы сверху */}
+      {/* Выбор катера */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Выбор кассы</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowHiddenCashes(!showHiddenCashes)}
-              className="flex items-center px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700"
-            >
-              {showHiddenCashes ? (
-                <>
-                  <Eye className="h-4 w-4 mr-1" />
-                  Скрыть скрытые
-                </>
-              ) : (
-                <>
-                  <EyeOff className="h-4 w-4 mr-1" />
-                  Показать скрытые
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => handleOpenCashModal()}
-              className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Создать кассу
-            </button>
-          </div>
+          <h2 className="text-lg font-semibold text-gray-900">Выбор катера</h2>
         </div>
-        {cashes.length === 0 ? (
-          <p className="text-gray-500 text-sm">Нет касс. Создайте первую кассу.</p>
+        {vessels.length === 0 ? (
+          <p className="text-gray-500 text-sm">Нет катеров. Сначала добавьте катер.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {cashes.map((cash) => (
+            {vessels.map((vessel) => (
               <div
-                key={cash.id}
-                onClick={() => setSelectedCash(cash)}
+                key={vessel.id}
+                onClick={() => setSelectedVessel(vessel)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
-                  selectedCash?.id === cash.id
+                  selectedVessel?.id === vessel.id
                     ? 'bg-primary-50 border-2 border-primary-500'
-                    : cash.isActive
-                    ? 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
-                    : 'bg-gray-100 border-2 border-gray-300 hover:bg-gray-200 opacity-75'
+                    : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
                 }`}
               >
-                <Wallet className={`h-4 w-4 ${cash.isActive ? 'text-gray-600' : 'text-gray-400'}`} />
-                <span className={`font-medium ${cash.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-                  {cash.name}
-                </span>
-                {!cash.isActive && (
-                  <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Скрыта</span>
-                )}
-                {cash.description && (
-                  <span className={`text-sm ${cash.isActive ? 'text-gray-600' : 'text-gray-400'}`}>
-                    ({cash.description})
-                  </span>
-                )}
-                <div className="flex gap-1 ml-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpenCashModal(cash)
-                    }}
-                    className="p-1 text-gray-600 hover:text-primary-600"
-                    title="Редактировать"
-                  >
-                    <Edit2 className="h-3 w-3" />
-                  </button>
-                  {cash.isActive ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleHideCash(cash)
-                      }}
-                      className="p-1 text-gray-600 hover:text-orange-600"
-                      title="Скрыть кассу"
-                    >
-                      <EyeOff className="h-3 w-3" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRestoreCash(cash)
-                      }}
-                      className="p-1 text-gray-600 hover:text-green-600"
-                      title="Восстановить кассу"
-                    >
-                      <Eye className="h-3 w-3" />
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteCash(cash)
-                    }}
-                    className="p-1 text-gray-600 hover:text-red-600"
-                    title="Удалить кассу (только если нет транзакций)"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
+                <Ship className="h-4 w-4 text-gray-600" />
+                <span className="font-medium text-gray-900">{vessel.name}</span>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Выбор кассы */}
+      {selectedVessel && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Выбор кассы для катера "{selectedVessel.name}"</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowHiddenCashes(!showHiddenCashes)}
+                className="flex items-center px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700"
+              >
+                {showHiddenCashes ? (
+                  <>
+                    <Eye className="h-4 w-4 mr-1" />
+                    Скрыть скрытые
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="h-4 w-4 mr-1" />
+                    Показать скрытые
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleOpenCashModal()}
+                className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Создать кассу
+              </button>
+            </div>
+          </div>
+          {cashes.length === 0 ? (
+            <p className="text-gray-500 text-sm">Нет касс для этого катера. Создайте первую кассу.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {cashes.map((cash) => (
+                <div
+                  key={cash.id}
+                  onClick={() => setSelectedCash(cash)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
+                    selectedCash?.id === cash.id
+                      ? 'bg-primary-50 border-2 border-primary-500'
+                      : cash.isActive
+                      ? 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                      : 'bg-gray-100 border-2 border-gray-300 hover:bg-gray-200 opacity-75'
+                  }`}
+                >
+                  <Wallet className={`h-4 w-4 ${cash.isActive ? 'text-gray-600' : 'text-gray-400'}`} />
+                  <span className={`font-medium ${cash.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                    {cash.name}
+                  </span>
+                  {!cash.isActive && (
+                    <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Скрыта</span>
+                  )}
+                  {cash.description && (
+                    <span className={`text-sm ${cash.isActive ? 'text-gray-600' : 'text-gray-400'}`}>
+                      ({cash.description})
+                    </span>
+                  )}
+                  <div className="flex gap-1 ml-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenCashModal(cash)
+                      }}
+                      className="p-1 text-gray-600 hover:text-primary-600"
+                      title="Редактировать"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </button>
+                    {cash.isActive ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleHideCash(cash)
+                        }}
+                        className="p-1 text-gray-600 hover:text-orange-600"
+                        title="Скрыть кассу"
+                      >
+                        <EyeOff className="h-3 w-3" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRestoreCash(cash)
+                        }}
+                        className="p-1 text-gray-600 hover:text-green-600"
+                        title="Восстановить кассу"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteCash(cash)
+                      }}
+                      className="p-1 text-gray-600 hover:text-red-600"
+                      title="Удалить кассу (только если нет транзакций)"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Детали кассы и транзакции */}
       {selectedCash ? (
@@ -701,30 +784,48 @@ export default function Cash() {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Название кассы *
-                    </label>
-                    <input
-                      type="text"
-                      value={cashForm.name}
-                      onChange={(e) => setCashForm({ ...cashForm, name: e.target.value })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      placeholder="Например: Касса капитана"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Описание</label>
-                    <textarea
-                      value={cashForm.description}
-                      onChange={(e) => setCashForm({ ...cashForm, description: e.target.value })}
-                      rows={3}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      placeholder="Описание кассы (необязательно)"
-                    />
-                  </div>
-                </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Катер *
+                        </label>
+                        <select
+                          value={cashForm.vesselId}
+                          onChange={(e) => setCashForm({ ...cashForm, vesselId: e.target.value })}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                          disabled={!!editingCash}
+                        >
+                          <option value="">Выберите катер</option>
+                          {vessels.map((vessel) => (
+                            <option key={vessel.id} value={vessel.id}>
+                              {vessel.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Название кассы *
+                        </label>
+                        <input
+                          type="text"
+                          value={cashForm.name}
+                          onChange={(e) => setCashForm({ ...cashForm, name: e.target.value })}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                          placeholder="Например: Касса капитана"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Описание</label>
+                        <textarea
+                          value={cashForm.description}
+                          onChange={(e) => setCashForm({ ...cashForm, description: e.target.value })}
+                          rows={3}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                          placeholder="Описание кассы (необязательно)"
+                        />
+                      </div>
+                    </div>
               </div>
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button

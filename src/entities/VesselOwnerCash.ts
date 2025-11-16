@@ -9,6 +9,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from './User';
+import { Vessel } from './Vessel';
 import { CashTransaction } from './CashTransaction';
 
 @Entity('vessel_owner_cashes')
@@ -38,6 +39,13 @@ export class VesselOwnerCash {
 
   @Column()
   vesselOwnerId: number;
+
+  @ManyToOne(() => Vessel)
+  @JoinColumn({ name: 'vesselId' })
+  vessel: Vessel;
+
+  @Column()
+  vesselId: number;
 
   @OneToMany(() => CashTransaction, (transaction) => transaction.cash)
   transactions: CashTransaction[];

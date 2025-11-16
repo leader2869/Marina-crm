@@ -281,6 +281,8 @@ export interface VesselOwnerCash {
   isActive: boolean
   vesselOwnerId: number
   vesselOwner?: User
+  vesselId: number
+  vessel?: Vessel
   transactions?: CashTransaction[]
   createdAt: string
   updatedAt: string
