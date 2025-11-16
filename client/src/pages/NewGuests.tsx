@@ -47,7 +47,8 @@ export default function NewGuests() {
         <BackButton />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Новые гости</h1>
-        <p className="mt-2 text-gray-600">Список всех пользователей, которые зашли в систему как гости</p>
+          <p className="mt-2 text-gray-600">Список всех пользователей, которые зашли в систему как гости</p>
+        </div>
       </div>
 
       {error && (

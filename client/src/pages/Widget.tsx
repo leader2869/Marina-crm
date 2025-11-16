@@ -30,7 +30,8 @@ export default function Widget() {
         <BackButton />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Виджет для бронирования</h1>
-        <p className="mt-2 text-gray-600">Встройте виджет бронирования на ваш сайт</p>
+          <p className="mt-2 text-gray-600">Встройте виджет бронирования на ваш сайт</p>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">

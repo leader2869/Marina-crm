@@ -299,7 +299,8 @@ export default function Vessels() {
           <BackButton />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Катера</h1>
-          <p className="mt-2 text-gray-600">Управление катерами</p>
+            <p className="mt-2 text-gray-600">Управление катерами</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <button

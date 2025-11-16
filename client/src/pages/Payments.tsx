@@ -67,14 +67,15 @@ export default function Payments() {
         <BackButton />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-          {isVesselOwner ? 'Платежи за яхт клуб' : 'Платежи'}
-        </h1>
-        <p className="mt-2 text-gray-600">
-          {isVesselOwner 
-            ? 'Здесь отображаются все платежи за стоянку в яхт-клубе'
-            : 'Управление платежами'
-          }
-        </p>
+            {isVesselOwner ? 'Платежи за яхт клуб' : 'Платежи'}
+          </h1>
+          <p className="mt-2 text-gray-600">
+            {isVesselOwner 
+              ? 'Здесь отображаются все платежи за стоянку в яхт-клубе'
+              : 'Управление платежами'
+            }
+          </p>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">

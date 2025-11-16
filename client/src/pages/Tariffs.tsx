@@ -241,7 +241,8 @@ export default function Tariffs() {
           <BackButton />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Тарифы</h1>
-          <p className="mt-2 text-gray-600">Управление тарифами на места в ваших яхт-клубах</p>
+            <p className="mt-2 text-gray-600">Управление тарифами на места в ваших яхт-клубах</p>
+          </div>
         </div>
         {selectedClub && (
           <button

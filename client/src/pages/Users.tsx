@@ -459,7 +459,8 @@ export default function UsersPage() {
           <BackButton />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Пользователи</h1>
-          <p className="mt-2 text-gray-600">Список всех зарегистрированных пользователей</p>
+            <p className="mt-2 text-gray-600">Список всех зарегистрированных пользователей</p>
+          </div>
         </div>
         <div className="flex gap-3">
           <button
