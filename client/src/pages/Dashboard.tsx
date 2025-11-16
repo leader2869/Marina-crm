@@ -19,8 +19,13 @@ export default function Dashboard() {
   useEffect(() => {
     const loadStats = async () => {
       try {
+        // Для суперадмина и администратора загружаем все опубликованные клубы
+        // Для остальных ролей загружаем с минимальным лимитом (нужен только total)
+        const isSuperAdminOrAdmin = user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN
+        const clubsParams = isSuperAdminOrAdmin ? { limit: 1000 } : { limit: 1 }
+        
         const [clubsRes, bookingsRes] = await Promise.all([
-          clubsService.getAll({ limit: 1 }),
+          clubsService.getAll(clubsParams),
           bookingsService.getAll({ limit: 1000 }), // Загружаем все бронирования для подсчета уникальных клубов
         ])
 
@@ -46,8 +51,17 @@ export default function Dashboard() {
             }
           })
           clubsCount = uniqueClubIds.size
+        } else if (user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN) {
+          // Для суперадмина и администратора считаем все опубликованные клубы (активные, валидированные, отправленные на валидацию)
+          const allClubs = (clubsRes as any)?.data || []
+          const publishedClubs = allClubs.filter((club: any) => 
+            club.isActive === true && 
+            club.isValidated === true && 
+            club.isSubmittedForValidation === true
+          )
+          clubsCount = publishedClubs.length
         } else {
-          // Для остальных ролей используем общее количество клубов
+          // Для остальных ролей используем общее количество клубов из ответа
           clubsCount = (clubsRes as any)?.data?.total || (clubsRes as any)?.total || 0
         }
 
