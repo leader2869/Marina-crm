@@ -21,6 +21,8 @@ export class VesselOwnerCashesController {
         parseInt(req.query.limit as string)
       );
 
+      const { includeHidden } = req.query;
+
       const cashRepository = AppDataSource.getRepository(VesselOwnerCash);
       const queryBuilder = cashRepository
         .createQueryBuilder('cash')
@@ -31,8 +33,10 @@ export class VesselOwnerCashesController {
         queryBuilder.where('cash.vesselOwnerId = :vesselOwnerId', { vesselOwnerId: req.userId });
       }
 
-      // Показываем только активные кассы (isActive = true)
-      queryBuilder.andWhere('cash.isActive = :isActive', { isActive: true });
+      // Показываем только активные кассы (isActive = true), если не запрошены скрытые
+      if (!includeHidden || includeHidden !== 'true') {
+        queryBuilder.andWhere('cash.isActive = :isActive', { isActive: true });
+      }
 
       const [cashes, total] = await queryBuilder
         .skip((page - 1) * limit)
@@ -384,6 +388,67 @@ export class VesselOwnerCashesController {
 
       res.json({
         totalIncome: parseFloat(totalIncome.toFixed(2)),
+        cashesCount: cashes.length,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Получить общую сумму расходов по всем кассам судовладельца
+  async getTotalExpense(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
+      const { startDate, endDate } = req.query;
+
+      const cashRepository = AppDataSource.getRepository(VesselOwnerCash);
+      const queryBuilder = cashRepository
+        .createQueryBuilder('cash')
+        .where('cash.isActive = :isActive', { isActive: true });
+
+      // Если не суперадмин или админ, показываем только свои кассы
+      if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        queryBuilder.andWhere('cash.vesselOwnerId = :vesselOwnerId', { vesselOwnerId: req.userId });
+      }
+
+      const cashes = await queryBuilder.getMany();
+
+      const transactionRepository = AppDataSource.getRepository(CashTransaction);
+      let totalExpense = 0;
+
+      for (const cash of cashes) {
+        const transactionQueryBuilder = transactionRepository
+          .createQueryBuilder('transaction')
+          .where('transaction.cashId = :cashId', { cashId: cash.id })
+          .andWhere('transaction.transactionType = :transactionType', { 
+            transactionType: CashTransactionType.EXPENSE 
+          });
+
+        // Фильтрация по периоду
+        if (startDate) {
+          transactionQueryBuilder.andWhere('transaction.date >= :startDate', {
+            startDate: new Date(startDate as string),
+          });
+        }
+        if (endDate) {
+          transactionQueryBuilder.andWhere('transaction.date <= :endDate', {
+            endDate: new Date(endDate as string),
+          });
+        }
+
+        const transactions = await transactionQueryBuilder.getMany();
+
+        transactions.forEach((transaction) => {
+          const amount = parseFloat(transaction.amount.toString());
+          totalExpense += amount;
+        });
+      }
+
+      res.json({
+        totalExpense: parseFloat(totalExpense.toFixed(2)),
         cashesCount: cashes.length,
       });
     } catch (error) {

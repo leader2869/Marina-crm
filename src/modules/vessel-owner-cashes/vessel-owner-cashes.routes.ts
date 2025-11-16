@@ -41,6 +41,7 @@ router.delete(
 
 // Роуты для касс с параметрами (ПОСЛЕ роутов транзакций)
 router.get('/total-income', authenticate, cashesController.getTotalIncome.bind(cashesController));
+router.get('/total-expense', authenticate, cashesController.getTotalExpense.bind(cashesController));
 router.get('/:id/balance', authenticate, cashesController.getBalance.bind(cashesController));
 router.get('/:id', authenticate, cashesController.getById.bind(cashesController));
 router.put('/:id', authenticate, cashesController.update.bind(cashesController));

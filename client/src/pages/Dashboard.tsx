@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { clubsService, bookingsService, vesselsService } from '../services/api'
+import { clubsService, bookingsService, vesselsService, vesselOwnerCashesService } from '../services/api'
 import { UserRole } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -33,12 +33,29 @@ export default function Dashboard() {
           vesselsCount = user?.vessels?.length || 0
         }
 
+        // Для судовладельца загружаем доходы и расходы из касс
+        let totalIncome = 0
+        let totalExpense = 0
+        
+        if (user?.role === UserRole.VESSEL_OWNER) {
+          try {
+            const [incomeRes, expenseRes] = await Promise.all([
+              vesselOwnerCashesService.getTotalIncome(),
+              vesselOwnerCashesService.getTotalExpense(),
+            ])
+            totalIncome = (incomeRes as any)?.totalIncome || 0
+            totalExpense = (expenseRes as any)?.totalExpense || 0
+          } catch (error) {
+            console.error('Ошибка загрузки доходов/расходов:', error)
+          }
+        }
+
         setStats({
           clubs: (clubsRes as any)?.data?.total || (clubsRes as any)?.total || 0,
           vessels: vesselsCount,
           bookings: (bookingsRes as any)?.data?.total || (bookingsRes as any)?.total || 0,
-          totalIncome: 0,
-          totalExpense: 0,
+          totalIncome,
+          totalExpense,
         })
       } catch (error) {
         console.error('Ошибка загрузки статистики:', error)

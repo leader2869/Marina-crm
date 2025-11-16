@@ -155,6 +155,7 @@ export const vesselOwnerCashesService = {
   delete: (id: number) => api.delete(`/vessel-owner/cashes/${id}`),
   getBalance: (id: number, params?: any) => api.get(`/vessel-owner/cashes/${id}/balance`, { params }),
   getTotalIncome: (params?: any) => api.get('/vessel-owner/cashes/total-income', { params }),
+  getTotalExpense: (params?: any) => api.get('/vessel-owner/cashes/total-expense', { params }),
   getTransactions: (cashId: number, params?: any) => api.get(`/vessel-owner/cashes/${cashId}/transactions`, { params }),
   getTransaction: (cashId: number, id: number) => api.get(`/vessel-owner/cashes/${cashId}/transactions/${id}`),
   createTransaction: (cashId: number, data: any) => api.post(`/vessel-owner/cashes/${cashId}/transactions`, data),

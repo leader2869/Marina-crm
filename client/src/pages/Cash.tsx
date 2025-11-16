@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X, EyeOff } from 'lucide-react'
+import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X, EyeOff, Eye } from 'lucide-react'
 import { vesselOwnerCashesService } from '../services/api'
 import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -21,6 +21,7 @@ export default function Cash() {
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('')
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
+  const [showHiddenCashes, setShowHiddenCashes] = useState(false)
 
   const [cashForm, setCashForm] = useState({
     name: '',
@@ -51,11 +52,23 @@ export default function Cash() {
   const loadCashes = async () => {
     try {
       setLoading(true)
-      const response = await vesselOwnerCashesService.getAll({ limit: 100 })
+      const params: any = { limit: 100 }
+      if (showHiddenCashes) {
+        params.includeHidden = true
+      }
+      const response = await vesselOwnerCashesService.getAll(params)
       const cashesData = response.data || []
-      setCashes(cashesData)
-      if (cashesData.length > 0 && !selectedCash) {
-        setSelectedCash(cashesData[0])
+      // Сортируем: сначала активные кассы, потом скрытые
+      const sortedCashes = [...cashesData].sort((a, b) => {
+        if (a.isActive && !b.isActive) return -1
+        if (!a.isActive && b.isActive) return 1
+        return 0
+      })
+      setCashes(sortedCashes)
+      if (sortedCashes.length > 0 && !selectedCash) {
+        // Выбираем первую активную кассу, если есть
+        const activeCash = sortedCashes.find((c: VesselOwnerCash) => c.isActive) || sortedCashes[0]
+        setSelectedCash(activeCash)
       }
     } catch (error: any) {
       console.error('Ошибка загрузки касс:', error)
@@ -186,6 +199,17 @@ export default function Cash() {
     }
   }
 
+  const handleRestoreCash = async (cash: VesselOwnerCash) => {
+    if (!confirm(`Восстановить кассу "${cash.name}"?`)) return
+
+    try {
+      await vesselOwnerCashesService.update(cash.id, { isActive: true })
+      await loadCashes()
+    } catch (error: any) {
+      alert(error.error || error.message || 'Ошибка восстановления кассы')
+    }
+  }
+
   const handleOpenTransactionModal = (transaction?: CashTransaction) => {
     if (transaction) {
       setEditingTransaction(transaction)
@@ -299,13 +323,31 @@ export default function Cash() {
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Выбор кассы</h2>
-          <button
-            onClick={() => handleOpenCashModal()}
-            className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Создать кассу
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowHiddenCashes(!showHiddenCashes)}
+              className="flex items-center px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700"
+            >
+              {showHiddenCashes ? (
+                <>
+                  <Eye className="h-4 w-4 mr-1" />
+                  Скрыть скрытые
+                </>
+              ) : (
+                <>
+                  <EyeOff className="h-4 w-4 mr-1" />
+                  Показать скрытые
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => handleOpenCashModal()}
+              className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Создать кассу
+            </button>
+          </div>
         </div>
         {cashes.length === 0 ? (
           <p className="text-gray-500 text-sm">Нет касс. Создайте первую кассу.</p>
@@ -318,13 +360,22 @@ export default function Cash() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
                   selectedCash?.id === cash.id
                     ? 'bg-primary-50 border-2 border-primary-500'
-                    : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                    : cash.isActive
+                    ? 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                    : 'bg-gray-100 border-2 border-gray-300 hover:bg-gray-200 opacity-75'
                 }`}
               >
-                <Wallet className="h-4 w-4 text-gray-600" />
-                <span className="font-medium text-gray-900">{cash.name}</span>
+                <Wallet className={`h-4 w-4 ${cash.isActive ? 'text-gray-600' : 'text-gray-400'}`} />
+                <span className={`font-medium ${cash.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                  {cash.name}
+                </span>
+                {!cash.isActive && (
+                  <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Скрыта</span>
+                )}
                 {cash.description && (
-                  <span className="text-sm text-gray-600">({cash.description})</span>
+                  <span className={`text-sm ${cash.isActive ? 'text-gray-600' : 'text-gray-400'}`}>
+                    ({cash.description})
+                  </span>
                 )}
                 <div className="flex gap-1 ml-2">
                   <button
@@ -337,16 +388,29 @@ export default function Cash() {
                   >
                     <Edit2 className="h-3 w-3" />
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleHideCash(cash)
-                    }}
-                    className="p-1 text-gray-600 hover:text-orange-600"
-                    title="Скрыть кассу"
-                  >
-                    <EyeOff className="h-3 w-3" />
-                  </button>
+                  {cash.isActive ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleHideCash(cash)
+                      }}
+                      className="p-1 text-gray-600 hover:text-orange-600"
+                      title="Скрыть кассу"
+                    >
+                      <EyeOff className="h-3 w-3" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRestoreCash(cash)
+                      }}
+                      className="p-1 text-gray-600 hover:text-green-600"
+                      title="Восстановить кассу"
+                    >
+                      <Eye className="h-3 w-3" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
