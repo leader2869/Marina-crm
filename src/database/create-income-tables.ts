@@ -166,6 +166,15 @@ const createIncomeTables = async (): Promise<void> => {
         `);
         console.log('✅ Колонка documentPath добавлена');
       }
+      
+      // Удаляем старую колонку type, если она существует (она не нужна в новой структуре)
+      if (columnNames.includes('type')) {
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          DROP COLUMN IF EXISTS type;
+        `);
+        console.log('✅ Старая колонка type удалена');
+      }
     }
 
     // Индексы для оптимизации запросов (с обработкой ошибок)
