@@ -67,8 +67,8 @@ export default function Layout() {
       { name: 'Виджет', href: '/widget', icon: Code, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Тарифы', href: '/tariffs', icon: Receipt, roles: [UserRole.CLUB_OWNER] },
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
-      { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
-      // Для судовладельца создаем подменю "Финансы"
+      { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
+      // Для судовладельца создаем подменю "Финансы" с дополнительными ссылками
       {
         name: 'Финансы',
         icon: DollarSign,

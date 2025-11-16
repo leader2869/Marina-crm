@@ -104,7 +104,14 @@ function App() {
                 </RoleProtectedRoute>
               } 
             />
-            <Route path="finances" element={<Finances />} />
+            <Route 
+              path="finances" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER]}>
+                  <Finances />
+                </RoleProtectedRoute>
+              } 
+            />
             <Route 
               path="incomes" 
               element={
