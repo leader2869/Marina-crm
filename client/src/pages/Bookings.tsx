@@ -268,6 +268,21 @@ export default function Bookings() {
                               <X className="h-4 w-4" />
                             </button>
                           )}
+                        {isVesselOwner &&
+                          booking.status === BookingStatus.CANCELLED &&
+                          booking.vesselOwnerId === user?.id && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteBooking(booking.id)
+                              }}
+                              disabled={deleting === booking.id}
+                              className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                              title="Удалить бронирование из базы данных (необратимо)"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                       </div>
                     </td>
                   </tr>
