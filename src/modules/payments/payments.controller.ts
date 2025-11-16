@@ -26,14 +26,14 @@ export class PaymentsController {
       const paymentRepository = AppDataSource.getRepository(Payment);
       const queryBuilder = paymentRepository
         .createQueryBuilder('payment')
-        .leftJoinAndSelect('payment.booking', 'booking')
+        .innerJoinAndSelect('payment.booking', 'booking')
         .leftJoinAndSelect('payment.payer', 'payer')
-        .leftJoinAndSelect('booking.club', 'club');
+        .innerJoinAndSelect('booking.club', 'club');
 
-      // Фильтрация по ролям
+      // Фильтрация по ролям - применяется первой и всегда
       if (req.userRole === UserRole.VESSEL_OWNER) {
         // Судовладелец видит только платежи своих бронирований
-        queryBuilder.where('booking.vesselOwnerId = :userId', { userId: req.userId });
+        queryBuilder.where('booking.vesselOwnerId = :vesselOwnerId', { vesselOwnerId: req.userId });
       } else if (req.userRole === UserRole.CLUB_OWNER) {
         // Владелец клуба видит только платежи своих клубов
         const clubRepository = AppDataSource.getRepository(Club);
@@ -52,10 +52,11 @@ export class PaymentsController {
         queryBuilder.where('club.id IN (:...clubIds)', { clubIds });
       } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
         // Для других ролей (guest и т.д.) показываем только свои платежи
-        queryBuilder.where('payment.payerId = :userId', { userId: req.userId });
+        queryBuilder.where('payment.payerId = :payerId', { payerId: req.userId });
       }
       // Для SUPER_ADMIN и ADMIN показываем все платежи без дополнительной фильтрации
 
+      // Дополнительные фильтры применяются через andWhere
       if (clubId) {
         queryBuilder.andWhere('club.id = :clubId', { clubId: parseInt(clubId as string) });
       }
