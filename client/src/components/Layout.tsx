@@ -22,12 +22,8 @@ import {
   Check,
   X as XIcon,
   Code,
-  TrendingUp,
-  TrendingDown,
   ChevronDown,
-  ChevronRight,
-  Wallet,
-  BarChart
+  ChevronRight
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
