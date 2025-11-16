@@ -298,8 +298,26 @@ export default function Vessels() {
           <h1 className="text-3xl font-bold text-gray-900">Катера</h1>
           <p className="mt-2 text-gray-600">Управление катерами</p>
         </div>
-        {isSuperAdmin && (
-          <div className="flex gap-3">
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setShowHiddenVessels(!showHiddenVessels)
+            }}
+            className="flex items-center px-3 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700"
+          >
+            {showHiddenVessels ? (
+              <>
+                <Eye className="h-4 w-4 mr-1" />
+                Скрыть скрытые
+              </>
+            ) : (
+              <>
+                <EyeOff className="h-4 w-4 mr-1" />
+                Показать скрытые
+              </>
+            )}
+          </button>
+          {isSuperAdmin && (
             <button
               onClick={exportToExcel}
               className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
@@ -308,16 +326,7 @@ export default function Vessels() {
               <Download className="h-5 w-5 mr-2" />
               Экспорт в Excel
             </button>
-            <button
-              onClick={handleOpenAdd}
-              className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Добавить катер
-            </button>
-          </div>
-        )}
-        {!isSuperAdmin && (
+          )}
           <button
             onClick={handleOpenAdd}
             className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
@@ -325,7 +334,7 @@ export default function Vessels() {
             <Plus className="h-5 w-5 mr-2" />
             Добавить катер
           </button>
-        )}
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-4">
