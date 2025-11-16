@@ -163,7 +163,7 @@ export default function Cash() {
       setCashForm({
         name: cash.name,
         description: cash.description || '',
-        vesselId: cash.vesselId?.toString() || selectedVessel?.id?.toString() || '',
+        vesselId: (cash.vesselId || selectedVessel?.id)?.toString() || '',
       })
     } else {
       setEditingCash(null)
