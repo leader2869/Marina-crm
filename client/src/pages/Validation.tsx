@@ -187,9 +187,6 @@ export default function Validation() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <BackButton />
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Валидация</h1>
             <p className="mt-2 text-gray-600">
