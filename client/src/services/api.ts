@@ -208,5 +208,21 @@ export const activityLogsService = {
   getAll: (params?: any) => api.get('/activity-logs', { params }),
 }
 
+export const incomeCategoriesService = {
+  getAll: (params?: any) => api.get('/vessel-owner/income-categories', { params }),
+  getById: (id: number) => api.get(`/vessel-owner/income-categories/${id}`),
+  create: (data: any) => api.post('/vessel-owner/income-categories', data),
+  update: (id: number, data: any) => api.put(`/vessel-owner/income-categories/${id}`, data),
+  delete: (id: number) => api.delete(`/vessel-owner/income-categories/${id}`),
+}
+
+export const incomesService = {
+  getAll: (params?: any) => api.get('/vessel-owner/incomes', { params }),
+  getById: (id: number) => api.get(`/vessel-owner/incomes/${id}`),
+  create: (data: any) => api.post('/vessel-owner/incomes', data),
+  update: (id: number, data: any) => api.put(`/vessel-owner/incomes/${id}`, data),
+  delete: (id: number) => api.delete(`/vessel-owner/incomes/${id}`),
+}
+
 export default api
 

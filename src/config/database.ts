@@ -17,6 +17,7 @@ import { BookingRule } from '../entities/BookingRule';
 import { ActivityLog } from '../entities/ActivityLog';
 import { VesselOwnerCash } from '../entities/VesselOwnerCash';
 import { CashTransaction } from '../entities/CashTransaction';
+import { IncomeCategory } from '../entities/IncomeCategory';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -95,6 +96,7 @@ export const AppDataSource = new DataSource({
     ActivityLog,
     VesselOwnerCash,
     CashTransaction,
+    IncomeCategory,
   ],
   migrations: ['src/database/migrations/**/*.ts'],
   subscribers: ['src/database/subscribers/**/*.ts'],

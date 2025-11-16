@@ -316,3 +316,33 @@ export interface CashBalance {
   }
 }
 
+export interface IncomeCategory {
+  id: number
+  name: string
+  description?: string
+  isActive: boolean
+  vesselOwnerId: number
+  vesselOwner?: User
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Income {
+  id: number
+  categoryId: number
+  category?: IncomeCategory
+  vesselId: number
+  vessel?: Vessel
+  cashId: number
+  cash?: VesselOwnerCash
+  amount: number
+  currency: string
+  paymentMethod: CashPaymentMethod
+  date: string
+  description?: string
+  counterparty?: string
+  documentPath?: string
+  createdAt: string
+  updatedAt: string
+}
+

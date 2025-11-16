@@ -7,20 +7,15 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { IncomeType, Currency } from '../types';
-import { Club } from './Club';
-import { Booking } from './Booking';
+import { Currency, CashPaymentMethod } from '../types';
+import { IncomeCategory } from './IncomeCategory';
+import { Vessel } from './Vessel';
+import { VesselOwnerCash } from './VesselOwnerCash';
 
 @Entity('incomes')
 export class Income {
   @PrimaryGeneratedColumn()
   id: number;
-
-  @Column({
-    type: 'enum',
-    enum: IncomeType,
-  })
-  type: IncomeType;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;
@@ -32,6 +27,12 @@ export class Income {
   })
   currency: Currency;
 
+  @Column({
+    type: 'enum',
+    enum: CashPaymentMethod,
+  })
+  paymentMethod: CashPaymentMethod; // 'cash' (наличные) или 'non_cash' (безналичные)
+
   @Column({ type: 'date' })
   date: Date;
 
@@ -39,10 +40,10 @@ export class Income {
   description: string;
 
   @Column({ nullable: true })
-  invoiceNumber: string;
+  counterparty: string; // Контрагент
 
-  @Column({ nullable: true })
-  documentPath: string; // путь к документу
+  @Column({ type: 'text', nullable: true })
+  documentPath: string; // Путь к документу
 
   @CreateDateColumn()
   createdAt: Date;
@@ -51,20 +52,24 @@ export class Income {
   updatedAt: Date;
 
   // Связи
-  @ManyToOne(() => Club, (club) => club.incomes)
-  @JoinColumn({ name: 'clubId' })
-  club: Club;
+  @ManyToOne(() => IncomeCategory, (category) => category.incomes)
+  @JoinColumn({ name: 'categoryId' })
+  category: IncomeCategory;
 
   @Column()
-  clubId: number;
+  categoryId: number;
 
-  @ManyToOne(() => Booking, (booking) => booking.payments, { nullable: true })
-  @JoinColumn({ name: 'bookingId' })
-  booking: Booking;
+  @ManyToOne(() => Vessel)
+  @JoinColumn({ name: 'vesselId' })
+  vessel: Vessel;
 
-  @Column({ nullable: true })
-  bookingId: number;
+  @Column()
+  vesselId: number;
+
+  @ManyToOne(() => VesselOwnerCash)
+  @JoinColumn({ name: 'cashId' })
+  cash: VesselOwnerCash;
+
+  @Column()
+  cashId: number;
 }
-
-
-

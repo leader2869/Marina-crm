@@ -14,6 +14,7 @@ import { Vessel } from './Vessel';
 import { Booking } from './Booking';
 import { UserClub } from './UserClub';
 import { VesselOwnerCash } from './VesselOwnerCash';
+import { IncomeCategory } from './IncomeCategory';
 
 @Entity('users')
 export class User {
@@ -92,6 +93,9 @@ export class User {
 
   @OneToMany(() => VesselOwnerCash, (cash) => cash.vesselOwner)
   vesselOwnerCashes: VesselOwnerCash[];
+
+  @OneToMany(() => IncomeCategory, (category) => category.vesselOwner)
+  incomeCategories: IncomeCategory[];
 }
 
 

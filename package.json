@@ -25,7 +25,8 @@
     "import-data": "ts-node src/database/import-data.ts",
     "check-data": "ts-node src/database/check-data.ts",
     "add-payment-status-cancelled": "ts-node src/database/add-payment-status-cancelled.ts",
-    "add-vessel-id-to-cashes": "ts-node src/database/add-vessel-id-to-cashes.ts"
+    "add-vessel-id-to-cashes": "ts-node src/database/add-vessel-id-to-cashes.ts",
+    "create-income-tables": "ts-node src/database/create-income-tables.ts"
   },
   "keywords": [
     "crm",

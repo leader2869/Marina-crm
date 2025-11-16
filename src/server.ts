@@ -18,6 +18,8 @@ import tariffsRoutes from './modules/tariffs/tariffs.routes';
 import bookingRulesRoutes from './modules/booking-rules/booking-rules.routes';
 import activityLogsRoutes from './modules/activity-logs/activity-logs.routes';
 import vesselOwnerCashesRoutes from './modules/vessel-owner-cashes/vessel-owner-cashes.routes';
+import incomeCategoriesRoutes from './modules/incomes/income-categories.routes';
+import incomesRoutes from './modules/incomes/incomes.routes';
 
 const app: Express = express();
 
@@ -230,6 +232,8 @@ app.use('/api/tariffs', autoActivityLogger, tariffsRoutes);
 app.use('/api/booking-rules', autoActivityLogger, bookingRulesRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
 app.use('/api/vessel-owner/cashes', autoActivityLogger, vesselOwnerCashesRoutes);
+app.use('/api/vessel-owner/income-categories', autoActivityLogger, incomeCategoriesRoutes);
+app.use('/api/vessel-owner/incomes', autoActivityLogger, incomesRoutes);
 
 // Error handler
 app.use(errorHandler);
