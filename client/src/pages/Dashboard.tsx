@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { clubsService, bookingsService, vesselsService, vesselOwnerCashesService } from '../services/api'
-import { UserRole } from '../types'
+import { UserRole, BookingStatus } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 
@@ -36,10 +36,11 @@ export default function Dashboard() {
         // Подсчет яхт-клубов
         let clubsCount = 0
         if (user?.role === UserRole.VESSEL_OWNER) {
-          // Для судовладельца считаем уникальные яхт-клубы из его бронирований
+          // Для судовладельца считаем уникальные яхт-клубы из его активных бронирований
           const allBookings = (bookingsRes as any)?.data || []
+          const activeBookings = allBookings.filter((booking: any) => booking.status !== BookingStatus.CANCELLED)
           const uniqueClubIds = new Set<number>()
-          allBookings.forEach((booking: any) => {
+          activeBookings.forEach((booking: any) => {
             if (booking.clubId) {
               uniqueClubIds.add(booking.clubId)
             }
@@ -70,9 +71,10 @@ export default function Dashboard() {
         // Подсчет бронирований
         let bookingsCount = 0
         if (user?.role === UserRole.VESSEL_OWNER) {
-          // Для судовладельца считаем количество его бронирований
+          // Для судовладельца считаем количество только активных бронирований (исключаем отмененные)
           const allBookings = (bookingsRes as any)?.data || []
-          bookingsCount = allBookings.length
+          const activeBookings = allBookings.filter((booking: any) => booking.status !== BookingStatus.CANCELLED)
+          bookingsCount = activeBookings.length
         } else {
           // Для остальных ролей используем total из ответа
           bookingsCount = (bookingsRes as any)?.data?.total || (bookingsRes as any)?.total || 0
