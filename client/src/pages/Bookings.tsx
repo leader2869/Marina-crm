@@ -140,6 +140,27 @@ export default function Bookings() {
     }
   }
 
+  const handleDeleteBooking = async (bookingId: number) => {
+    if (!confirm('Вы уверены, что хотите удалить это бронирование из базы данных? Это действие необратимо и удалит все связанные платежи.')) {
+      return
+    }
+
+    if (!confirm('ВНИМАНИЕ! Это действие удалит бронирование и все связанные платежи навсегда. Продолжить?')) {
+      return
+    }
+
+    setDeleting(bookingId)
+    try {
+      await bookingsService.delete(bookingId)
+      await loadBookings()
+      alert('Бронирование успешно удалено')
+    } catch (error: any) {
+      alert(error.error || error.message || 'Ошибка удаления бронирования')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
   if (loading) {
     return <LoadingAnimation message="Загрузка бронирований..." />
   }
