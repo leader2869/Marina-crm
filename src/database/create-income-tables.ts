@@ -27,6 +27,17 @@ const createIncomeTables = async (): Promise<void> => {
 
     console.log('📝 Выполняем миграцию: создание таблиц income_categories и incomes...');
 
+    // Создание enum типа для способов оплаты (если еще не существует)
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'cash_payment_method_enum') THEN
+          CREATE TYPE cash_payment_method_enum AS ENUM ('cash', 'non_cash');
+        END IF;
+      END $$;
+    `);
+    console.log('✅ Enum cash_payment_method_enum проверен/создан');
+
     // Создание таблицы категорий приходов
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS income_categories (
@@ -88,23 +99,72 @@ const createIncomeTables = async (): Promise<void> => {
       if (!columnNames.includes('categoryId')) {
         await queryRunner.query(`
           ALTER TABLE incomes 
-          ADD COLUMN "categoryId" INTEGER NOT NULL REFERENCES income_categories(id) ON DELETE CASCADE;
+          ADD COLUMN "categoryId" INTEGER REFERENCES income_categories(id) ON DELETE CASCADE;
         `);
         console.log('✅ Колонка categoryId добавлена');
       }
       if (!columnNames.includes('vesselId')) {
         await queryRunner.query(`
           ALTER TABLE incomes 
-          ADD COLUMN "vesselId" INTEGER NOT NULL REFERENCES vessels(id) ON DELETE CASCADE;
+          ADD COLUMN "vesselId" INTEGER REFERENCES vessels(id) ON DELETE CASCADE;
         `);
         console.log('✅ Колонка vesselId добавлена');
       }
       if (!columnNames.includes('cashId')) {
         await queryRunner.query(`
           ALTER TABLE incomes 
-          ADD COLUMN "cashId" INTEGER NOT NULL REFERENCES vessel_owner_cashes(id) ON DELETE CASCADE;
+          ADD COLUMN "cashId" INTEGER REFERENCES vessel_owner_cashes(id) ON DELETE CASCADE;
         `);
         console.log('✅ Колонка cashId добавлена');
+      }
+      if (!columnNames.includes('amount')) {
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          ADD COLUMN amount DECIMAL(12, 2);
+        `);
+        console.log('✅ Колонка amount добавлена');
+      }
+      if (!columnNames.includes('currency')) {
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          ADD COLUMN currency currency_enum DEFAULT 'RUB';
+        `);
+        console.log('✅ Колонка currency добавлена');
+      }
+      if (!columnNames.includes('paymentMethod')) {
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          ADD COLUMN "paymentMethod" cash_payment_method_enum;
+        `);
+        console.log('✅ Колонка paymentMethod добавлена');
+      }
+      if (!columnNames.includes('date')) {
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          ADD COLUMN date DATE;
+        `);
+        console.log('✅ Колонка date добавлена');
+      }
+      if (!columnNames.includes('description')) {
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          ADD COLUMN description TEXT;
+        `);
+        console.log('✅ Колонка description добавлена');
+      }
+      if (!columnNames.includes('counterparty')) {
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          ADD COLUMN counterparty VARCHAR(255);
+        `);
+        console.log('✅ Колонка counterparty добавлена');
+      }
+      if (!columnNames.includes('documentPath')) {
+        await queryRunner.query(`
+          ALTER TABLE incomes 
+          ADD COLUMN "documentPath" TEXT;
+        `);
+        console.log('✅ Колонка documentPath добавлена');
       }
     }
 
