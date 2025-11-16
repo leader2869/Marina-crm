@@ -1,8 +1,8 @@
 import { useEffect, useState, Fragment } from 'react'
-import { bookingsService } from '../services/api'
-import { Booking, UserRole, BookingStatus } from '../types'
-import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X } from 'lucide-react'
-import { format } from 'date-fns'
+import { bookingsService, paymentsService } from '../services/api'
+import { Booking, UserRole, BookingStatus, Payment, PaymentStatus } from '../types'
+import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard } from 'lucide-react'
+import { format, isAfter, isToday, startOfDay } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 
@@ -12,6 +12,8 @@ export default function Bookings() {
   const [loading, setLoading] = useState(true)
   const [expandedBookings, setExpandedBookings] = useState<Set<number>>(new Set())
   const [cancelling, setCancelling] = useState<number | null>(null)
+  const [bookingPayments, setBookingPayments] = useState<Map<number, Payment[]>>(new Map())
+  const [loadingPayments, setLoadingPayments] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadBookings()
@@ -54,19 +56,73 @@ export default function Bookings() {
     return statusMap[status] || status
   }
 
-  const toggleBookingDetails = (bookingId: number) => {
+  const toggleBookingDetails = async (bookingId: number) => {
     const newExpanded = new Set(expandedBookings)
-    if (newExpanded.has(bookingId)) {
+    const isCurrentlyExpanded = newExpanded.has(bookingId)
+    
+    if (isCurrentlyExpanded) {
       newExpanded.delete(bookingId)
     } else {
       newExpanded.add(bookingId)
+      
+      // Для VESSEL_OWNER загружаем предстоящие платежи для активных бронирований
+      const booking = bookings.find(b => b.id === bookingId)
+      if (user?.role === UserRole.VESSEL_OWNER && booking && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING)) {
+        await loadUpcomingPayments(bookingId)
+      }
     }
     setExpandedBookings(newExpanded)
   }
 
+  const loadUpcomingPayments = async (bookingId: number) => {
+    if (loadingPayments.has(bookingId) || bookingPayments.has(bookingId)) {
+      return // Уже загружаем или уже загружены
+    }
+
+    setLoadingPayments(prev => new Set(prev).add(bookingId))
+    try {
+      const response = await paymentsService.getAll({ 
+        bookingId, 
+        limit: 100 
+      })
+      const allPayments: Payment[] = response.data || []
+      
+      // Фильтруем предстоящие платежи: pending или overdue, у которых dueDate >= сегодня
+      const today = startOfDay(new Date())
+      const upcomingPayments = allPayments.filter((payment: Payment) => {
+        const dueDate = startOfDay(new Date(payment.dueDate))
+        const isUpcoming = isAfter(dueDate, today) || isToday(dueDate)
+        const isPendingOrOverdue = payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.OVERDUE
+        return isUpcoming && isPendingOrOverdue
+      })
+      
+      // Сортируем по dueDate (ближайшие первыми)
+      upcomingPayments.sort((a, b) => {
+        const dateA = new Date(a.dueDate).getTime()
+        const dateB = new Date(b.dueDate).getTime()
+        return dateA - dateB
+      })
+      
+      setBookingPayments(prev => {
+        const newMap = new Map(prev)
+        newMap.set(bookingId, upcomingPayments)
+        return newMap
+      })
+    } catch (error) {
+      console.error('Ошибка загрузки платежей для бронирования:', error)
+    } finally {
+      setLoadingPayments(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(bookingId)
+        return newSet
+      })
+    }
+  }
+
   const isClubOwner = user?.role === UserRole.CLUB_OWNER
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
-  const canViewDetails = isClubOwner || isSuperAdmin
+  const isVesselOwner = user?.role === UserRole.VESSEL_OWNER
+  const canViewDetails = isClubOwner || isSuperAdmin || isVesselOwner
 
   const canCancelBooking = (booking: Booking) => {
     if (isSuperAdmin || user?.role === UserRole.ADMIN) return true
