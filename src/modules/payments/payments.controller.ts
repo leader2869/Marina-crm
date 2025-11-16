@@ -2,9 +2,10 @@ import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
 import { Payment } from '../../entities/Payment';
 import { Booking } from '../../entities/Booking';
+import { Club } from '../../entities/Club';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
-import { PaymentStatus, PaymentMethod, Currency, BookingStatus } from '../../types';
+import { PaymentStatus, PaymentMethod, Currency, BookingStatus, UserRole } from '../../types';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { isAfter } from 'date-fns';
 import { PaymentService } from '../../services/payment.service';
@@ -12,6 +13,10 @@ import { PaymentService } from '../../services/payment.service';
 export class PaymentsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
       const { page, limit } = getPaginationParams(
         parseInt(req.query.page as string),
         parseInt(req.query.limit as string)
@@ -25,12 +30,38 @@ export class PaymentsController {
         .leftJoinAndSelect('payment.payer', 'payer')
         .leftJoinAndSelect('booking.club', 'club');
 
+      // Фильтрация по ролям
+      if (req.userRole === UserRole.VESSEL_OWNER) {
+        // Судовладелец видит только платежи своих бронирований
+        queryBuilder.where('booking.vesselOwnerId = :userId', { userId: req.userId });
+      } else if (req.userRole === UserRole.CLUB_OWNER) {
+        // Владелец клуба видит только платежи своих клубов
+        const clubRepository = AppDataSource.getRepository(Club);
+        const userClubs = await clubRepository.find({
+          where: { ownerId: req.userId },
+          select: ['id'],
+        });
+        
+        if (userClubs.length === 0) {
+          // Если у пользователя нет клубов, возвращаем пустой результат
+          res.json(createPaginatedResponse([], 0, page, limit));
+          return;
+        }
+        
+        const clubIds = userClubs.map(club => club.id);
+        queryBuilder.where('club.id IN (:...clubIds)', { clubIds });
+      } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        // Для других ролей (guest и т.д.) показываем только свои платежи
+        queryBuilder.where('payment.payerId = :userId', { userId: req.userId });
+      }
+      // Для SUPER_ADMIN и ADMIN показываем все платежи без дополнительной фильтрации
+
       if (clubId) {
-        queryBuilder.where('club.id = :clubId', { clubId: parseInt(clubId as string) });
+        queryBuilder.andWhere('club.id = :clubId', { clubId: parseInt(clubId as string) });
       }
 
       if (bookingId) {
-        queryBuilder.where('payment.bookingId = :bookingId', { bookingId: parseInt(bookingId as string) });
+        queryBuilder.andWhere('payment.bookingId = :bookingId', { bookingId: parseInt(bookingId as string) });
       }
 
       if (status) {
@@ -51,6 +82,10 @@ export class PaymentsController {
 
   async getById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
       const { id } = req.params;
 
       const paymentRepository = AppDataSource.getRepository(Payment);
@@ -61,6 +96,21 @@ export class PaymentsController {
 
       if (!payment) {
         throw new AppError('Платеж не найден', 404);
+      }
+
+      // Проверка прав доступа
+      if (req.userRole === UserRole.VESSEL_OWNER) {
+        if (payment.booking.vesselOwnerId !== req.userId) {
+          throw new AppError('Доступ запрещен', 403);
+        }
+      } else if (req.userRole === UserRole.CLUB_OWNER) {
+        if (payment.booking.club.ownerId !== req.userId) {
+          throw new AppError('Доступ запрещен', 403);
+        }
+      } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        if (payment.payerId !== req.userId) {
+          throw new AppError('Доступ запрещен', 403);
+        }
       }
 
       res.json(payment);
@@ -133,13 +183,21 @@ export class PaymentsController {
       }
 
       // Проверка прав доступа
-      if (
-        payment.payerId !== req.userId &&
-        payment.booking.club.ownerId !== req.userId &&
-        req.userRole !== 'super_admin' &&
-        req.userRole !== 'admin'
-      ) {
-        throw new AppError('Недостаточно прав для изменения статуса', 403);
+      if (req.userRole === UserRole.VESSEL_OWNER) {
+        // Судовладелец может изменять статус только своих платежей
+        if (payment.booking.vesselOwnerId !== req.userId) {
+          throw new AppError('Недостаточно прав для изменения статуса', 403);
+        }
+      } else if (req.userRole === UserRole.CLUB_OWNER) {
+        // Владелец клуба может изменять статус платежей своих клубов
+        if (payment.booking.club.ownerId !== req.userId) {
+          throw new AppError('Недостаточно прав для изменения статуса', 403);
+        }
+      } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        // Для других ролей - только свои платежи
+        if (payment.payerId !== req.userId) {
+          throw new AppError('Недостаточно прав для изменения статуса', 403);
+        }
       }
 
       payment.status = status as PaymentStatus;
@@ -192,6 +250,10 @@ export class PaymentsController {
 
   async getOverduePayments(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
       const { clubId } = req.query;
 
       const paymentRepository = AppDataSource.getRepository(Payment);
@@ -202,6 +264,30 @@ export class PaymentsController {
         .leftJoinAndSelect('booking.club', 'club')
         .where('payment.status = :status', { status: PaymentStatus.PENDING })
         .andWhere('payment.dueDate < :today', { today: new Date() });
+
+      // Фильтрация по ролям
+      if (req.userRole === UserRole.VESSEL_OWNER) {
+        // Судовладелец видит только просроченные платежи своих бронирований
+        queryBuilder.andWhere('booking.vesselOwnerId = :userId', { userId: req.userId });
+      } else if (req.userRole === UserRole.CLUB_OWNER) {
+        // Владелец клуба видит только просроченные платежи своих клубов
+        const clubRepository = AppDataSource.getRepository(Club);
+        const userClubs = await clubRepository.find({
+          where: { ownerId: req.userId },
+          select: ['id'],
+        });
+        
+        if (userClubs.length === 0) {
+          res.json([]);
+          return;
+        }
+        
+        const clubIds = userClubs.map(club => club.id);
+        queryBuilder.andWhere('club.id IN (:...clubIds)', { clubIds });
+      } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        // Для других ролей показываем только свои просроченные платежи
+        queryBuilder.andWhere('payment.payerId = :userId', { userId: req.userId });
+      }
 
       if (clubId) {
         queryBuilder.andWhere('club.id = :clubId', { clubId: parseInt(clubId as string) });
