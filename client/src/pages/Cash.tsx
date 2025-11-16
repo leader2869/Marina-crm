@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X, EyeOff, Eye } from 'lucide-react'
-import { vesselOwnerCashesService } from '../services/api'
-import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency } from '../types'
+import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X, EyeOff, Eye, Ship } from 'lucide-react'
+import { vesselOwnerCashesService, vesselsService } from '../services/api'
+import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency, Vessel } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { format } from 'date-fns'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Cash() {
   const { user } = useAuth()
