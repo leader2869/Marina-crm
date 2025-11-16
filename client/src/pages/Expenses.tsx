@@ -8,7 +8,8 @@ export default function Expenses() {
         <BackButton />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Расходы</h1>
-        <p className="mt-2 text-gray-600">Управление расходами</p>
+          <p className="mt-2 text-gray-600">Управление расходами</p>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">

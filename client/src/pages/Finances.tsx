@@ -106,10 +106,11 @@ export default function Finances() {
         <BackButton />
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-          <DollarSign className="h-8 w-8 text-primary-600 mr-3" />
-          Финансы
-        </h1>
-        <p className="mt-2 text-gray-600">Управление финансовыми операциями</p>
+            <DollarSign className="h-8 w-8 text-primary-600 mr-3" />
+            Финансы
+          </h1>
+          <p className="mt-2 text-gray-600">Управление финансовыми операциями</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">

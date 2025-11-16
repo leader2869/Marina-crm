@@ -639,7 +639,8 @@ export default function ClubDetails() {
           <BackButton />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{club.name}</h1>
-          {club.description && <p className="mt-2 text-gray-600">{club.description}</p>}
+            {club.description && <p className="mt-2 text-gray-600">{club.description}</p>}
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           {canEdit() && (

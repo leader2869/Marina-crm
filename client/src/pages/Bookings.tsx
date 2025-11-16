@@ -173,7 +173,8 @@ export default function Bookings() {
           <BackButton />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Бронирования</h1>
-          <p className="mt-2 text-gray-600">Управление бронированиями</p>
+            <p className="mt-2 text-gray-600">Управление бронированиями</p>
+          </div>
         </div>
       </div>
 

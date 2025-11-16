@@ -8,7 +8,8 @@ export default function Analytics() {
         <BackButton />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Аналитика</h1>
-        <p className="mt-2 text-gray-600">Финансовая аналитика и отчеты</p>
+          <p className="mt-2 text-gray-600">Финансовая аналитика и отчеты</p>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
