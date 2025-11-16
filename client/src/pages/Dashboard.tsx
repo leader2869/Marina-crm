@@ -21,7 +21,7 @@ export default function Dashboard() {
       try {
         const [clubsRes, bookingsRes] = await Promise.all([
           clubsService.getAll({ limit: 1 }),
-          bookingsService.getAll({ limit: 1 }),
+          bookingsService.getAll({ limit: 1000 }), // Загружаем все бронирования для подсчета уникальных клубов
         ])
 
         // Для супер-администратора загружаем все судна, для остальных - только свои
@@ -31,6 +31,23 @@ export default function Dashboard() {
           vesselsCount = (vesselsRes as any)?.data?.total || (vesselsRes as any)?.total || 0
         } else {
           vesselsCount = user?.vessels?.length || 0
+        }
+
+        // Подсчет яхт-клубов
+        let clubsCount = 0
+        if (user?.role === UserRole.VESSEL_OWNER) {
+          // Для судовладельца считаем уникальные яхт-клубы из его бронирований
+          const allBookings = (bookingsRes as any)?.data || []
+          const uniqueClubIds = new Set<number>()
+          allBookings.forEach((booking: any) => {
+            if (booking.clubId) {
+              uniqueClubIds.add(booking.clubId)
+            }
+          })
+          clubsCount = uniqueClubIds.size
+        } else {
+          // Для остальных ролей используем общее количество клубов
+          clubsCount = (clubsRes as any)?.data?.total || (clubsRes as any)?.total || 0
         }
 
         // Для судовладельца загружаем доходы и расходы из касс
@@ -50,10 +67,21 @@ export default function Dashboard() {
           }
         }
 
+        // Подсчет бронирований
+        let bookingsCount = 0
+        if (user?.role === UserRole.VESSEL_OWNER) {
+          // Для судовладельца считаем количество его бронирований
+          const allBookings = (bookingsRes as any)?.data || []
+          bookingsCount = allBookings.length
+        } else {
+          // Для остальных ролей используем total из ответа
+          bookingsCount = (bookingsRes as any)?.data?.total || (bookingsRes as any)?.total || 0
+        }
+
         setStats({
-          clubs: (clubsRes as any)?.data?.total || (clubsRes as any)?.total || 0,
+          clubs: clubsCount,
           vessels: vesselsCount,
-          bookings: (bookingsRes as any)?.data?.total || (bookingsRes as any)?.total || 0,
+          bookings: bookingsCount,
           totalIncome,
           totalExpense,
         })
