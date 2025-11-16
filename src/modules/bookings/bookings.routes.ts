@@ -11,7 +11,8 @@ router.get('/:id/payment-schedule', authenticate, bookingsController.getPaymentS
 router.get('/:id', authenticate, bookingsController.getById.bind(bookingsController));
 router.post('/', authenticate, bookingsController.create.bind(bookingsController));
 router.put('/:id', authenticate, bookingsController.update.bind(bookingsController));
-router.delete('/:id', authenticate, bookingsController.cancel.bind(bookingsController));
+router.post('/:id/cancel', authenticate, bookingsController.cancel.bind(bookingsController));
+router.delete('/:id', authenticate, bookingsController.delete.bind(bookingsController));
 
 export default router;
 

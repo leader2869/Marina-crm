@@ -1,7 +1,7 @@
 import { useEffect, useState, Fragment } from 'react'
 import { bookingsService, paymentsService } from '../services/api'
 import { Booking, UserRole, BookingStatus, Payment, PaymentStatus } from '../types'
-import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard } from 'lucide-react'
+import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -12,6 +12,7 @@ export default function Bookings() {
   const [loading, setLoading] = useState(true)
   const [expandedBookings, setExpandedBookings] = useState<Set<number>>(new Set())
   const [cancelling, setCancelling] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState<number | null>(null)
   const [bookingPayments, setBookingPayments] = useState<Map<number, Payment[]>>(new Map())
   const [loadingPayments, setLoadingPayments] = useState<Set<number>>(new Set())
 

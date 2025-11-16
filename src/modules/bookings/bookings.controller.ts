@@ -951,6 +951,99 @@ export class BookingsController {
       next(error);
     }
   }
+
+  async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      const bookingRepository = AppDataSource.getRepository(Booking);
+      const paymentRepository = AppDataSource.getRepository(Payment);
+      const berthRepository = AppDataSource.getRepository(Berth);
+
+      const booking = await bookingRepository.findOne({
+        where: { id: parseInt(id) },
+        relations: ['club', 'berth', 'vessel', 'vesselOwner'],
+      });
+
+      if (!booking) {
+        throw new AppError('Бронирование не найдено', 404);
+      }
+
+      // Проверка прав доступа
+      const isClubOwner = req.userRole === 'club_owner' && booking.club.ownerId === req.userId;
+      const canDelete =
+        booking.vesselOwnerId === req.userId ||
+        isClubOwner ||
+        req.userRole === 'super_admin' ||
+        req.userRole === 'admin';
+
+      if (!canDelete) {
+        throw new AppError('Недостаточно прав для удаления', 403);
+      }
+
+      // Используем транзакцию для атомарного удаления
+      const queryRunner = AppDataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        // Удаляем все платежи бронирования
+        const allPayments = await paymentRepository.find({
+          where: { bookingId: booking.id },
+        });
+
+        if (allPayments.length > 0) {
+          const paymentIds = allPayments.map((p) => p.id);
+          await queryRunner.manager.getRepository(Payment).delete({ id: In(paymentIds) });
+          console.log(`[Booking Delete] Удалено платежей: ${allPayments.length}`);
+        }
+
+        // Освобождаем место (berth), если оно было занято
+        if (booking.berth && booking.status === BookingStatus.ACTIVE) {
+          await queryRunner.manager.getRepository(Berth).update(
+            { id: booking.berthId },
+            { isAvailable: true }
+          );
+          console.log(`[Booking Delete] Место ${booking.berthId} освобождено`);
+        }
+
+        // Удаляем бронирование
+        await queryRunner.manager.getRepository(Booking).delete(booking.id);
+        console.log(`[Booking Delete] Бронирование ${booking.id} удалено`);
+
+        await queryRunner.commitTransaction();
+
+        // Логируем удаление
+        const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
+        const clubName = booking.club?.name || 'неизвестный клуб';
+        const vesselName = booking.vessel?.name || 'неизвестное судно';
+        const berthNumber = booking.berth?.number || 'неизвестное место';
+        const description = `${userName || 'Пользователь'} удалил бронь #${booking.id}: судно "${vesselName}" на месте ${berthNumber} в яхт-клубе "${clubName}" (с ${booking.startDate ? new Date(booking.startDate).toLocaleDateString('ru-RU') : 'N/A'} по ${booking.endDate ? new Date(booking.endDate).toLocaleDateString('ru-RU') : 'N/A'})`;
+
+        await ActivityLogService.logActivity({
+          activityType: ActivityType.DELETE,
+          entityType: EntityType.BOOKING,
+          entityId: booking.id,
+          userId: req.userId || null,
+          description,
+          oldValues: null,
+          newValues: null,
+          ipAddress: req.ip || (req.headers['x-forwarded-for'] as string) || null,
+          userAgent: req.headers['user-agent'] || null,
+        });
+
+        res.json({ message: 'Бронирование удалено', booking });
+      } catch (error: any) {
+        await queryRunner.rollbackTransaction();
+        console.error(`[Booking Delete] Ошибка при удалении бронирования ${booking.id}:`, error);
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 

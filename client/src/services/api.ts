@@ -131,7 +131,8 @@ export const bookingsService = {
   getById: (id: number) => api.get(`/bookings/${id}`),
   create: (data: any) => api.post('/bookings', data),
   update: (id: number, data: any) => api.put(`/bookings/${id}`, data),
-  cancel: (id: number) => api.delete(`/bookings/${id}`),
+  cancel: (id: number) => api.post(`/bookings/${id}/cancel`),
+  delete: (id: number) => api.delete(`/bookings/${id}`),
 }
 
 export const financesService = {
