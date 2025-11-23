@@ -33,8 +33,8 @@ export class UsersController {
 
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      // Только супер-администратор может видеть всех пользователей
-      if (req.userRole !== 'super_admin') {
+      // Только супер-администратор и администратор могут видеть всех пользователей
+      if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
         throw new AppError('Недостаточно прав доступа', 403);
       }
 
