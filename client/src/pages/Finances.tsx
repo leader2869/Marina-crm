@@ -63,7 +63,7 @@ export default function Finances() {
       availableFor: [UserRole.VESSEL_OWNER],
     },
     {
-      name: 'Приходы',
+      name: 'Все приходы',
       href: '/incomes',
       icon: TrendingUp,
       description: 'Просмотр приходов',
@@ -73,7 +73,7 @@ export default function Finances() {
       showValue: true,
     },
     {
-      name: 'Расходы',
+      name: 'Все расходы',
       href: '/expenses',
       icon: TrendingDown,
       description: 'Управление расходами',
