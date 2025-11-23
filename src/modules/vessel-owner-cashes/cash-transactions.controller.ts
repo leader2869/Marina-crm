@@ -270,8 +270,11 @@ export class CashTransactionsController {
       const transaction = transactionRepository.create(transactionData);
       const saved = await transactionRepository.save(transaction);
 
+      // save() может вернуть массив или одну сущность, поэтому проверяем тип
+      const savedId = Array.isArray(saved) ? saved[0].id : saved.id;
+
       const savedTransaction = await transactionRepository.findOne({
-        where: { id: (saved as CashTransaction).id },
+        where: { id: savedId },
         relations: ['cash', 'incomeCategory', 'expenseCategory'],
       });
 
