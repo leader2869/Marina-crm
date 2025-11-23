@@ -625,14 +625,37 @@ export default function UsersPage() {
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      {user.avatar ? (
+                      {user.avatar && user.avatar.trim() && user.avatar.startsWith('data:image') ? (
                         <img
                           src={user.avatar}
                           alt={`${user.firstName} ${user.lastName}`}
-                          className="w-8 h-8 rounded-full object-cover border-2 border-gray-300"
+                          className="w-8 h-8 rounded-full object-cover border-2 border-gray-300 flex-shrink-0"
+                          onError={(e) => {
+                            // Если изображение не загрузилось, заменяем на иконку
+                            const img = e.currentTarget
+                            img.style.display = 'none'
+                            const parent = img.parentElement
+                            if (parent && !parent.querySelector('.avatar-fallback')) {
+                              const iconDiv = document.createElement('div')
+                              iconDiv.className = 'avatar-fallback w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300 flex-shrink-0'
+                              const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+                              svg.setAttribute('class', 'h-5 w-5 text-gray-400')
+                              svg.setAttribute('fill', 'none')
+                              svg.setAttribute('stroke', 'currentColor')
+                              svg.setAttribute('viewBox', '0 0 24 24')
+                              const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+                              path.setAttribute('stroke-linecap', 'round')
+                              path.setAttribute('stroke-linejoin', 'round')
+                              path.setAttribute('stroke-width', '2')
+                              path.setAttribute('d', 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z')
+                              svg.appendChild(path)
+                              iconDiv.appendChild(svg)
+                              parent.insertBefore(iconDiv, img)
+                            }
+                          }}
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300 flex-shrink-0">
                           <User className="h-5 w-5 text-gray-400" />
                         </div>
                       )}

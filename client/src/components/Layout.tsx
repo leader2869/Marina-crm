@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { authService } from '../services/api'
 import { UserRole } from '../types'
 import { usersService, clubsService, authService } from '../services/api'
 import { 
@@ -26,7 +27,7 @@ import {
   ChevronRight,
   User
 } from 'lucide-react'
-import { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 
 export default function Layout() {
   const { user, logout } = useAuth()
@@ -368,10 +369,15 @@ export default function Layout() {
       }
 
       if (Object.keys(updateData).length > 0) {
-        await authService.updateProfile(updateData)
+        const response = await authService.updateProfile(updateData)
         setSuccess('Профиль успешно обновлен')
-        // Обновляем пользователя в контексте
-        window.location.reload() // Простой способ обновить данные
+        // Обновляем профиль пользователя
+        const updatedProfile = await authService.getProfile()
+        // Обновляем пользователя в контексте через перезагрузку страницы
+        // Это самый надежный способ обновить все данные
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
       } else {
         setError('Нет изменений для сохранения')
       }
@@ -660,11 +666,22 @@ export default function Layout() {
                 className="flex-1 cursor-pointer hover:bg-gray-50 -m-2 p-2 rounded-lg transition-colors"
               >
                 <div className="flex items-center space-x-3">
-                  {user?.avatar ? (
+                  {user?.avatar && user.avatar.trim() ? (
                     <img
                       src={user.avatar}
                       alt={`${user.firstName} ${user.lastName}`}
                       className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
+                      onError={(e) => {
+                        // Если изображение не загрузилось, заменяем на иконку
+                        e.currentTarget.style.display = 'none'
+                        const parent = e.currentTarget.parentElement
+                        if (parent) {
+                          const iconDiv = document.createElement('div')
+                          iconDiv.className = 'w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300'
+                          iconDiv.innerHTML = '<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>'
+                          parent.insertBefore(iconDiv, e.currentTarget)
+                        }
+                      }}
                     />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
@@ -789,11 +806,22 @@ export default function Layout() {
               })()}
             </h2>
             <div className="flex items-center space-x-4">
-              {user?.avatar ? (
+              {user?.avatar && user.avatar.trim() ? (
                 <img
                   src={user.avatar}
                   alt={`${user.firstName} ${user.lastName}`}
                   className="w-8 h-8 rounded-full object-cover border-2 border-gray-300"
+                  onError={(e) => {
+                    // Если изображение не загрузилось, заменяем на иконку
+                    e.currentTarget.style.display = 'none'
+                    const parent = e.currentTarget.parentElement
+                    if (parent) {
+                      const iconDiv = document.createElement('div')
+                      iconDiv.className = 'w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300'
+                      iconDiv.innerHTML = '<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>'
+                      parent.insertBefore(iconDiv, e.currentTarget)
+                    }
+                  }}
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">

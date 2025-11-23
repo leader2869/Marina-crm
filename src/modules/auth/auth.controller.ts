@@ -419,7 +419,7 @@ export class AuthController {
           lastName: updatedUser!.lastName,
           phone: updatedUser!.phone,
           role: updatedUser!.role,
-          avatar: updatedUser!.avatar,
+          avatar: updatedUser!.avatar || null,
           isValidated: updatedUser!.isValidated,
           ownedClubs: updatedUser!.ownedClubs,
           vessels: updatedUser!.vessels,
