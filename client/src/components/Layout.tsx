@@ -358,7 +358,7 @@ export default function Layout() {
       }
 
       if (Object.keys(updateData).length > 0) {
-        const response = await authService.updateProfile(updateData)
+        await authService.updateProfile(updateData)
         setSuccess('Профиль успешно обновлен')
         // Обновляем пользователя в контексте
         window.location.reload() // Простой способ обновить данные
