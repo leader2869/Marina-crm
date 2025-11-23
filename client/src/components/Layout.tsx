@@ -368,10 +368,8 @@ export default function Layout() {
       }
 
       if (Object.keys(updateData).length > 0) {
-        const response = await authService.updateProfile(updateData)
+        await authService.updateProfile(updateData)
         setSuccess('Профиль успешно обновлен')
-        // Обновляем профиль пользователя
-        const updatedProfile = await authService.getProfile()
         // Обновляем пользователя в контексте через перезагрузку страницы
         // Это самый надежный способ обновить все данные
         setTimeout(() => {
