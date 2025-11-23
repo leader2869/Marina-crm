@@ -15,7 +15,9 @@ import { Booking } from './Booking';
 import { UserClub } from './UserClub';
 import { VesselOwnerCash } from './VesselOwnerCash';
 import { IncomeCategory } from './IncomeCategory';
-import { VesselOwnerExpenseCategory } from './VesselOwnerExpenseCategory';
+// Временно закомментировано до выполнения миграции БД
+// После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
+// import { VesselOwnerExpenseCategory } from './VesselOwnerExpenseCategory';
 
 @Entity('users')
 export class User {

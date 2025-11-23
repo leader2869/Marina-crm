@@ -18,7 +18,9 @@ import { ActivityLog } from '../entities/ActivityLog';
 import { VesselOwnerCash } from '../entities/VesselOwnerCash';
 import { CashTransaction } from '../entities/CashTransaction';
 import { IncomeCategory } from '../entities/IncomeCategory';
-import { VesselOwnerExpenseCategory } from '../entities/VesselOwnerExpenseCategory';
+// Временно закомментировано до выполнения миграции БД
+// После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
+// import { VesselOwnerExpenseCategory } from '../entities/VesselOwnerExpenseCategory';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
