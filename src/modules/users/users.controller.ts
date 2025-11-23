@@ -135,8 +135,8 @@ export class UsersController {
 
   async getGuests(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      // Только супер-администратор может видеть гостей
-      if (req.userRole !== 'super_admin') {
+      // Только супер-администратор и администратор могут видеть гостей
+      if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
         throw new AppError('Недостаточно прав доступа', 403);
       }
 
@@ -189,8 +189,8 @@ export class UsersController {
 
   async getById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      // Только супер-администратор может видеть детали пользователя
-      if (req.userRole !== 'super_admin') {
+      // Только супер-администратор и администратор могут видеть детали пользователя
+      if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
         throw new AppError('Недостаточно прав доступа', 403);
       }
 
@@ -219,7 +219,7 @@ export class UsersController {
   async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       // Только супер-администратор может создавать пользователей
-      if (req.userRole !== 'super_admin') {
+      if (req.userRole !== UserRole.SUPER_ADMIN) {
         throw new AppError('Недостаточно прав доступа', 403);
       }
 
@@ -345,7 +345,7 @@ export class UsersController {
   async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       // Только супер-администратор может обновлять пользователей
-      if (req.userRole !== 'super_admin') {
+      if (req.userRole !== UserRole.SUPER_ADMIN) {
         throw new AppError('Недостаточно прав доступа', 403);
       }
 
@@ -519,7 +519,7 @@ export class UsersController {
   async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       // Только супер-администратор может удалять пользователей
-      if (req.userRole !== 'super_admin') {
+      if (req.userRole !== UserRole.SUPER_ADMIN) {
         throw new AppError('Недостаточно прав доступа', 403);
       }
 
