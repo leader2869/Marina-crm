@@ -10,7 +10,8 @@ router.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`[Auth Router] ${req.method} ${req.path}`, {
     originalUrl: req.originalUrl,
     baseUrl: req.baseUrl,
-    url: req.url
+    url: req.url,
+    body: req.method !== 'GET' ? req.body : undefined
   });
   next();
 });
