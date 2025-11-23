@@ -183,13 +183,13 @@ export default function Dashboard() {
       color: 'bg-yellow-500',
     },
     {
-      name: 'Приходы',
+      name: 'Все приходы',
       value: `${stats.totalIncome.toLocaleString()} ₽`,
       icon: TrendingUp,
       color: 'bg-emerald-500',
     },
     {
-      name: 'Расходы',
+      name: 'Все расходы',
       value: `${stats.totalExpense.toLocaleString()} ₽`,
       icon: TrendingDown,
       color: 'bg-red-500',
