@@ -789,6 +789,17 @@ export default function Layout() {
               })()}
             </h2>
             <div className="flex items-center space-x-4">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={`${user.firstName} ${user.lastName}`}
+                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-300"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+              )}
               <span className="text-sm text-gray-600">
                 {user?.firstName} {user?.lastName}
               </span>
