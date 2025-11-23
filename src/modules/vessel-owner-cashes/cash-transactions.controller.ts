@@ -271,7 +271,7 @@ export class CashTransactionsController {
       const saved = await transactionRepository.save(transaction);
 
       const savedTransaction = await transactionRepository.findOne({
-        where: { id: saved.id },
+        where: { id: (saved as CashTransaction).id },
         relations: ['cash', 'incomeCategory', 'expenseCategory'],
       });
 

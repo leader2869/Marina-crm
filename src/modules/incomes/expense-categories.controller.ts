@@ -133,7 +133,7 @@ export class ExpenseCategoriesController {
       }
 
       if (name !== undefined) category.name = name as string;
-      if (description !== undefined) category.description = description ? (description as string) : undefined;
+      if (description !== undefined) category.description = description ? (description as string) : (null as any);
       if (isActive !== undefined) category.isActive = isActive as boolean;
 
       await categoryRepository.save(category);
