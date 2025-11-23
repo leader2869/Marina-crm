@@ -65,13 +65,16 @@ export default function UsersPage() {
 
   const loadUsers = async () => {
     try {
+      setLoading(true)
+      setError('')
       const response = await usersService.getAll({ limit: 100 })
+      console.log('Ответ API пользователей:', response)
       setUsers(response.data || [])
     } catch (error: any) {
       console.error('Ошибка загрузки пользователей:', error)
-      if (error.error || error.message) {
-        setError(error.error || error.message)
-      }
+      const errorMessage = error.error || error.message || 'Ошибка загрузки пользователей'
+      setError(errorMessage)
+      alert(errorMessage)
     } finally {
       setLoading(false)
     }
