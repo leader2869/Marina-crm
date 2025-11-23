@@ -26,7 +26,7 @@ import {
   ChevronRight,
   User
 } from 'lucide-react'
-import React, { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 
 export default function Layout() {
   const { user, logout } = useAuth()
