@@ -118,8 +118,9 @@ app.options('*', (req: Request, res: Response) => {
   res.sendStatus(200);
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Увеличиваем лимит размера тела запроса для загрузки изображений (50MB)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Debug logging for Vercel (only in production)
 if (process.env.VERCEL || process.env.NODE_ENV === 'production') {

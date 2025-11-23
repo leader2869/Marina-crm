@@ -917,12 +917,50 @@ export default function Layout() {
                                   setError('Файл должен быть изображением')
                                   return
                                 }
+                                
+                                // Сжимаем изображение перед конвертацией в base64
                                 const reader = new FileReader()
                                 reader.onloadend = () => {
-                                  const base64String = reader.result as string
-                                  setProfileForm({ ...profileForm, avatar: base64String })
-                                  setAvatarPreview(base64String)
-                                  setError('')
+                                  const img = new Image()
+                                  img.onload = () => {
+                                    // Создаем canvas для сжатия
+                                    const canvas = document.createElement('canvas')
+                                    const maxWidth = 400
+                                    const maxHeight = 400
+                                    let width = img.width
+                                    let height = img.height
+                                    
+                                    // Вычисляем новые размеры с сохранением пропорций
+                                    if (width > height) {
+                                      if (width > maxWidth) {
+                                        height = (height * maxWidth) / width
+                                        width = maxWidth
+                                      }
+                                    } else {
+                                      if (height > maxHeight) {
+                                        width = (width * maxHeight) / height
+                                        height = maxHeight
+                                      }
+                                    }
+                                    
+                                    canvas.width = width
+                                    canvas.height = height
+                                    
+                                    // Рисуем сжатое изображение
+                                    const ctx = canvas.getContext('2d')
+                                    if (ctx) {
+                                      ctx.drawImage(img, 0, 0, width, height)
+                                      // Конвертируем в base64 с качеством 0.8 (80%)
+                                      const base64String = canvas.toDataURL('image/jpeg', 0.8)
+                                      setProfileForm({ ...profileForm, avatar: base64String })
+                                      setAvatarPreview(base64String)
+                                      setError('')
+                                    }
+                                  }
+                                  img.onerror = () => {
+                                    setError('Ошибка загрузки изображения')
+                                  }
+                                  img.src = reader.result as string
                                 }
                                 reader.readAsDataURL(file)
                               }
