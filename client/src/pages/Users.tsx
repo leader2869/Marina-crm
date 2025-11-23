@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usersService, clubsService } from '../services/api'
 import { UserRole, Club, Vessel } from '../types'
-import { Users, Edit2, X, Plus, Trash2, Search, Ship, Download, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
+import { Users, Edit2, X, Plus, Trash2, Search, Ship, Download, ArrowUp, ArrowDown, ChevronsUpDown, User } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import * as XLSX from 'xlsx'
@@ -20,6 +20,7 @@ interface UserData {
   debt: number
   createdAt: string
   vessels?: Vessel[]
+  avatar?: string
 }
 
 export default function UsersPage() {
@@ -623,7 +624,20 @@ export default function UsersPage() {
                   className="hover:bg-gray-50 cursor-pointer"
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">#{user.id}</div>
+                    <div className="flex items-center space-x-2">
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={`${user.firstName} ${user.lastName}`}
+                          className="w-8 h-8 rounded-full object-cover border-2 border-gray-300"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                          <User className="h-5 w-5 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="text-sm font-medium text-gray-900">#{user.id}</div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
