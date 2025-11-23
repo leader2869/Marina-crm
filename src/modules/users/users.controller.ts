@@ -122,6 +122,7 @@ export class UsersController {
             debt: totalDebt,
             createdAt: user.createdAt,
             vessels: user.vessels || [],
+            avatar: user.avatar || undefined,
           };
         })
       );
