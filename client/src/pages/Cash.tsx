@@ -201,8 +201,9 @@ export default function Cash() {
       if (dateTo) params.endDate = dateTo
 
       const response = await vesselOwnerCashesService.getTransactions(selectedCash.id, params)
-      const transactionsData = response.data || []
-      setTransactions(transactionsData)
+      // Проверяем структуру ответа - может быть response.data или response напрямую
+      const transactionsData = response?.data || response || []
+      setTransactions(Array.isArray(transactionsData) ? transactionsData : [])
     } catch (error: any) {
       console.error('Ошибка загрузки транзакций:', error)
       alert(error.error || error.message || 'Ошибка загрузки транзакций')
@@ -681,32 +682,35 @@ export default function Cash() {
       {/* Детали кассы и транзакции */}
       {selectedCash ? (
             <div className="space-y-6">
+              {/* Заголовок и кнопки */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900">{selectedCash.name}</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        handleOpenTransactionModal(undefined, true, CashTransactionType.INCOME)
+                      }}
+                      className="flex items-center px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                    >
+                      <ArrowDown className="h-4 w-4 mr-1" />
+                      Приход
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleOpenTransactionModal(undefined, true, CashTransactionType.EXPENSE)
+                      }}
+                      className="flex items-center px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                    >
+                      <ArrowUp className="h-4 w-4 mr-1" />
+                      Расход
+                    </button>
+                  </div>
+                </div>
+              
               {/* Баланс кассы */}
               {balance && (
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-900">{selectedCash.name}</h2>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          handleOpenTransactionModal(undefined, true, CashTransactionType.INCOME)
-                        }}
-                        className="flex items-center px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                      >
-                        <ArrowDown className="h-4 w-4 mr-1" />
-                        Приход
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleOpenTransactionModal(undefined, true, CashTransactionType.EXPENSE)
-                        }}
-                        className="flex items-center px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                      >
-                        <ArrowUp className="h-4 w-4 mr-1" />
-                        Расход
-                      </button>
-                    </div>
-                  </div>
+                <div>
 
                   {/* Выбор периода */}
                   <div className="mb-4 p-4 bg-gray-50 rounded-lg">
@@ -776,6 +780,7 @@ export default function Cash() {
                   </div>
                 </div>
               )}
+              </div>
 
               {/* Фильтры */}
               <div className="bg-white rounded-lg shadow p-4">
