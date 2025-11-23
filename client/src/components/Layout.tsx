@@ -1,6 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { authService } from '../services/api'
 import { UserRole } from '../types'
 import { usersService, clubsService, authService } from '../services/api'
 import { 
