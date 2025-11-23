@@ -31,6 +31,8 @@ export default function Expenses() {
   
   // Фильтры
   const [selectedCategory, setSelectedCategory] = useState<number | ''>('')
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
   
   // Формы
   const [categoryForm, setCategoryForm] = useState({
@@ -44,7 +46,7 @@ export default function Expenses() {
 
   useEffect(() => {
     loadTransactions()
-  }, [selectedCategory])
+  }, [selectedCategory, dateFrom, dateTo])
 
   const loadData = async () => {
     try {
@@ -84,13 +86,18 @@ export default function Expenses() {
       const allTransactions: CashTransaction[] = []
       for (const cash of cashes) {
         try {
+          const params: any = {
+            limit: 1000,
+            transactionType: CashTransactionType.EXPENSE,
+          }
+          // Временно не используем expenseCategoryId, пока миграция не выполнена
+          // if (selectedCategory) params.expenseCategoryId = selectedCategory
+          if (dateFrom) params.startDate = dateFrom
+          if (dateTo) params.endDate = dateTo
+          
           const transactionsResponse = await vesselOwnerCashesService.getTransactions(
             cash.id,
-            { 
-              limit: 1000,
-              transactionType: CashTransactionType.EXPENSE,
-              ...(selectedCategory ? { expenseCategoryId: selectedCategory } : {})
-            }
+            params
           )
           const cashTransactions = transactionsResponse.data || []
           allTransactions.push(...cashTransactions)
