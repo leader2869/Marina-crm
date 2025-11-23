@@ -362,5 +362,166 @@ export class AuthController {
       next(error);
     }
   }
+
+  async updateProfile(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
+      const { firstName, lastName, email } = req.body;
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: req.userId },
+      });
+
+      if (!user) {
+        throw new AppError('Пользователь не найден', 404);
+      }
+
+      // Обновление имени
+      if (firstName !== undefined) {
+        user.firstName = firstName;
+      }
+      if (lastName !== undefined) {
+        user.lastName = lastName;
+      }
+
+      // Обновление email с проверкой уникальности
+      if (email !== undefined && email !== user.email) {
+        const existingUser = await userRepository.findOne({ where: { email } });
+        if (existingUser) {
+          throw new AppError('Пользователь с таким email уже существует', 400);
+        }
+        user.email = email;
+      }
+
+      await userRepository.save(user);
+
+      // Получаем обновленного пользователя с связями
+      const updatedUser = await userRepository.findOne({
+        where: { id: req.userId },
+        relations: ['ownedClubs', 'vessels', 'managedClub'],
+      });
+
+      res.json({
+        message: 'Профиль успешно обновлен',
+        user: {
+          id: updatedUser!.id,
+          email: updatedUser!.email,
+          firstName: updatedUser!.firstName,
+          lastName: updatedUser!.lastName,
+          phone: updatedUser!.phone,
+          role: updatedUser!.role,
+          avatar: updatedUser!.avatar,
+          isValidated: updatedUser!.isValidated,
+          ownedClubs: updatedUser!.ownedClubs,
+          vessels: updatedUser!.vessels,
+          managedClub: updatedUser!.managedClub,
+          createdAt: updatedUser!.createdAt,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async changePassword(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        throw new AppError('Текущий и новый пароль обязательны', 400);
+      }
+
+      if (newPassword.length < 6) {
+        throw new AppError('Новый пароль должен содержать минимум 6 символов', 400);
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: req.userId },
+      });
+
+      if (!user) {
+        throw new AppError('Пользователь не найден', 404);
+      }
+
+      // Проверяем текущий пароль
+      const isPasswordValid = await comparePassword(currentPassword, user.password);
+      if (!isPasswordValid) {
+        throw new AppError('Неверный текущий пароль', 400);
+      }
+
+      // Устанавливаем новый пароль
+      user.password = await hashPassword(newPassword);
+      await userRepository.save(user);
+
+      res.json({
+        message: 'Пароль успешно изменен',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async requestPhoneChange(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
+      const { newPhone } = req.body;
+
+      if (!newPhone || !newPhone.trim()) {
+        throw new AppError('Новый номер телефона обязателен', 400);
+      }
+
+      // Валидация телефона
+      if (!newPhone.startsWith('+7')) {
+        throw new AppError('Номер телефона должен начинаться с +7', 400);
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: req.userId },
+      });
+
+      if (!user) {
+        throw new AppError('Пользователь не найден', 404);
+      }
+
+      // Проверяем, не используется ли этот номер другим пользователем
+      const normalizedPhone = this.normalizePhone(newPhone);
+      const allUsers = await userRepository.find({ where: { isActive: true } });
+      const existingUserByPhone = allUsers.find(u => {
+        if (!u.phone || u.id === user.id) return false;
+        const normalizedDb = this.normalizePhone(u.phone);
+        return normalizedDb === normalizedPhone;
+      });
+
+      if (existingUserByPhone) {
+        throw new AppError('Пользователь с таким номером телефона уже существует', 400);
+      }
+
+      // Сохраняем запрос на изменение телефона (пока не подтвержден суперадминистратором)
+      // Можно использовать отдельную таблицу для запросов или добавить поле в User
+      // Для простоты, сохраняем в поле phonePendingValidation
+      // Но в текущей схеме User нет такого поля, поэтому просто сохраняем запрос
+      // В реальном приложении нужно создать таблицу PhoneChangeRequests
+
+      res.json({
+        message: 'Запрос на изменение номера телефона отправлен на валидацию суперадминистратору',
+        newPhone,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 

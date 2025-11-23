@@ -103,6 +103,12 @@ export const authService = {
   loginAsGuest: (firstName: string, phone?: string): Promise<{ user: any; token: string }> => 
     api.post('/auth/guest', { firstName, phone }) as Promise<{ user: any; token: string }>,
   getProfile: (): Promise<any> => api.get('/auth/profile') as Promise<any>,
+  updateProfile: (data: { firstName?: string; lastName?: string; email?: string }): Promise<{ user: any; message: string }> =>
+    api.put('/auth/profile', data) as Promise<{ user: any; message: string }>,
+  changePassword: (data: { currentPassword: string; newPassword: string }): Promise<{ message: string }> =>
+    api.post('/auth/change-password', data) as Promise<{ message: string }>,
+  requestPhoneChange: (data: { newPhone: string }): Promise<{ message: string; newPhone: string }> =>
+    api.post('/auth/request-phone-change', data) as Promise<{ message: string; newPhone: string }>,
 }
 
 export const clubsService = {

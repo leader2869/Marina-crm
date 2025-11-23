@@ -19,6 +19,9 @@ router.post('/register', authController.register.bind(authController));
 router.post('/login', authController.login.bind(authController));
 router.post('/guest', authController.loginAsGuest.bind(authController));
 router.get('/profile', authenticate, authController.getProfile.bind(authController));
+router.put('/profile', authenticate, authController.updateProfile.bind(authController));
+router.post('/change-password', authenticate, authController.changePassword.bind(authController));
+router.post('/request-phone-change', authenticate, authController.requestPhoneChange.bind(authController));
 
 // Информационные GET endpoints для документации
 router.get('/login', (req: Request, res: Response) => {

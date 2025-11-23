@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
-import { usersService, clubsService } from '../services/api'
+import { usersService, clubsService, authService } from '../services/api'
 import { 
   LayoutDashboard, 
   Anchor, 
@@ -42,6 +42,22 @@ export default function Layout() {
   const [isEditingDate, setIsEditingDate] = useState(false)
   const [dateInput, setDateInput] = useState('')
   const [timeInput, setTimeInput] = useState('')
+  
+  // Состояние для модального окна редактирования профиля
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [profileForm, setProfileForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'phone'>('profile')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   // Определяем доступные пункты меню в зависимости от роли
   const navigation = useMemo(() => {
@@ -290,6 +306,128 @@ export default function Layout() {
     setTimeInput('')
   }
 
+  // Обработчики для модального окна профиля
+  const handleOpenProfileModal = () => {
+    if (!user) return
+    setProfileForm({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    })
+    setActiveTab('profile')
+    setError('')
+    setSuccess('')
+    setShowProfileModal(true)
+  }
+
+  const handleCloseProfileModal = () => {
+    setShowProfileModal(false)
+    setProfileForm({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    })
+    setError('')
+    setSuccess('')
+  }
+
+  const handleSaveProfile = async () => {
+    if (saving) return
+    setError('')
+    setSuccess('')
+
+    try {
+      setSaving(true)
+      const updateData: any = {}
+      if (profileForm.firstName !== user?.firstName) {
+        updateData.firstName = profileForm.firstName
+      }
+      if (profileForm.lastName !== user?.lastName) {
+        updateData.lastName = profileForm.lastName
+      }
+      if (profileForm.email !== user?.email) {
+        updateData.email = profileForm.email
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const response = await authService.updateProfile(updateData)
+        setSuccess('Профиль успешно обновлен')
+        // Обновляем пользователя в контексте
+        window.location.reload() // Простой способ обновить данные
+      } else {
+        setError('Нет изменений для сохранения')
+      }
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка обновления профиля')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (saving) return
+    setError('')
+    setSuccess('')
+
+    if (!profileForm.currentPassword || !profileForm.newPassword) {
+      setError('Заполните все поля')
+      return
+    }
+
+    if (profileForm.newPassword !== profileForm.confirmPassword) {
+      setError('Новые пароли не совпадают')
+      return
+    }
+
+    if (profileForm.newPassword.length < 6) {
+      setError('Новый пароль должен содержать минимум 6 символов')
+      return
+    }
+
+    try {
+      setSaving(true)
+      await authService.changePassword({
+        currentPassword: profileForm.currentPassword,
+        newPassword: profileForm.newPassword,
+      })
+      setSuccess('Пароль успешно изменен')
+      setProfileForm({ ...profileForm, currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка смены пароля')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRequestPhoneChange = async () => {
+    if (saving) return
+    setError('')
+    setSuccess('')
+
+    if (!profileForm.phone || !profileForm.phone.startsWith('+7')) {
+      setError('Номер телефона должен начинаться с +7')
+      return
+    }
+
+    try {
+      setSaving(true)
+      await authService.requestPhoneChange({ newPhone: profileForm.phone })
+      setSuccess('Запрос на изменение номера телефона отправлен на валидацию суперадминистратору')
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка запроса изменения телефона')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar */}
@@ -507,7 +645,10 @@ export default function Layout() {
           </nav>
           <div className="p-4 border-t">
             <div className="flex items-center justify-between mb-2">
-              <div>
+              <div 
+                onClick={handleOpenProfileModal}
+                className="flex-1 cursor-pointer hover:bg-gray-50 -m-2 p-2 rounded-lg transition-colors"
+              >
                 <p className="text-sm font-medium text-gray-900">
                   {user?.firstName} {user?.lastName}
                 </p>
@@ -635,6 +776,247 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Модальное окно редактирования профиля */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+              onClick={handleCloseProfileModal}
+            />
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Редактирование профиля
+                  </h3>
+                  <button onClick={handleCloseProfileModal} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {/* Вкладки */}
+                <div className="border-b border-gray-200 mb-4">
+                  <nav className="-mb-px flex space-x-8">
+                    <button
+                      onClick={() => setActiveTab('profile')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        activeTab === 'profile'
+                          ? 'border-primary-500 text-primary-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      Профиль
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('password')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        activeTab === 'password'
+                          ? 'border-primary-500 text-primary-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      Сменить пароль
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('phone')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        activeTab === 'phone'
+                          ? 'border-primary-500 text-primary-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      Изменить телефон
+                    </button>
+                  </nav>
+                </div>
+
+                {/* Сообщения об ошибках и успехе */}
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                )}
+                {success && (
+                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-sm text-green-800">{success}</p>
+                  </div>
+                )}
+
+                {/* Содержимое вкладок */}
+                {activeTab === 'profile' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Имя *
+                      </label>
+                      <input
+                        type="text"
+                        value={profileForm.firstName}
+                        onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Фамилия *
+                      </label>
+                      <input
+                        type="text"
+                        value={profileForm.lastName}
+                        onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={profileForm.email}
+                        onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleSaveProfile}
+                        disabled={saving}
+                        className={`px-4 py-2 rounded-md text-sm font-medium text-white ${
+                          saving
+                            ? 'bg-primary-400 cursor-not-allowed'
+                            : 'bg-primary-600 hover:bg-primary-700'
+                        }`}
+                      >
+                        {saving ? 'Сохранение...' : 'Сохранить'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'password' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Текущий пароль *
+                      </label>
+                      <input
+                        type="password"
+                        value={profileForm.currentPassword}
+                        onChange={(e) => setProfileForm({ ...profileForm, currentPassword: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Новый пароль *
+                      </label>
+                      <input
+                        type="password"
+                        value={profileForm.newPassword}
+                        onChange={(e) => setProfileForm({ ...profileForm, newPassword: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                        minLength={6}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">Минимум 6 символов</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Подтвердите новый пароль *
+                      </label>
+                      <input
+                        type="password"
+                        value={profileForm.confirmPassword}
+                        onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                        minLength={6}
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleChangePassword}
+                        disabled={saving}
+                        className={`px-4 py-2 rounded-md text-sm font-medium text-white ${
+                          saving
+                            ? 'bg-primary-400 cursor-not-allowed'
+                            : 'bg-primary-600 hover:bg-primary-700'
+                        }`}
+                      >
+                        {saving ? 'Сохранение...' : 'Изменить пароль'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'phone' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Текущий номер телефона
+                      </label>
+                      <input
+                        type="text"
+                        value={user?.phone || 'Не указан'}
+                        disabled
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Новый номер телефона *
+                      </label>
+                      <input
+                        type="tel"
+                        value={profileForm.phone}
+                        onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                        placeholder="+7XXXXXXXXXX"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        required
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Номер телефона должен начинаться с +7. Запрос будет отправлен на валидацию суперадминистратору.
+                      </p>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleRequestPhoneChange}
+                        disabled={saving}
+                        className={`px-4 py-2 rounded-md text-sm font-medium text-white ${
+                          saving
+                            ? 'bg-primary-400 cursor-not-allowed'
+                            : 'bg-primary-600 hover:bg-primary-700'
+                        }`}
+                      >
+                        {saving ? 'Отправка...' : 'Отправить запрос'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleCloseProfileModal}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
