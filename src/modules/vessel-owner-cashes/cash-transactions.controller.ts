@@ -87,70 +87,20 @@ export class CashTransactionsController {
       // Фильтрация по expenseCategoryId (только если поле существует в БД)
       // Пропускаем фильтрацию, если поле не существует - это обработается в try-catch ниже
       
-      let transactions, total;
-      try {
-        // Пытаемся загрузить с expenseCategory
-        if (expenseCategoryId) {
-          queryBuilder.andWhere('transaction.expenseCategoryId = :expenseCategoryId', {
-            expenseCategoryId: parseInt(expenseCategoryId as string),
-          });
-        }
-        
-        [transactions, total] = await queryBuilder
-          .leftJoinAndSelect('transaction.expenseCategory', 'expenseCategory')
-          .skip((pageNum - 1) * limitNum)
-          .take(limitNum)
-          .orderBy('transaction.date', 'DESC')
-          .addOrderBy('transaction.createdAt', 'DESC')
-          .getManyAndCount();
-      } catch (error: any) {
-        // Если ошибка связана с отсутствием таблицы/поля, загружаем без expenseCategory
-        if (error.message?.includes('expenseCategory') || error.message?.includes('expense_category') || error.message?.includes('column') || error.code === '42P01' || error.code === '42703') {
-          console.warn('Поле expenseCategoryId не найдено в БД, загружаем транзакции без этой связи');
-          // Убираем фильтр по expenseCategoryId, если поле не существует
-          const queryBuilderWithoutExpense = transactionRepository
-            .createQueryBuilder('transaction')
-            .leftJoinAndSelect('transaction.cash', 'cash')
-            .leftJoinAndSelect('transaction.incomeCategory', 'incomeCategory')
-            .where('transaction.cashId = :cashId', { cashId: parseInt(cashId) });
-          
-          // Применяем остальные фильтры
-          if (startDate) {
-            queryBuilderWithoutExpense.andWhere('transaction.date >= :startDate', {
-              startDate: new Date(startDate as string),
-            });
-          }
-          if (endDate) {
-            queryBuilderWithoutExpense.andWhere('transaction.date <= :endDate', {
-              endDate: new Date(endDate as string),
-            });
-          }
-          if (transactionType) {
-            queryBuilderWithoutExpense.andWhere('transaction.transactionType = :transactionType', {
-              transactionType,
-            });
-          }
-          if (paymentMethod) {
-            queryBuilderWithoutExpense.andWhere('transaction.paymentMethod = :paymentMethod', {
-              paymentMethod,
-            });
-          }
-          if (categoryId) {
-            queryBuilderWithoutExpense.andWhere('transaction.categoryId = :categoryId', {
-              categoryId: parseInt(categoryId as string),
-            });
-          }
-          
-          [transactions, total] = await queryBuilderWithoutExpense
-            .skip((pageNum - 1) * limitNum)
-            .take(limitNum)
-            .orderBy('transaction.date', 'DESC')
-            .addOrderBy('transaction.createdAt', 'DESC')
-            .getManyAndCount();
-        } else {
-          throw error;
-        }
-      }
+      // Временно не используем expenseCategory, пока миграция не выполнена
+      // Убираем фильтрацию по expenseCategoryId, если поле не существует
+      // if (expenseCategoryId) {
+      //   queryBuilder.andWhere('transaction.expenseCategoryId = :expenseCategoryId', {
+      //     expenseCategoryId: parseInt(expenseCategoryId as string),
+      //   });
+      // }
+
+      const [transactions, total] = await queryBuilder
+        .skip((pageNum - 1) * limitNum)
+        .take(limitNum)
+        .orderBy('transaction.date', 'DESC')
+        .addOrderBy('transaction.createdAt', 'DESC')
+        .getManyAndCount();
 
       res.json(createPaginatedResponse(transactions, total, pageNum, limitNum));
     } catch (error) {
@@ -187,18 +137,11 @@ export class CashTransactionsController {
       }
 
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
-      let transaction = await transactionRepository.findOne({
+      // Временно не используем expenseCategory, пока миграция не выполнена
+      const transaction = await transactionRepository.findOne({
         where: { id: parseInt(id), cashId: parseInt(cashId) },
-        relations: ['cash', 'incomeCategory', 'expenseCategory'],
+        relations: ['cash', 'incomeCategory'],
       });
-      
-      // Если не найдено с expenseCategory, пробуем без него
-      if (!transaction) {
-        transaction = await transactionRepository.findOne({
-          where: { id: parseInt(id), cashId: parseInt(cashId) },
-          relations: ['cash', 'incomeCategory'],
-        });
-      }
 
       if (!transaction) {
         throw new AppError('Транзакция не найдена', 404);
@@ -255,7 +198,8 @@ export class CashTransactionsController {
 
       // Проверяем существование категории, если указана
       let categoryIdValue: number | null = null;
-      let expenseCategoryIdValue: number | null = null;
+      // Временно не используем expenseCategoryId, пока миграция не выполнена
+      // let expenseCategoryIdValue: number | null = null;
       
       // Для приходов используем IncomeCategory
       if (transactionType === CashTransactionType.INCOME && categoryId !== undefined && categoryId !== null) {
@@ -285,33 +229,11 @@ export class CashTransactionsController {
         }
       }
       
+      // Временно не используем expenseCategoryId, пока миграция не выполнена
       // Для расходов используем VesselOwnerExpenseCategory
-      if (transactionType === CashTransactionType.EXPENSE && expenseCategoryId !== undefined && expenseCategoryId !== null) {
-        const expenseCategoryIdNum = typeof expenseCategoryId === 'string' 
-          ? (expenseCategoryId.trim() === '' ? null : parseInt(expenseCategoryId)) 
-          : expenseCategoryId;
-        
-        if (expenseCategoryIdNum !== null && !isNaN(expenseCategoryIdNum) && expenseCategoryIdNum > 0) {
-          const expenseCategoryRepository = AppDataSource.getRepository(VesselOwnerExpenseCategory);
-          const expenseCategory = await expenseCategoryRepository.findOne({
-            where: { id: expenseCategoryIdNum },
-          });
-          
-          if (!expenseCategory) {
-            throw new AppError('Категория расхода не найдена', 404);
-          }
-          
-          if (
-            req.userRole !== UserRole.SUPER_ADMIN &&
-            req.userRole !== UserRole.ADMIN &&
-            expenseCategory.vesselOwnerId !== req.userId
-          ) {
-            throw new AppError('Доступ к категории расхода запрещен', 403);
-          }
-          
-          expenseCategoryIdValue = expenseCategory.id;
-        }
-      }
+      // if (transactionType === CashTransactionType.EXPENSE && expenseCategoryId !== undefined && expenseCategoryId !== null) {
+      //   ...
+      // }
 
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
       const transactionData: any = {
@@ -327,44 +249,19 @@ export class CashTransactionsController {
         categoryId: categoryIdValue,
       };
       
-      // Добавляем expenseCategoryId только если поле существует в БД
-      // TypeORM автоматически проигнорирует несуществующие поля при сохранении
-      if (expenseCategoryIdValue !== null && expenseCategoryIdValue !== undefined) {
-        transactionData.expenseCategoryId = expenseCategoryIdValue;
-      }
+      // Временно не используем expenseCategoryId, пока миграция не выполнена
+      // if (expenseCategoryIdValue !== null && expenseCategoryIdValue !== undefined) {
+      //   transactionData.expenseCategoryId = expenseCategoryIdValue;
+      // }
       
       const transaction = transactionRepository.create(transactionData);
+      await transactionRepository.save(transaction);
 
-      let savedTransactionId: number;
-      try {
-        await transactionRepository.save(transaction);
-        savedTransactionId = transaction.id;
-      } catch (error: any) {
-        // Если ошибка связана с отсутствием поля expenseCategoryId, сохраняем без него
-        if (error.message?.includes('expenseCategoryId') || error.message?.includes('expense_category') || error.message?.includes('column') || error.code === '42703') {
-          console.warn('Поле expenseCategoryId не существует в БД, сохраняем транзакцию без этого поля');
-          const transactionDataWithoutExpense = { ...transactionData };
-          delete transactionDataWithoutExpense.expenseCategoryId;
-          const transactionWithoutExpense = transactionRepository.create(transactionDataWithoutExpense);
-          const saved = await transactionRepository.save(transactionWithoutExpense);
-          savedTransactionId = saved.id;
-        } else {
-          throw error;
-        }
-      }
-
-      let savedTransaction = await transactionRepository.findOne({
+      // Временно не используем expenseCategory, пока миграция не выполнена
+      const savedTransaction = await transactionRepository.findOne({
         where: { id: savedTransactionId },
-        relations: ['cash', 'incomeCategory', 'expenseCategory'],
+        relations: ['cash', 'incomeCategory'],
       });
-      
-      // Если не найдено с expenseCategory, пробуем без него
-      if (!savedTransaction) {
-        savedTransaction = await transactionRepository.findOne({
-          where: { id: savedTransactionId },
-          relations: ['cash', 'incomeCategory'],
-        });
-      }
 
       res.status(201).json(savedTransaction);
     } catch (error) {
@@ -458,78 +355,19 @@ export class CashTransactionsController {
         }
       }
       
-      // Обновляем категорию расхода, если тип транзакции - расход
-      // Проверяем наличие поля в БД через try-catch
-      if (expenseCategoryId !== undefined && finalTransactionType === CashTransactionType.EXPENSE) {
-        try {
-          if (expenseCategoryId === null || expenseCategoryId === '') {
-            // Пытаемся установить null, но не падаем, если поле не существует
-            try {
-              (transaction as any).expenseCategoryId = null;
-            } catch (e) {
-              // Игнорируем, если поле не существует
-            }
-            transaction.categoryId = null; // Очищаем категорию прихода
-          } else {
-            const expenseCategoryRepository = AppDataSource.getRepository(VesselOwnerExpenseCategory);
-            const expenseCategory = await expenseCategoryRepository.findOne({
-              where: { id: parseInt(expenseCategoryId as string) },
-            });
-            if (!expenseCategory) {
-              throw new AppError('Категория расхода не найдена', 404);
-            }
-            if (
-              req.userRole !== UserRole.SUPER_ADMIN &&
-              req.userRole !== UserRole.ADMIN &&
-              expenseCategory.vesselOwnerId !== req.userId
-            ) {
-              throw new AppError('Категория расхода не принадлежит вам', 403);
-            }
-            // Пытаемся установить expenseCategoryId, но не падаем, если поле не существует
-            try {
-              (transaction as any).expenseCategoryId = parseInt(expenseCategoryId as string);
-            } catch (e) {
-              // Игнорируем, если поле не существует
-              console.warn('Поле expenseCategoryId не существует в БД, пропускаем установку');
-            }
-            transaction.categoryId = null; // Очищаем категорию прихода
-          }
-        } catch (error: any) {
-          // Если таблица категорий расходов не существует, просто игнорируем
-          if (error.message?.includes('VesselOwnerExpenseCategory') || error.message?.includes('relation') || error.code === '42P01') {
-            console.warn('Таблица категорий расходов не найдена, пропускаем обновление expenseCategoryId');
-          } else {
-            throw error;
-          }
-        }
-      }
+      // Временно не используем expenseCategoryId, пока миграция не выполнена
+      // Обновление категории расхода будет работать после выполнения миграции
+      // if (expenseCategoryId !== undefined && finalTransactionType === CashTransactionType.EXPENSE) {
+      //   ...
+      // }
 
-      try {
-        await transactionRepository.save(transaction);
-      } catch (error: any) {
-        // Если ошибка связана с отсутствием поля expenseCategoryId, сохраняем без него
-        if (error.message?.includes('expenseCategoryId') || error.message?.includes('expense_category') || error.message?.includes('column') || error.code === '42703') {
-          console.warn('Поле expenseCategoryId не существует в БД, сохраняем транзакцию без этого поля');
-          // Удаляем expenseCategoryId из транзакции перед сохранением
-          delete (transaction as any).expenseCategoryId;
-          await transactionRepository.save(transaction);
-        } else {
-          throw error;
-        }
-      }
+      await transactionRepository.save(transaction);
 
-      let updatedTransaction = await transactionRepository.findOne({
+      // Временно не используем expenseCategory, пока миграция не выполнена
+      const updatedTransaction = await transactionRepository.findOne({
         where: { id: transaction.id },
-        relations: ['cash', 'incomeCategory', 'expenseCategory'],
+        relations: ['cash', 'incomeCategory'],
       });
-      
-      // Если не найдено с expenseCategory, пробуем без него
-      if (!updatedTransaction) {
-        updatedTransaction = await transactionRepository.findOne({
-          where: { id: transaction.id },
-          relations: ['cash', 'incomeCategory'],
-        });
-      }
 
       res.json(updatedTransaction);
     } catch (error) {
