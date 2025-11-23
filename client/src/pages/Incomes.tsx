@@ -184,30 +184,51 @@ export default function Incomes() {
     }
   }
 
+  const [assignForm, setAssignForm] = useState({
+    categoryId: '',
+    description: '',
+    counterparty: '',
+  })
+
   const handleOpenAssignCategoryModal = (transaction: CashTransaction) => {
     setSelectedTransaction(transaction)
+    setAssignForm({
+      categoryId: transaction.categoryId?.toString() || '',
+      description: transaction.description || '',
+      counterparty: transaction.counterparty || '',
+    })
     setShowAssignCategoryModal(true)
   }
 
   const handleCloseAssignCategoryModal = () => {
     setShowAssignCategoryModal(false)
     setSelectedTransaction(null)
+    setAssignForm({
+      categoryId: '',
+      description: '',
+      counterparty: '',
+    })
   }
 
-  const handleAssignCategory = async (categoryId: number | null) => {
+  const handleAssignCategory = async () => {
     if (!selectedTransaction || assigningCategory) return
 
     try {
       setAssigningCategory(true)
+      const categoryId = assignForm.categoryId ? parseInt(assignForm.categoryId) : null
       await vesselOwnerCashesService.updateTransaction(
         selectedTransaction.cashId,
         selectedTransaction.id,
-        { categoryId: categoryId || null }
+        { 
+          categoryId: categoryId,
+          description: assignForm.description || undefined,
+          counterparty: assignForm.counterparty || undefined,
+        }
       )
       await loadTransactions()
       handleCloseAssignCategoryModal()
     } catch (error: any) {
-      alert(error.error || error.message || 'Ошибка привязки категории')
+      alert(error.error || error.message || 'Ошибка сохранения')
     } finally {
       setAssigningCategory(false)
     }
@@ -603,11 +624,8 @@ export default function Incomes() {
                       Категория
                     </label>
                     <select
-                      value={selectedTransaction.categoryId || ''}
-                      onChange={(e) => {
-                        const newCategoryId = e.target.value ? parseInt(e.target.value) : null
-                        handleAssignCategory(newCategoryId)
-                      }}
+                      value={assignForm.categoryId}
+                      onChange={(e) => setAssignForm({ ...assignForm, categoryId: e.target.value })}
                       disabled={assigningCategory}
                       className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${
                         assigningCategory ? 'bg-gray-100 cursor-not-allowed' : ''
@@ -621,15 +639,57 @@ export default function Incomes() {
                       ))}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Описание
+                    </label>
+                    <textarea
+                      value={assignForm.description}
+                      onChange={(e) => setAssignForm({ ...assignForm, description: e.target.value })}
+                      disabled={assigningCategory}
+                      rows={3}
+                      className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${
+                        assigningCategory ? 'bg-gray-100 cursor-not-allowed' : ''
+                      }`}
+                      placeholder="Описание прихода (необязательно)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Контрагент
+                    </label>
+                    <input
+                      type="text"
+                      value={assignForm.counterparty}
+                      onChange={(e) => setAssignForm({ ...assignForm, counterparty: e.target.value })}
+                      disabled={assigningCategory}
+                      className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${
+                        assigningCategory ? 'bg-gray-100 cursor-not-allowed' : ''
+                      }`}
+                      placeholder="Контрагент (необязательно)"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
-                  onClick={handleCloseAssignCategoryModal}
-                  className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleAssignCategory}
+                  disabled={assigningCategory}
+                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm ${
+                    assigningCategory
+                      ? 'bg-primary-400 cursor-not-allowed'
+                      : 'bg-primary-600 hover:bg-primary-700'
+                  }`}
                 >
-                  Закрыть
+                  {assigningCategory ? 'Сохранение...' : 'Сохранить'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseAssignCategoryModal}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Отмена
                 </button>
               </div>
             </div>
