@@ -28,8 +28,8 @@ export default function Finances() {
         vesselOwnerCashesService.getTotalIncome(),
         vesselOwnerCashesService.getTotalExpense(),
       ])
-      setTotalIncome((incomeRes as any)?.totalIncome || 0)
-      setTotalExpense((expenseRes as any)?.totalExpense || 0)
+      setTotalIncome(Number((incomeRes as any)?.totalIncome || 0))
+      setTotalExpense(Number((expenseRes as any)?.totalExpense || 0))
     } catch (error) {
       console.error('Ошибка загрузки финансовых данных:', error)
     } finally {
@@ -135,7 +135,7 @@ export default function Finances() {
               {module.showValue && module.value !== undefined && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <p className="text-2xl font-bold text-gray-900">
-                    {module.value.toLocaleString('ru-RU', {
+                    {Number(module.value).toLocaleString('ru-RU', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{' '}

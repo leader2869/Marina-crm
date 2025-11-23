@@ -213,10 +213,10 @@ export default function Incomes() {
     return acc
   }, {} as Record<number, { categoryId: number; categoryName: string; transactions: CashTransaction[]; total: number }>)
 
-  const totalIncome = transactions.reduce((sum, transaction) => sum + transaction.amount, 0)
-  const uncategorizedTotal = transactions
+  const totalIncome = Number(transactions.reduce((sum, transaction) => sum + Number(transaction.amount), 0))
+  const uncategorizedTotal = Number(transactions
     .filter(t => !t.categoryId)
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + Number(t.amount), 0))
 
   if (loading) {
     return <LoadingAnimation message="Загрузка приходов..." />
@@ -251,7 +251,7 @@ export default function Incomes() {
           <div className="bg-green-50 p-4 rounded-lg">
             <p className="text-sm text-gray-600 mb-2">Общая сумма приходов</p>
             <p className="text-3xl font-bold text-green-600">
-              {totalIncome.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+              {Number(totalIncome).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
             </p>
             <p className="text-sm text-gray-500 mt-2">
               Всего транзакций: {transactions.length}
@@ -260,7 +260,7 @@ export default function Incomes() {
           <div className="bg-blue-50 p-4 rounded-lg">
             <p className="text-sm text-gray-600 mb-2">С категориями</p>
             <p className="text-3xl font-bold text-blue-600">
-              {(totalIncome - uncategorizedTotal).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+              {Number(totalIncome - uncategorizedTotal).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
             </p>
             <p className="text-sm text-gray-500 mt-2">
               {Object.keys(transactionsByCategory).filter(k => k !== '0').length} категорий
@@ -269,7 +269,7 @@ export default function Incomes() {
           <div className="bg-yellow-50 p-4 rounded-lg">
             <p className="text-sm text-gray-600 mb-2">Без категорий</p>
             <p className="text-3xl font-bold text-yellow-600">
-              {uncategorizedTotal.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+              {Number(uncategorizedTotal).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
             </p>
             <p className="text-sm text-gray-500 mt-2">
               {transactions.filter(t => !t.categoryId).length} транзакций
@@ -294,7 +294,7 @@ export default function Incomes() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories.map((category) => {
               const categoryTransactions = transactions.filter(t => t.categoryId === category.id)
-              const categoryTotal = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
+              const categoryTotal = Number(categoryTransactions.reduce((sum, t) => sum + Number(t.amount), 0))
               return (
                 <div
                   key={category.id}
@@ -307,7 +307,7 @@ export default function Incomes() {
                         <p className="text-sm text-gray-600 mt-1">{category.description}</p>
                       )}
                       <p className="text-sm text-green-600 font-semibold mt-2">
-                        {categoryTotal.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+                        {Number(categoryTotal).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         {categoryTransactions.length} транзакций
