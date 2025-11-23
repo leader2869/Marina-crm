@@ -85,16 +85,11 @@ export class CashTransactionsController {
         });
       }
 
-      // Фильтрация по expenseCategoryId (только если поле существует в БД)
-      // Пропускаем фильтрацию, если поле не существует - это обработается в try-catch ниже
-      
-      // Временно не используем expenseCategory, пока миграция не выполнена
-      // Убираем фильтрацию по expenseCategoryId, если поле не существует
-      // if (expenseCategoryId) {
-      //   queryBuilder.andWhere('transaction.expenseCategoryId = :expenseCategoryId', {
-      //     expenseCategoryId: parseInt(expenseCategoryId as string),
-      //   });
-      // }
+      if (expenseCategoryId) {
+        queryBuilder.andWhere('transaction.expenseCategoryId = :expenseCategoryId', {
+          expenseCategoryId: parseInt(expenseCategoryId as string),
+        });
+      }
 
       const [transactions, total] = await queryBuilder
         .skip((pageNum - 1) * limitNum)
