@@ -1,6 +1,8 @@
 import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
-import { VesselOwnerExpenseCategory } from '../../entities/VesselOwnerExpenseCategory';
+// Временно закомментировано до выполнения миграции БД
+// После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
+// import { VesselOwnerExpenseCategory } from '../../entities/VesselOwnerExpenseCategory';
 import { AppError } from '../../middleware/errorHandler';
 import { AuthRequest } from '../../middleware/auth';
 import { UserRole } from '../../types';

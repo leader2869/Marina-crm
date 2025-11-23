@@ -3,7 +3,9 @@ import { AppDataSource } from '../../config/database';
 import { VesselOwnerCash } from '../../entities/VesselOwnerCash';
 import { CashTransaction } from '../../entities/CashTransaction';
 import { IncomeCategory } from '../../entities/IncomeCategory';
-import { VesselOwnerExpenseCategory } from '../../entities/VesselOwnerExpenseCategory';
+// Временно закомментировано до выполнения миграции БД
+// После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
+// import { VesselOwnerExpenseCategory } from '../../entities/VesselOwnerExpenseCategory';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
