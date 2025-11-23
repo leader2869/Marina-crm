@@ -15,6 +15,7 @@ router.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Основные роуты
 router.post('/register', authController.register.bind(authController));
 router.post('/login', authController.login.bind(authController));
 router.post('/guest', authController.loginAsGuest.bind(authController));
@@ -23,7 +24,7 @@ router.put('/profile', authenticate, authController.updateProfile.bind(authContr
 router.post('/change-password', authenticate, authController.changePassword.bind(authController));
 router.post('/request-phone-change', authenticate, authController.requestPhoneChange.bind(authController));
 
-// Информационные GET endpoints для документации
+// Информационные GET endpoints для документации (должны быть после основных роутов)
 router.get('/login', (req: Request, res: Response) => {
   res.status(405).json({
     error: 'Метод не разрешен',
