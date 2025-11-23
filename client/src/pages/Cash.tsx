@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X, EyeOff, Eye, Ship } from 'lucide-react'
-import { vesselOwnerCashesService, vesselsService } from '../services/api'
-import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency, Vessel } from '../types'
+import { vesselOwnerCashesService, vesselsService, incomeCategoriesService } from '../services/api'
+import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency, Vessel, IncomeCategory } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 import { format } from 'date-fns'
@@ -9,17 +10,22 @@ import { useAuth } from '../contexts/AuthContext'
 
 export default function Cash() {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [vessels, setVessels] = useState<Vessel[]>([])
+  const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
   const [cashes, setCashes] = useState<VesselOwnerCash[]>([])
   const [selectedCash, setSelectedCash] = useState<VesselOwnerCash | null>(null)
   const [transactions, setTransactions] = useState<CashTransaction[]>([])
   const [balance, setBalance] = useState<CashBalance | null>(null)
+  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [vesselsLoading, setVesselsLoading] = useState(true)
   const [transactionsLoading, setTransactionsLoading] = useState(false)
   const [showCashModal, setShowCashModal] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
+  const [isTransactionTypeLocked, setIsTransactionTypeLocked] = useState(false)
   const [editingCash, setEditingCash] = useState<VesselOwnerCash | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<CashTransaction | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -43,15 +49,23 @@ export default function Cash() {
     date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
     counterparty: '',
+    categoryId: '',
   })
 
   useEffect(() => {
     loadVessels()
-  }, [])
+    loadIncomeCategories()
+  }, [searchParams])
 
   useEffect(() => {
     if (selectedVessel) {
       loadCashes()
+      // Обновляем баланс катера при изменении выбора
+      if (selectedVessel.id && !vesselBalances[selectedVessel.id]) {
+        loadVesselBalance(selectedVessel.id).then((balance) => {
+          setVesselBalances(prev => ({ ...prev, [selectedVessel.id]: balance }))
+        })
+      }
     } else {
       setCashes([])
       setSelectedCash(null)
@@ -67,6 +81,35 @@ export default function Cash() {
     }
   }, [selectedCash, filterType, filterPaymentMethod, dateFrom, dateTo])
 
+  const loadVesselBalance = async (vesselId: number): Promise<number> => {
+    try {
+      // Загружаем все кассы катера
+      const cashesResponse = await vesselOwnerCashesService.getAll({ 
+        limit: 100, 
+        vesselId: vesselId 
+      })
+      const vesselCashes = cashesResponse.data || []
+      
+      // Загружаем баланс для каждой кассы и суммируем
+      let totalBalance = 0
+      for (const cash of vesselCashes) {
+        try {
+          const balanceResponse: any = await vesselOwnerCashesService.getBalance(cash.id)
+          if (balanceResponse && typeof balanceResponse.balance === 'number') {
+            totalBalance += balanceResponse.balance
+          }
+        } catch (error) {
+          console.error(`Ошибка загрузки баланса кассы ${cash.id}:`, error)
+        }
+      }
+      
+      return totalBalance
+    } catch (error) {
+      console.error(`Ошибка загрузки баланса катера ${vesselId}:`, error)
+      return 0
+    }
+  }
+
   const loadVessels = async () => {
     try {
       setVesselsLoading(true)
@@ -75,7 +118,28 @@ export default function Cash() {
       // Фильтруем только катера текущего пользователя
       const userVessels = vesselsData.filter((vessel: Vessel) => vessel.ownerId === user?.id)
       setVessels(userVessels)
-      if (userVessels.length > 0 && !selectedVessel) {
+      
+      // Загружаем балансы для всех катеров
+      const balances: Record<number, number> = {}
+      for (const vessel of userVessels) {
+        balances[vessel.id] = await loadVesselBalance(vessel.id)
+      }
+      setVesselBalances(balances)
+      
+      // Проверяем, есть ли vesselId в URL параметрах
+      const vesselIdParam = searchParams.get('vesselId')
+      if (vesselIdParam) {
+        const vesselId = parseInt(vesselIdParam)
+        const vessel = userVessels.find((v: Vessel) => v.id === vesselId)
+        if (vessel) {
+          setSelectedVessel(vessel)
+          // Удаляем параметр из URL после использования
+          setSearchParams({}, { replace: true })
+        } else if (userVessels.length > 0) {
+          // Если катер не найден, выбираем первый
+          setSelectedVessel(userVessels[0])
+        }
+      } else if (userVessels.length > 0 && !selectedVessel) {
         setSelectedVessel(userVessels[0])
       }
     } catch (error: any) {
@@ -158,6 +222,18 @@ export default function Cash() {
     }
   }
 
+  const loadIncomeCategories = async () => {
+    try {
+      setCategoriesLoading(true)
+      const response = await incomeCategoriesService.getAll({ limit: 100 })
+      setIncomeCategories(response.data || [])
+    } catch (error: any) {
+      console.error('Ошибка загрузки категорий:', error)
+    } finally {
+      setCategoriesLoading(false)
+    }
+  }
+
   const handleOpenCashModal = (cash?: VesselOwnerCash) => {
     if (cash) {
       setEditingCash(cash)
@@ -209,6 +285,11 @@ export default function Cash() {
         await vesselOwnerCashesService.create(cashData)
       }
       await loadCashes()
+      // Обновляем баланс катера после изменения кассы
+      if (selectedVessel?.id) {
+        const newBalance = await loadVesselBalance(selectedVessel.id)
+        setVesselBalances(prev => ({ ...prev, [selectedVessel.id]: newBalance }))
+      }
       handleCloseCashModal()
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка сохранения кассы')
@@ -226,6 +307,11 @@ export default function Cash() {
         setBalance(null)
       }
       await loadCashes()
+      // Обновляем баланс катера после удаления кассы
+      if (selectedVessel?.id) {
+        const newBalance = await loadVesselBalance(selectedVessel.id)
+        setVesselBalances(prev => ({ ...prev, [selectedVessel.id]: newBalance }))
+      }
     } catch (error: any) {
       const errorMessage = error.error || error.message || 'Ошибка удаления кассы'
       // Если ошибка связана с наличием транзакций, предлагаем скрыть кассу
@@ -250,6 +336,11 @@ export default function Cash() {
         setBalance(null)
       }
       await loadCashes()
+      // Обновляем баланс катера после скрытия кассы
+      if (selectedVessel?.id) {
+        const newBalance = await loadVesselBalance(selectedVessel.id)
+        setVesselBalances(prev => ({ ...prev, [selectedVessel.id]: newBalance }))
+      }
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка скрытия кассы')
     }
@@ -261,14 +352,20 @@ export default function Cash() {
     try {
       await vesselOwnerCashesService.update(cash.id, { isActive: true })
       await loadCashes()
+      // Обновляем баланс катера после восстановления кассы
+      if (selectedVessel?.id) {
+        const newBalance = await loadVesselBalance(selectedVessel.id)
+        setVesselBalances(prev => ({ ...prev, [selectedVessel.id]: newBalance }))
+      }
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка восстановления кассы')
     }
   }
 
-  const handleOpenTransactionModal = (transaction?: CashTransaction) => {
+  const handleOpenTransactionModal = (transaction?: CashTransaction, lockType: boolean = false, transactionType?: CashTransactionType) => {
     if (transaction) {
       setEditingTransaction(transaction)
+      setIsTransactionTypeLocked(false) // При редактировании можно менять тип
       setTransactionForm({
         transactionType: transaction.transactionType,
         amount: transaction.amount.toString(),
@@ -277,17 +374,20 @@ export default function Cash() {
         date: format(new Date(transaction.date), 'yyyy-MM-dd'),
         description: transaction.description || '',
         counterparty: transaction.counterparty || '',
+        categoryId: transaction.categoryId?.toString() || '',
       })
     } else {
       setEditingTransaction(null)
+      setIsTransactionTypeLocked(lockType) // Блокируем тип, если открыто из кнопки
       setTransactionForm({
-        transactionType: CashTransactionType.INCOME,
+        transactionType: transactionType || transactionForm.transactionType || CashTransactionType.INCOME,
         amount: '',
         currency: Currency.RUB,
         paymentMethod: CashPaymentMethod.CASH,
         date: format(new Date(), 'yyyy-MM-dd'),
         description: '',
         counterparty: '',
+        categoryId: '',
       })
     }
     setShowTransactionModal(true)
@@ -296,6 +396,7 @@ export default function Cash() {
   const handleCloseTransactionModal = () => {
     setShowTransactionModal(false)
     setEditingTransaction(null)
+    setIsTransactionTypeLocked(false)
     setTransactionForm({
       transactionType: CashTransactionType.INCOME,
       amount: '',
@@ -304,6 +405,7 @@ export default function Cash() {
       date: format(new Date(), 'yyyy-MM-dd'),
       description: '',
       counterparty: '',
+      categoryId: '',
     })
   }
 
@@ -319,17 +421,36 @@ export default function Cash() {
     }
 
     try {
+      const categoryIdValue = transactionForm.categoryId && transactionForm.categoryId !== '' 
+        ? parseInt(transactionForm.categoryId) 
+        : null;
+      
+      const transactionData = {
+        transactionType: transactionForm.transactionType,
+        amount: transactionForm.amount,
+        currency: transactionForm.currency,
+        paymentMethod: transactionForm.paymentMethod,
+        date: transactionForm.date,
+        description: transactionForm.description || undefined,
+        counterparty: transactionForm.counterparty || undefined,
+        categoryId: categoryIdValue,
+      }
       if (editingTransaction) {
         await vesselOwnerCashesService.updateTransaction(
           selectedCash.id,
           editingTransaction.id,
-          transactionForm
+          transactionData
         )
       } else {
-        await vesselOwnerCashesService.createTransaction(selectedCash.id, transactionForm)
+        await vesselOwnerCashesService.createTransaction(selectedCash.id, transactionData)
       }
       await loadTransactions()
       await loadBalance()
+      // Обновляем баланс катера после изменения транзакции
+      if (selectedVessel?.id) {
+        const newBalance = await loadVesselBalance(selectedVessel.id)
+        setVesselBalances(prev => ({ ...prev, [selectedVessel.id]: newBalance }))
+      }
       handleCloseTransactionModal()
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка сохранения транзакции')
@@ -345,6 +466,11 @@ export default function Cash() {
       await vesselOwnerCashesService.deleteTransaction(selectedCash.id, transaction.id)
       await loadTransactions()
       await loadBalance()
+      // Обновляем баланс катера после удаления транзакции
+      if (selectedVessel?.id) {
+        const newBalance = await loadVesselBalance(selectedVessel.id)
+        setVesselBalances(prev => ({ ...prev, [selectedVessel.id]: newBalance }))
+      }
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка удаления транзакции')
     }
@@ -387,20 +513,31 @@ export default function Cash() {
           <p className="text-gray-500 text-sm">Нет катеров. Сначала добавьте катер.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {vessels.map((vessel) => (
-              <div
-                key={vessel.id}
-                onClick={() => setSelectedVessel(vessel)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
-                  selectedVessel?.id === vessel.id
-                    ? 'bg-primary-50 border-2 border-primary-500'
-                    : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
-                }`}
-              >
-                <Ship className="h-4 w-4 text-gray-600" />
-                <span className="font-medium text-gray-900">{vessel.name}</span>
-              </div>
-            ))}
+            {vessels.map((vessel) => {
+              const vesselBalance = vesselBalances[vessel.id] || 0
+              return (
+                <div
+                  key={vessel.id}
+                  onClick={() => setSelectedVessel(vessel)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
+                    selectedVessel?.id === vessel.id
+                      ? 'bg-primary-50 border-2 border-primary-500'
+                      : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                  }`}
+                >
+                  <Ship className="h-4 w-4 text-gray-600" />
+                  <span className="font-medium text-gray-900">{vessel.name}</span>
+                  <span className={`text-sm font-semibold ${
+                    vesselBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    ({Number(vesselBalance).toLocaleString('ru-RU', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })} ₽)
+                  </span>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -526,7 +663,9 @@ export default function Cash() {
                     <h2 className="text-xl font-semibold text-gray-900">{selectedCash.name}</h2>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleOpenTransactionModal()}
+                        onClick={() => {
+                          handleOpenTransactionModal(undefined, true, CashTransactionType.INCOME)
+                        }}
                         className="flex items-center px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
                       >
                         <ArrowDown className="h-4 w-4 mr-1" />
@@ -534,11 +673,7 @@ export default function Cash() {
                       </button>
                       <button
                         onClick={() => {
-                          setTransactionForm((prev) => ({
-                            ...prev,
-                            transactionType: CashTransactionType.EXPENSE,
-                          }))
-                          handleOpenTransactionModal()
+                          handleOpenTransactionModal(undefined, true, CashTransactionType.EXPENSE)
                         }}
                         className="flex items-center px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
                       >
@@ -676,6 +811,9 @@ export default function Cash() {
                           Тип
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Категория
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                           Сумма
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -695,13 +833,13 @@ export default function Cash() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {transactionsLoading ? (
                         <tr>
-                          <td colSpan={7} className="px-6 py-4 text-center">
+                          <td colSpan={8} className="px-6 py-4 text-center">
                             <LoadingAnimation message="Загрузка транзакций..." />
                           </td>
                         </tr>
                       ) : filteredTransactions.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                          <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                             Нет транзакций
                           </td>
                         </tr>
@@ -722,6 +860,15 @@ export default function Cash() {
                                   <ArrowUp className="h-3 w-3 mr-1" />
                                   Расход
                                 </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {transaction.incomeCategory ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {transaction.incomeCategory.name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">Без категории</span>
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
@@ -889,11 +1036,47 @@ export default function Cash() {
                           transactionType: e.target.value as CashTransactionType,
                         })
                       }
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                      disabled={isTransactionTypeLocked}
+                      className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 ${
+                        isTransactionTypeLocked 
+                          ? 'bg-gray-100 cursor-not-allowed' 
+                          : 'bg-white'
+                      }`}
                     >
                       <option value={CashTransactionType.INCOME}>Приход</option>
                       <option value={CashTransactionType.EXPENSE}>Расход</option>
                     </select>
+                    {isTransactionTypeLocked && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Тип транзакции выбран автоматически
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {transactionForm.transactionType === CashTransactionType.INCOME ? 'Категория прихода' : 'Категория расхода'}
+                    </label>
+                    <select
+                      value={transactionForm.categoryId}
+                      onChange={(e) =>
+                        setTransactionForm({ ...transactionForm, categoryId: e.target.value })
+                      }
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    >
+                      <option value="">Без категории</option>
+                      {incomeCategories
+                        .filter((cat) => cat.isActive)
+                        .map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                    </select>
+                    {incomeCategories.filter((cat) => cat.isActive).length === 0 && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Нет доступных категорий. Создайте категории в разделе "Приходы"
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Сумма *</label>

@@ -157,6 +157,7 @@ export class CashTransactionsController {
         description,
         counterparty,
         documentPath,
+        categoryId,
       } = req.body;
 
       // Проверяем существование кассы и права доступа
@@ -182,6 +183,40 @@ export class CashTransactionsController {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
       }
 
+      // Проверяем существование категории, если указана
+      let categoryIdValue: number | null = null;
+      
+      // Обрабатываем categoryId - может быть строкой, числом или null
+      if (categoryId !== undefined && categoryId !== null) {
+        // Преобразуем в число, если это строка
+        const categoryIdNum = typeof categoryId === 'string' 
+          ? (categoryId.trim() === '' ? null : parseInt(categoryId)) 
+          : categoryId;
+        
+        // Проверяем, что это валидное число
+        if (categoryIdNum !== null && !isNaN(categoryIdNum) && categoryIdNum > 0) {
+          const categoryRepository = AppDataSource.getRepository(IncomeCategory);
+          const category = await categoryRepository.findOne({
+            where: { id: categoryIdNum },
+          });
+          
+          if (!category) {
+            throw new AppError('Категория не найдена', 404);
+          }
+          
+          // Проверяем, что категория принадлежит текущему пользователю
+          if (
+            req.userRole !== UserRole.SUPER_ADMIN &&
+            req.userRole !== UserRole.ADMIN &&
+            category.vesselOwnerId !== req.userId
+          ) {
+            throw new AppError('Доступ к категории запрещен', 403);
+          }
+          
+          categoryIdValue = category.id;
+        }
+      }
+
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
       const transaction = transactionRepository.create({
         cashId: parseInt(cashId),
@@ -193,13 +228,14 @@ export class CashTransactionsController {
         description: description as string | undefined,
         counterparty: counterparty as string | undefined,
         documentPath: documentPath as string | undefined,
+        categoryId: categoryIdValue,
       });
 
       await transactionRepository.save(transaction);
 
       const savedTransaction = await transactionRepository.findOne({
         where: { id: transaction.id },
-        relations: ['cash'],
+        relations: ['cash', 'incomeCategory'],
       });
 
       res.status(201).json(savedTransaction);
