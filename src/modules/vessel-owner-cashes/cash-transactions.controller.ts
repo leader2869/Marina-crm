@@ -3,9 +3,7 @@ import { AppDataSource } from '../../config/database';
 import { VesselOwnerCash } from '../../entities/VesselOwnerCash';
 import { CashTransaction } from '../../entities/CashTransaction';
 import { IncomeCategory } from '../../entities/IncomeCategory';
-// Временно закомментировано до выполнения миграции БД
-// После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
-// import { VesselOwnerExpenseCategory } from '../../entities/VesselOwnerExpenseCategory';
+import { VesselOwnerExpenseCategory } from '../../entities/VesselOwnerExpenseCategory';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -54,6 +52,7 @@ export class CashTransactionsController {
         .createQueryBuilder('transaction')
         .leftJoinAndSelect('transaction.cash', 'cash')
         .leftJoinAndSelect('transaction.incomeCategory', 'incomeCategory')
+        .leftJoinAndSelect('transaction.expenseCategory', 'expenseCategory')
         .where('transaction.cashId = :cashId', { cashId: parseInt(cashId) });
 
       // Фильтрация по периоду
@@ -139,10 +138,9 @@ export class CashTransactionsController {
       }
 
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
-      // Временно не используем expenseCategory, пока миграция не выполнена
       const transaction = await transactionRepository.findOne({
         where: { id: parseInt(id), cashId: parseInt(cashId) },
-        relations: ['cash', 'incomeCategory'],
+        relations: ['cash', 'incomeCategory', 'expenseCategory'],
       });
 
       if (!transaction) {
@@ -200,8 +198,7 @@ export class CashTransactionsController {
 
       // Проверяем существование категории, если указана
       let categoryIdValue: number | null = null;
-      // Временно не используем expenseCategoryId, пока миграция не выполнена
-      // let expenseCategoryIdValue: number | null = null;
+      let expenseCategoryIdValue: number | null = null;
       
       // Для приходов используем IncomeCategory
       if (transactionType === CashTransactionType.INCOME && categoryId !== undefined && categoryId !== null) {
@@ -231,11 +228,33 @@ export class CashTransactionsController {
         }
       }
       
-      // Временно не используем expenseCategoryId, пока миграция не выполнена
       // Для расходов используем VesselOwnerExpenseCategory
-      // if (transactionType === CashTransactionType.EXPENSE && expenseCategoryId !== undefined && expenseCategoryId !== null) {
-      //   ...
-      // }
+      if (transactionType === CashTransactionType.EXPENSE && expenseCategoryId !== undefined && expenseCategoryId !== null) {
+        const expenseCategoryIdNum = typeof expenseCategoryId === 'string' 
+          ? (expenseCategoryId.trim() === '' ? null : parseInt(expenseCategoryId)) 
+          : expenseCategoryId;
+        
+        if (expenseCategoryIdNum !== null && !isNaN(expenseCategoryIdNum) && expenseCategoryIdNum > 0) {
+          const expenseCategoryRepository = AppDataSource.getRepository(VesselOwnerExpenseCategory);
+          const expenseCategory = await expenseCategoryRepository.findOne({
+            where: { id: expenseCategoryIdNum },
+          });
+          
+          if (!expenseCategory) {
+            throw new AppError('Категория расхода не найдена', 404);
+          }
+          
+          if (
+            req.userRole !== UserRole.SUPER_ADMIN &&
+            req.userRole !== UserRole.ADMIN &&
+            expenseCategory.vesselOwnerId !== req.userId
+          ) {
+            throw new AppError('Доступ к категории расхода запрещен', 403);
+          }
+          
+          expenseCategoryIdValue = expenseCategory.id;
+        }
+      }
 
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
       const transactionData: any = {
@@ -249,20 +268,15 @@ export class CashTransactionsController {
         counterparty: counterparty as string | undefined,
         documentPath: documentPath as string | undefined,
         categoryId: categoryIdValue,
+        expenseCategoryId: expenseCategoryIdValue,
       };
-      
-      // Временно не используем expenseCategoryId, пока миграция не выполнена
-      // if (expenseCategoryIdValue !== null && expenseCategoryIdValue !== undefined) {
-      //   transactionData.expenseCategoryId = expenseCategoryIdValue;
-      // }
       
       const transaction = transactionRepository.create(transactionData);
       const saved = await transactionRepository.save(transaction);
 
-      // Временно не используем expenseCategory, пока миграция не выполнена
       const savedTransaction = await transactionRepository.findOne({
         where: { id: saved.id },
-        relations: ['cash', 'incomeCategory'],
+        relations: ['cash', 'incomeCategory', 'expenseCategory'],
       });
 
       res.status(201).json(savedTransaction);
@@ -289,8 +303,7 @@ export class CashTransactionsController {
         counterparty,
         documentPath,
         categoryId,
-        // Временно не используем expenseCategoryId, пока миграция не выполнена
-        // expenseCategoryId,
+        expenseCategoryId,
       } = req.body;
 
       // Проверяем существование кассы и права доступа
@@ -337,8 +350,7 @@ export class CashTransactionsController {
       if (categoryId !== undefined && finalTransactionType === CashTransactionType.INCOME) {
         if (categoryId === null || categoryId === '') {
           transaction.categoryId = null;
-          // Временно не используем expenseCategoryId, пока миграция не выполнена
-          // transaction.expenseCategoryId = null; // Очищаем категорию расхода
+          transaction.expenseCategoryId = null; // Очищаем категорию расхода
         } else {
           const categoryRepository = AppDataSource.getRepository(IncomeCategory);
           const category = await categoryRepository.findOne({
@@ -355,23 +367,40 @@ export class CashTransactionsController {
             throw new AppError('Категория прихода не принадлежит вам', 403);
           }
           transaction.categoryId = parseInt(categoryId as string);
-          // Временно не используем expenseCategoryId, пока миграция не выполнена
-          // transaction.expenseCategoryId = null; // Очищаем категорию расхода
+          transaction.expenseCategoryId = null; // Очищаем категорию расхода
         }
       }
       
-      // Временно не используем expenseCategoryId, пока миграция не выполнена
-      // Обновление категории расхода будет работать после выполнения миграции
-      // if (expenseCategoryId !== undefined && finalTransactionType === CashTransactionType.EXPENSE) {
-      //   ...
-      // }
+      // Обновляем категорию расхода, если тип транзакции - расход
+      if (expenseCategoryId !== undefined && finalTransactionType === CashTransactionType.EXPENSE) {
+        if (expenseCategoryId === null || expenseCategoryId === '') {
+          transaction.expenseCategoryId = null;
+          transaction.categoryId = null; // Очищаем категорию прихода
+        } else {
+          const expenseCategoryRepository = AppDataSource.getRepository(VesselOwnerExpenseCategory);
+          const expenseCategory = await expenseCategoryRepository.findOne({
+            where: { id: parseInt(expenseCategoryId as string) },
+          });
+          if (!expenseCategory) {
+            throw new AppError('Категория расхода не найдена', 404);
+          }
+          if (
+            req.userRole !== UserRole.SUPER_ADMIN &&
+            req.userRole !== UserRole.ADMIN &&
+            expenseCategory.vesselOwnerId !== req.userId
+          ) {
+            throw new AppError('Категория расхода не принадлежит вам', 403);
+          }
+          transaction.expenseCategoryId = parseInt(expenseCategoryId as string);
+          transaction.categoryId = null; // Очищаем категорию прихода
+        }
+      }
 
       await transactionRepository.save(transaction);
 
-      // Временно не используем expenseCategory, пока миграция не выполнена
       const updatedTransaction = await transactionRepository.findOne({
         where: { id: transaction.id },
-        relations: ['cash', 'incomeCategory'],
+        relations: ['cash', 'incomeCategory', 'expenseCategory'],
       });
 
       res.json(updatedTransaction);

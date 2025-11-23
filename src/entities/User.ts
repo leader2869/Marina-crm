@@ -15,9 +15,7 @@ import { Booking } from './Booking';
 import { UserClub } from './UserClub';
 import { VesselOwnerCash } from './VesselOwnerCash';
 import { IncomeCategory } from './IncomeCategory';
-// Временно закомментировано до выполнения миграции БД
-// После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
-// import { VesselOwnerExpenseCategory } from './VesselOwnerExpenseCategory';
+import { VesselOwnerExpenseCategory } from './VesselOwnerExpenseCategory';
 
 @Entity('users')
 export class User {
@@ -100,10 +98,8 @@ export class User {
   @OneToMany(() => IncomeCategory, (category) => category.vesselOwner)
   incomeCategories: IncomeCategory[];
 
-  // Временно закомментировано до выполнения миграции БД
-  // После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
-  // @OneToMany(() => VesselOwnerExpenseCategory, (category) => category.vesselOwner)
-  // expenseCategories: VesselOwnerExpenseCategory[];
+  @OneToMany(() => VesselOwnerExpenseCategory, (category) => category.vesselOwner)
+  expenseCategories: VesselOwnerExpenseCategory[];
 }
 
 
