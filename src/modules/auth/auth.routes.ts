@@ -59,7 +59,10 @@ router.all('*', (req: Request, res: Response) => {
       'POST /api/auth/login',
       'POST /api/auth/register',
       'POST /api/auth/guest',
-      'GET /api/auth/profile'
+      'GET /api/auth/profile',
+      'PUT /api/auth/profile',
+      'POST /api/auth/change-password',
+      'POST /api/auth/request-phone-change'
     ]
   });
 });
