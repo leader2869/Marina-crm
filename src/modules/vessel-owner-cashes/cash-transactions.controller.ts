@@ -297,6 +297,7 @@ export class CashTransactionsController {
         counterparty,
         documentPath,
         categoryId,
+        expenseCategoryId,
       } = req.body;
 
       // Проверяем существование кассы и права доступа
