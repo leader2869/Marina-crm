@@ -255,11 +255,11 @@ export class CashTransactionsController {
       // }
       
       const transaction = transactionRepository.create(transactionData);
-      await transactionRepository.save(transaction);
+      const saved = await transactionRepository.save(transaction);
 
       // Временно не используем expenseCategory, пока миграция не выполнена
       const savedTransaction = await transactionRepository.findOne({
-        where: { id: savedTransactionId },
+        where: { id: saved.id },
         relations: ['cash', 'incomeCategory'],
       });
 
