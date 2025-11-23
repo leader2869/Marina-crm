@@ -72,11 +72,14 @@ export class CashTransaction {
   @Column({ nullable: true })
   categoryId: number | null;
 
-  @ManyToOne(() => VesselOwnerExpenseCategory, { nullable: true })
-  @JoinColumn({ name: 'expenseCategoryId' })
-  expenseCategory: VesselOwnerExpenseCategory | null;
-
-  @Column({ nullable: true })
-  expenseCategoryId: number | null;
+  // Временно закомментировано до выполнения миграции БД
+  // После выполнения миграции (создание таблицы vessel_owner_expense_categories и добавление поля expenseCategoryId)
+  // раскомментировать эти строки:
+  // @ManyToOne(() => VesselOwnerExpenseCategory, { nullable: true })
+  // @JoinColumn({ name: 'expenseCategoryId' })
+  // expenseCategory: VesselOwnerExpenseCategory | null;
+  //
+  // @Column({ nullable: true })
+  // expenseCategoryId: number | null;
 }
 
