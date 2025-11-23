@@ -19,7 +19,6 @@ export default function Cash() {
   const [transactions, setTransactions] = useState<CashTransaction[]>([])
   const [balance, setBalance] = useState<CashBalance | null>(null)
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([])
-  const [categoriesLoading, setCategoriesLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [vesselsLoading, setVesselsLoading] = useState(true)
   const [transactionsLoading, setTransactionsLoading] = useState(false)
@@ -224,13 +223,10 @@ export default function Cash() {
 
   const loadIncomeCategories = async () => {
     try {
-      setCategoriesLoading(true)
       const response = await incomeCategoriesService.getAll({ limit: 100 })
       setIncomeCategories(response.data || [])
     } catch (error: any) {
       console.error('Ошибка загрузки категорий:', error)
-    } finally {
-      setCategoriesLoading(false)
     }
   }
 
