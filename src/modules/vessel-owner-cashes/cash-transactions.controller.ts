@@ -287,7 +287,8 @@ export class CashTransactionsController {
         counterparty,
         documentPath,
         categoryId,
-        expenseCategoryId,
+        // Временно не используем expenseCategoryId, пока миграция не выполнена
+        // expenseCategoryId,
       } = req.body;
 
       // Проверяем существование кассы и права доступа
@@ -334,7 +335,8 @@ export class CashTransactionsController {
       if (categoryId !== undefined && finalTransactionType === CashTransactionType.INCOME) {
         if (categoryId === null || categoryId === '') {
           transaction.categoryId = null;
-          transaction.expenseCategoryId = null; // Очищаем категорию расхода
+          // Временно не используем expenseCategoryId, пока миграция не выполнена
+          // transaction.expenseCategoryId = null; // Очищаем категорию расхода
         } else {
           const categoryRepository = AppDataSource.getRepository(IncomeCategory);
           const category = await categoryRepository.findOne({
@@ -351,7 +353,8 @@ export class CashTransactionsController {
             throw new AppError('Категория прихода не принадлежит вам', 403);
           }
           transaction.categoryId = parseInt(categoryId as string);
-          transaction.expenseCategoryId = null; // Очищаем категорию расхода
+          // Временно не используем expenseCategoryId, пока миграция не выполнена
+          // transaction.expenseCategoryId = null; // Очищаем категорию расхода
         }
       }
       
