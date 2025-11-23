@@ -98,7 +98,9 @@ export const AppDataSource = new DataSource({
     VesselOwnerCash,
     CashTransaction,
     IncomeCategory,
-    VesselOwnerExpenseCategory,
+    // Временно закомментировано до выполнения миграции БД
+    // После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
+    // VesselOwnerExpenseCategory,
   ],
   migrations: ['src/database/migrations/**/*.ts'],
   subscribers: ['src/database/subscribers/**/*.ts'],

@@ -98,8 +98,10 @@ export class User {
   @OneToMany(() => IncomeCategory, (category) => category.vesselOwner)
   incomeCategories: IncomeCategory[];
 
-  @OneToMany(() => VesselOwnerExpenseCategory, (category) => category.vesselOwner)
-  expenseCategories: VesselOwnerExpenseCategory[];
+  // Временно закомментировано до выполнения миграции БД
+  // После выполнения миграции (создание таблицы vessel_owner_expense_categories) раскомментировать:
+  // @OneToMany(() => VesselOwnerExpenseCategory, (category) => category.vesselOwner)
+  // expenseCategories: VesselOwnerExpenseCategory[];
 }
 
 
