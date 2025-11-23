@@ -358,7 +358,7 @@ export default function Expenses() {
       {/* Фильтры */}
       <div className="bg-white rounded-lg shadow p-4">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Фильтры</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Категория
@@ -375,6 +375,41 @@ export default function Expenses() {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата от
+            </label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата до
+            </label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <div className="flex items-end">
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                }}
+                className="w-full px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Сбросить даты
+              </button>
+            )}
           </div>
         </div>
       </div>
