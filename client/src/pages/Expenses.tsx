@@ -90,8 +90,7 @@ export default function Expenses() {
             limit: 1000,
             transactionType: CashTransactionType.EXPENSE,
           }
-          // Временно не используем expenseCategoryId, пока миграция не выполнена
-          // if (selectedCategory) params.expenseCategoryId = selectedCategory
+          if (selectedCategory) params.expenseCategoryId = selectedCategory
           if (dateFrom) params.startDate = dateFrom
           if (dateTo) params.endDate = dateTo
           
