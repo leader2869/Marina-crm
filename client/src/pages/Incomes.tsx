@@ -20,6 +20,8 @@ export default function Incomes() {
   const [loading, setLoading] = useState(true)
   const [categoriesLoading, setCategoriesLoading] = useState(false)
   const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [savingCategory, setSavingCategory] = useState(false)
+  const [assigningCategory, setAssigningCategory] = useState(false)
   
   // Модальные окна
   const [showCategoryModal, setShowCategoryModal] = useState(false)
@@ -140,12 +142,16 @@ export default function Incomes() {
   }
 
   const handleSaveCategory = async () => {
-    try {
-      if (!categoryForm.name.trim()) {
-        alert('Название категории обязательно')
-        return
-      }
+    if (savingCategory) return // Предотвращаем повторное нажатие
+    
+    if (!categoryForm.name.trim()) {
+      alert('Название категории обязательно')
+      return
+    }
 
+    try {
+      setSavingCategory(true)
+      
       if (editingCategory) {
         await incomeCategoriesService.update(editingCategory.id, categoryForm)
       } else {
@@ -156,6 +162,8 @@ export default function Incomes() {
       handleCloseCategoryModal()
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка сохранения категории')
+    } finally {
+      setSavingCategory(false)
     }
   }
 
@@ -181,9 +189,10 @@ export default function Incomes() {
   }
 
   const handleAssignCategory = async (categoryId: number | null) => {
-    if (!selectedTransaction) return
+    if (!selectedTransaction || assigningCategory) return
 
     try {
+      setAssigningCategory(true)
       await vesselOwnerCashesService.updateTransaction(
         selectedTransaction.cashId,
         selectedTransaction.id,
@@ -193,6 +202,8 @@ export default function Incomes() {
       handleCloseAssignCategoryModal()
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка привязки категории')
+    } finally {
+      setAssigningCategory(false)
     }
   }
 
@@ -497,9 +508,14 @@ export default function Incomes() {
                 <button
                   type="button"
                   onClick={handleSaveCategory}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  disabled={savingCategory}
+                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm ${
+                    savingCategory
+                      ? 'bg-primary-400 cursor-not-allowed'
+                      : 'bg-primary-600 hover:bg-primary-700'
+                  }`}
                 >
-                  {editingCategory ? 'Сохранить' : 'Создать'}
+                  {savingCategory ? 'Сохранение...' : editingCategory ? 'Сохранить' : 'Создать'}
                 </button>
                 <button
                   type="button"
@@ -551,7 +567,10 @@ export default function Incomes() {
                         const newCategoryId = e.target.value ? parseInt(e.target.value) : null
                         handleAssignCategory(newCategoryId)
                       }}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      disabled={assigningCategory}
+                      className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${
+                        assigningCategory ? 'bg-gray-100 cursor-not-allowed' : ''
+                      }`}
                     >
                       <option value="">Без категории</option>
                       {categories.map((cat) => (

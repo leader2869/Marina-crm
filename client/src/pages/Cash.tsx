@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Wallet, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Search, X, EyeOff, Eye, Ship } from 'lucide-react'
-import { vesselOwnerCashesService, vesselsService, incomeCategoriesService } from '../services/api'
-import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency, Vessel, IncomeCategory } from '../types'
+import { vesselOwnerCashesService, vesselsService, incomeCategoriesService, expenseCategoriesService } from '../services/api'
+import { VesselOwnerCash, CashTransaction, CashBalance, CashTransactionType, CashPaymentMethod, Currency, Vessel, IncomeCategory, VesselOwnerExpenseCategory } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 import { format } from 'date-fns'
@@ -19,9 +19,11 @@ export default function Cash() {
   const [transactions, setTransactions] = useState<CashTransaction[]>([])
   const [balance, setBalance] = useState<CashBalance | null>(null)
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([])
+  const [expenseCategories, setExpenseCategories] = useState<VesselOwnerExpenseCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [vesselsLoading, setVesselsLoading] = useState(true)
   const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [savingTransaction, setSavingTransaction] = useState(false)
   const [showCashModal, setShowCashModal] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [isTransactionTypeLocked, setIsTransactionTypeLocked] = useState(false)
@@ -49,11 +51,13 @@ export default function Cash() {
     description: '',
     counterparty: '',
     categoryId: '',
+    expenseCategoryId: '',
   })
 
   useEffect(() => {
     loadVessels()
     loadIncomeCategories()
+    loadExpenseCategories()
   }, [searchParams])
 
   useEffect(() => {
@@ -226,7 +230,16 @@ export default function Cash() {
       const response = await incomeCategoriesService.getAll({ limit: 100 })
       setIncomeCategories(response.data || [])
     } catch (error: any) {
-      console.error('Ошибка загрузки категорий:', error)
+      console.error('Ошибка загрузки категорий приходов:', error)
+    }
+  }
+
+  const loadExpenseCategories = async () => {
+    try {
+      const response = await expenseCategoriesService.getAll({ limit: 100 })
+      setExpenseCategories(response.data || [])
+    } catch (error: any) {
+      console.error('Ошибка загрузки категорий расходов:', error)
     }
   }
 
@@ -371,6 +384,7 @@ export default function Cash() {
         description: transaction.description || '',
         counterparty: transaction.counterparty || '',
         categoryId: transaction.categoryId?.toString() || '',
+        expenseCategoryId: transaction.expenseCategoryId?.toString() || '',
       })
     } else {
       setEditingTransaction(null)
@@ -384,6 +398,7 @@ export default function Cash() {
         description: '',
         counterparty: '',
         categoryId: '',
+        expenseCategoryId: '',
       })
     }
     setShowTransactionModal(true)
@@ -402,10 +417,13 @@ export default function Cash() {
       description: '',
       counterparty: '',
       categoryId: '',
+      expenseCategoryId: '',
     })
   }
 
   const handleSaveTransaction = async () => {
+    if (savingTransaction) return // Предотвращаем повторное нажатие
+    
     if (!selectedCash) {
       alert('Выберите кассу')
       return
@@ -417,8 +435,16 @@ export default function Cash() {
     }
 
     try {
-      const categoryIdValue = transactionForm.categoryId && transactionForm.categoryId !== '' 
+      setSavingTransaction(true)
+      
+      const categoryIdValue = transactionForm.transactionType === CashTransactionType.INCOME 
+        && transactionForm.categoryId && transactionForm.categoryId !== '' 
         ? parseInt(transactionForm.categoryId) 
+        : null;
+      
+      const expenseCategoryIdValue = transactionForm.transactionType === CashTransactionType.EXPENSE 
+        && transactionForm.expenseCategoryId && transactionForm.expenseCategoryId !== '' 
+        ? parseInt(transactionForm.expenseCategoryId) 
         : null;
       
       const transactionData = {
@@ -430,6 +456,7 @@ export default function Cash() {
         description: transactionForm.description || undefined,
         counterparty: transactionForm.counterparty || undefined,
         categoryId: categoryIdValue,
+        expenseCategoryId: expenseCategoryIdValue,
       }
       if (editingTransaction) {
         await vesselOwnerCashesService.updateTransaction(
@@ -450,6 +477,8 @@ export default function Cash() {
       handleCloseTransactionModal()
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка сохранения транзакции')
+    } finally {
+      setSavingTransaction(false)
     }
   }
 
@@ -859,13 +888,22 @@ export default function Cash() {
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {transaction.incomeCategory ? (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  {transaction.incomeCategory.name}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">Без категории</span>
-                              )}
+                              {transaction.transactionType === CashTransactionType.INCOME 
+                                ? (transaction.incomeCategory ? (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      {transaction.incomeCategory.name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">Без категории</span>
+                                  ))
+                                : (transaction.expenseCategory ? (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                      {transaction.expenseCategory.name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">Без категории</span>
+                                  ))
+                              }
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                               {transaction.amount.toLocaleString('ru-RU')} ₽
@@ -1053,26 +1091,46 @@ export default function Cash() {
                       {transactionForm.transactionType === CashTransactionType.INCOME ? 'Категория прихода' : 'Категория расхода'}
                     </label>
                     <select
-                      value={transactionForm.categoryId}
-                      onChange={(e) =>
-                        setTransactionForm({ ...transactionForm, categoryId: e.target.value })
-                      }
+                      value={transactionForm.transactionType === CashTransactionType.INCOME 
+                        ? transactionForm.categoryId 
+                        : transactionForm.expenseCategoryId}
+                      onChange={(e) => {
+                        if (transactionForm.transactionType === CashTransactionType.INCOME) {
+                          setTransactionForm({ ...transactionForm, categoryId: e.target.value, expenseCategoryId: '' })
+                        } else {
+                          setTransactionForm({ ...transactionForm, expenseCategoryId: e.target.value, categoryId: '' })
+                        }
+                      }}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                     >
                       <option value="">Без категории</option>
-                      {incomeCategories
-                        .filter((cat) => cat.isActive)
-                        .map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
+                      {transactionForm.transactionType === CashTransactionType.INCOME
+                        ? incomeCategories
+                            .filter((cat) => cat.isActive)
+                            .map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))
+                        : expenseCategories
+                            .filter((cat) => cat.isActive)
+                            .map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
                     </select>
-                    {incomeCategories.filter((cat) => cat.isActive).length === 0 && (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Нет доступных категорий. Создайте категории в разделе "Приходы"
-                      </p>
-                    )}
+                    {transactionForm.transactionType === CashTransactionType.INCOME 
+                      ? incomeCategories.filter((cat) => cat.isActive).length === 0 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Нет доступных категорий. Создайте категории в разделе "Приходы"
+                          </p>
+                        )
+                      : expenseCategories.filter((cat) => cat.isActive).length === 0 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Нет доступных категорий. Создайте категории в разделе "Расходы"
+                          </p>
+                        )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Сумма *</label>
@@ -1155,9 +1213,18 @@ export default function Cash() {
                 <button
                   type="button"
                   onClick={handleSaveTransaction}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  disabled={savingTransaction}
+                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm ${
+                    savingTransaction
+                      ? 'bg-primary-400 cursor-not-allowed'
+                      : 'bg-primary-600 hover:bg-primary-700'
+                  }`}
                 >
-                  {editingTransaction ? 'Сохранить' : 'Создать'}
+                  {savingTransaction 
+                    ? 'Сохранение...' 
+                    : editingTransaction 
+                      ? 'Сохранить' 
+                      : 'Создать'}
                 </button>
                 <button
                   type="button"

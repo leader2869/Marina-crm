@@ -10,6 +10,7 @@ import {
 import { CashTransactionType, CashPaymentMethod, Currency } from '../types';
 import { VesselOwnerCash } from './VesselOwnerCash';
 import { IncomeCategory } from './IncomeCategory';
+import { VesselOwnerExpenseCategory } from './VesselOwnerExpenseCategory';
 
 @Entity('cash_transactions')
 export class CashTransaction {
@@ -70,5 +71,12 @@ export class CashTransaction {
 
   @Column({ nullable: true })
   categoryId: number | null;
+
+  @ManyToOne(() => VesselOwnerExpenseCategory, { nullable: true })
+  @JoinColumn({ name: 'expenseCategoryId' })
+  expenseCategory: VesselOwnerExpenseCategory | null;
+
+  @Column({ nullable: true })
+  expenseCategoryId: number | null;
 }
 

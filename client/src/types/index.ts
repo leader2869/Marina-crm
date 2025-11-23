@@ -302,6 +302,8 @@ export interface CashTransaction {
   cash?: VesselOwnerCash
   categoryId?: number
   incomeCategory?: IncomeCategory
+  expenseCategoryId?: number
+  expenseCategory?: VesselOwnerExpenseCategory
   createdAt: string
   updatedAt: string
 }
@@ -319,6 +321,17 @@ export interface CashBalance {
 }
 
 export interface IncomeCategory {
+  id: number
+  name: string
+  description?: string
+  isActive: boolean
+  vesselOwnerId: number
+  vesselOwner?: User
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VesselOwnerExpenseCategory {
   id: number
   name: string
   description?: string

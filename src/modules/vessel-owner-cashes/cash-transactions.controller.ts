@@ -3,6 +3,7 @@ import { AppDataSource } from '../../config/database';
 import { VesselOwnerCash } from '../../entities/VesselOwnerCash';
 import { CashTransaction } from '../../entities/CashTransaction';
 import { IncomeCategory } from '../../entities/IncomeCategory';
+import { VesselOwnerExpenseCategory } from '../../entities/VesselOwnerExpenseCategory';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -44,13 +45,14 @@ export class CashTransactionsController {
         parseInt(limit as string)
       );
 
-      const { startDate, endDate, transactionType, paymentMethod, categoryId } = req.query;
+      const { startDate, endDate, transactionType, paymentMethod, categoryId, expenseCategoryId } = req.query;
 
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
       const queryBuilder = transactionRepository
         .createQueryBuilder('transaction')
         .leftJoinAndSelect('transaction.cash', 'cash')
         .leftJoinAndSelect('transaction.incomeCategory', 'incomeCategory')
+        .leftJoinAndSelect('transaction.expenseCategory', 'expenseCategory')
         .where('transaction.cashId = :cashId', { cashId: parseInt(cashId) });
 
       // Фильтрация по периоду
@@ -80,6 +82,12 @@ export class CashTransactionsController {
       if (categoryId) {
         queryBuilder.andWhere('transaction.categoryId = :categoryId', {
           categoryId: parseInt(categoryId as string),
+        });
+      }
+
+      if (expenseCategoryId) {
+        queryBuilder.andWhere('transaction.expenseCategoryId = :expenseCategoryId', {
+          expenseCategoryId: parseInt(expenseCategoryId as string),
         });
       }
 
@@ -127,7 +135,7 @@ export class CashTransactionsController {
       const transactionRepository = AppDataSource.getRepository(CashTransaction);
       const transaction = await transactionRepository.findOne({
         where: { id: parseInt(id), cashId: parseInt(cashId) },
-        relations: ['cash', 'incomeCategory'],
+        relations: ['cash', 'incomeCategory', 'expenseCategory'],
       });
 
       if (!transaction) {
@@ -185,15 +193,14 @@ export class CashTransactionsController {
 
       // Проверяем существование категории, если указана
       let categoryIdValue: number | null = null;
+      let expenseCategoryIdValue: number | null = null;
       
-      // Обрабатываем categoryId - может быть строкой, числом или null
-      if (categoryId !== undefined && categoryId !== null) {
-        // Преобразуем в число, если это строка
+      // Для приходов используем IncomeCategory
+      if (transactionType === CashTransactionType.INCOME && categoryId !== undefined && categoryId !== null) {
         const categoryIdNum = typeof categoryId === 'string' 
           ? (categoryId.trim() === '' ? null : parseInt(categoryId)) 
           : categoryId;
         
-        // Проверяем, что это валидное число
         if (categoryIdNum !== null && !isNaN(categoryIdNum) && categoryIdNum > 0) {
           const categoryRepository = AppDataSource.getRepository(IncomeCategory);
           const category = await categoryRepository.findOne({
@@ -201,19 +208,46 @@ export class CashTransactionsController {
           });
           
           if (!category) {
-            throw new AppError('Категория не найдена', 404);
+            throw new AppError('Категория прихода не найдена', 404);
           }
           
-          // Проверяем, что категория принадлежит текущему пользователю
           if (
             req.userRole !== UserRole.SUPER_ADMIN &&
             req.userRole !== UserRole.ADMIN &&
             category.vesselOwnerId !== req.userId
           ) {
-            throw new AppError('Доступ к категории запрещен', 403);
+            throw new AppError('Доступ к категории прихода запрещен', 403);
           }
           
           categoryIdValue = category.id;
+        }
+      }
+      
+      // Для расходов используем VesselOwnerExpenseCategory
+      if (transactionType === CashTransactionType.EXPENSE && expenseCategoryId !== undefined && expenseCategoryId !== null) {
+        const expenseCategoryIdNum = typeof expenseCategoryId === 'string' 
+          ? (expenseCategoryId.trim() === '' ? null : parseInt(expenseCategoryId)) 
+          : expenseCategoryId;
+        
+        if (expenseCategoryIdNum !== null && !isNaN(expenseCategoryIdNum) && expenseCategoryIdNum > 0) {
+          const expenseCategoryRepository = AppDataSource.getRepository(VesselOwnerExpenseCategory);
+          const expenseCategory = await expenseCategoryRepository.findOne({
+            where: { id: expenseCategoryIdNum },
+          });
+          
+          if (!expenseCategory) {
+            throw new AppError('Категория расхода не найдена', 404);
+          }
+          
+          if (
+            req.userRole !== UserRole.SUPER_ADMIN &&
+            req.userRole !== UserRole.ADMIN &&
+            expenseCategory.vesselOwnerId !== req.userId
+          ) {
+            throw new AppError('Доступ к категории расхода запрещен', 403);
+          }
+          
+          expenseCategoryIdValue = expenseCategory.id;
         }
       }
 
@@ -229,13 +263,14 @@ export class CashTransactionsController {
         counterparty: counterparty as string | undefined,
         documentPath: documentPath as string | undefined,
         categoryId: categoryIdValue,
+        expenseCategoryId: expenseCategoryIdValue,
       });
 
       await transactionRepository.save(transaction);
 
       const savedTransaction = await transactionRepository.findOne({
         where: { id: transaction.id },
-        relations: ['cash', 'incomeCategory'],
+        relations: ['cash', 'incomeCategory', 'expenseCategory'],
       });
 
       res.status(201).json(savedTransaction);
@@ -303,26 +338,54 @@ export class CashTransactionsController {
       if (counterparty !== undefined) transaction.counterparty = counterparty || undefined;
       if (documentPath !== undefined)
         transaction.documentPath = documentPath || undefined;
-      if (categoryId !== undefined) {
+      // Обновляем категорию прихода, если тип транзакции - приход
+      const finalTransactionType = transactionType !== undefined ? transactionType as CashTransactionType : transaction.transactionType;
+      if (categoryId !== undefined && finalTransactionType === CashTransactionType.INCOME) {
         if (categoryId === null || categoryId === '') {
           transaction.categoryId = null;
+          transaction.expenseCategoryId = null; // Очищаем категорию расхода
         } else {
-          // Проверяем существование категории и права доступа
           const categoryRepository = AppDataSource.getRepository(IncomeCategory);
           const category = await categoryRepository.findOne({
             where: { id: parseInt(categoryId as string) },
           });
           if (!category) {
-            throw new AppError('Категория не найдена', 404);
+            throw new AppError('Категория прихода не найдена', 404);
           }
           if (
             req.userRole !== UserRole.SUPER_ADMIN &&
             req.userRole !== UserRole.ADMIN &&
             category.vesselOwnerId !== req.userId
           ) {
-            throw new AppError('Категория не принадлежит вам', 403);
+            throw new AppError('Категория прихода не принадлежит вам', 403);
           }
           transaction.categoryId = parseInt(categoryId as string);
+          transaction.expenseCategoryId = null; // Очищаем категорию расхода
+        }
+      }
+      
+      // Обновляем категорию расхода, если тип транзакции - расход
+      if (expenseCategoryId !== undefined && finalTransactionType === CashTransactionType.EXPENSE) {
+        if (expenseCategoryId === null || expenseCategoryId === '') {
+          transaction.expenseCategoryId = null;
+          transaction.categoryId = null; // Очищаем категорию прихода
+        } else {
+          const expenseCategoryRepository = AppDataSource.getRepository(VesselOwnerExpenseCategory);
+          const expenseCategory = await expenseCategoryRepository.findOne({
+            where: { id: parseInt(expenseCategoryId as string) },
+          });
+          if (!expenseCategory) {
+            throw new AppError('Категория расхода не найдена', 404);
+          }
+          if (
+            req.userRole !== UserRole.SUPER_ADMIN &&
+            req.userRole !== UserRole.ADMIN &&
+            expenseCategory.vesselOwnerId !== req.userId
+          ) {
+            throw new AppError('Категория расхода не принадлежит вам', 403);
+          }
+          transaction.expenseCategoryId = parseInt(expenseCategoryId as string);
+          transaction.categoryId = null; // Очищаем категорию прихода
         }
       }
 
@@ -330,7 +393,7 @@ export class CashTransactionsController {
 
       const updatedTransaction = await transactionRepository.findOne({
         where: { id: transaction.id },
-        relations: ['cash', 'incomeCategory'],
+        relations: ['cash', 'incomeCategory', 'expenseCategory'],
       });
 
       res.json(updatedTransaction);

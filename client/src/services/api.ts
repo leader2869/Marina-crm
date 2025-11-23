@@ -216,6 +216,14 @@ export const incomeCategoriesService = {
   delete: (id: number) => api.delete(`/vessel-owner/income-categories/${id}`),
 }
 
+export const expenseCategoriesService = {
+  getAll: (params?: any) => api.get('/vessel-owner/expense-categories', { params }),
+  getById: (id: number) => api.get(`/vessel-owner/expense-categories/${id}`),
+  create: (data: any) => api.post('/vessel-owner/expense-categories', data),
+  update: (id: number, data: any) => api.put(`/vessel-owner/expense-categories/${id}`, data),
+  delete: (id: number) => api.delete(`/vessel-owner/expense-categories/${id}`),
+}
+
 export const incomesService = {
   getAll: (params?: any) => api.get('/vessel-owner/incomes', { params }),
   getById: (id: number) => api.get(`/vessel-owner/incomes/${id}`),
