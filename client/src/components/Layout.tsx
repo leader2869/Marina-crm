@@ -23,7 +23,8 @@ import {
   X as XIcon,
   Code,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  User
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -53,7 +54,9 @@ export default function Layout() {
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
+    avatar: '',
   })
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'phone'>('profile')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -317,7 +320,9 @@ export default function Layout() {
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
+      avatar: user.avatar || '',
     })
+    setAvatarPreview(user.avatar || null)
     setActiveTab('profile')
     setError('')
     setSuccess('')
@@ -334,7 +339,9 @@ export default function Layout() {
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
+      avatar: '',
     })
+    setAvatarPreview(null)
     setError('')
     setSuccess('')
   }
@@ -355,6 +362,9 @@ export default function Layout() {
       }
       if (profileForm.email !== user?.email) {
         updateData.email = profileForm.email
+      }
+      if (profileForm.avatar !== user?.avatar) {
+        updateData.avatar = profileForm.avatar || null
       }
 
       if (Object.keys(updateData).length > 0) {
@@ -649,10 +659,25 @@ export default function Layout() {
                 onClick={handleOpenProfileModal}
                 className="flex-1 cursor-pointer hover:bg-gray-50 -m-2 p-2 rounded-lg transition-colors"
               >
-                <p className="text-sm font-medium text-gray-900">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
+                <div className="flex items-center space-x-3">
+                  {user?.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={`${user.firstName} ${user.lastName}`}
+                      className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                      <User className="h-6 w-6 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.firstName} {user?.lastName}
+                    </p>
+                    <p className="text-xs text-gray-500">{user?.email}</p>
+                  </div>
+                </div>
                 <p className="text-xs text-primary-600 font-medium mt-1">
                   {user?.role === UserRole.CLUB_OWNER && 'Владелец клуба'}
                   {user?.role === UserRole.VESSEL_OWNER && 'Судовладелец'}
@@ -847,6 +872,70 @@ export default function Layout() {
                 {/* Содержимое вкладок */}
                 {activeTab === 'profile' && (
                   <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Аватар
+                      </label>
+                      <div className="flex items-center space-x-4">
+                        {(avatarPreview || user?.avatar) && (
+                          <img
+                            src={avatarPreview || user?.avatar || ''}
+                            alt="Аватар"
+                            className="w-20 h-20 rounded-full object-cover border-2 border-gray-300"
+                          />
+                        )}
+                        {!avatarPreview && !user?.avatar && (
+                          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                            <User className="h-10 w-10 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                // Проверяем размер файла (макс 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  setError('Размер файла не должен превышать 5MB')
+                                  return
+                                }
+                                // Проверяем тип файла
+                                if (!file.type.startsWith('image/')) {
+                                  setError('Файл должен быть изображением')
+                                  return
+                                }
+                                const reader = new FileReader()
+                                reader.onloadend = () => {
+                                  const base64String = reader.result as string
+                                  setProfileForm({ ...profileForm, avatar: base64String })
+                                  setAvatarPreview(base64String)
+                                  setError('')
+                                }
+                                reader.readAsDataURL(file)
+                              }
+                            }}
+                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">
+                            Рекомендуемый размер: 200x200px. Максимальный размер: 5MB
+                          </p>
+                        </div>
+                        {(avatarPreview || user?.avatar) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileForm({ ...profileForm, avatar: '' })
+                              setAvatarPreview(null)
+                            }}
+                            className="px-3 py-1 text-sm text-red-600 hover:text-red-700"
+                          >
+                            Удалить
+                          </button>
+                        )}
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Имя *

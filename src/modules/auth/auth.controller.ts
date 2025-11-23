@@ -369,7 +369,7 @@ export class AuthController {
         throw new AppError('Требуется аутентификация', 401);
       }
 
-      const { firstName, lastName, email } = req.body;
+      const { firstName, lastName, email, avatar } = req.body;
 
       const userRepository = AppDataSource.getRepository(User);
       const user = await userRepository.findOne({
@@ -395,6 +395,11 @@ export class AuthController {
           throw new AppError('Пользователь с таким email уже существует', 400);
         }
         user.email = email;
+      }
+
+      // Обновление аватара (может быть base64 строка или URL)
+      if (avatar !== undefined) {
+        user.avatar = avatar || null;
       }
 
       await userRepository.save(user);
