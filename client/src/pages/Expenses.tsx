@@ -472,6 +472,9 @@ export default function Expenses() {
                     Описание
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Контрагент
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
                   </th>
                 </tr>
@@ -505,6 +508,9 @@ export default function Expenses() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {transaction.description || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {transaction.counterparty || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
