@@ -26,7 +26,15 @@ import {
   ChevronRight,
   User,
   Wrench,
-  ShoppingCart
+  ShoppingCart,
+  FilePlus,
+  CheckCircle,
+  Route,
+  Search,
+  DollarSign,
+  Calendar,
+  UtensilsCrossed,
+  Code
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -84,10 +92,18 @@ export default function Layout() {
       { name: 'Виджет', href: '/widget', icon: Code, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Тарифы', href: '/tariffs', icon: Receipt, roles: [UserRole.CLUB_OWNER] },
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
-      { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER] },
+      { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.AGENT] },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
       { name: 'Обслуживание катеров', href: '/vessel-maintenance', icon: Wrench, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Агентские заказы', href: '/agent-orders', icon: ShoppingCart, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
+      // Меню для Агента
+      { name: 'Разместить заказ', href: '/agent/create-order', icon: FilePlus, roles: [UserRole.AGENT] },
+      { name: 'Завершенные заказы', href: '/agent/completed-orders', icon: CheckCircle, roles: [UserRole.AGENT] },
+      { name: 'Мои маршруты', href: '/agent/routes', icon: Route, roles: [UserRole.AGENT] },
+      { name: 'Подборка катеров', href: '/agent/vessel-selection', icon: Search, roles: [UserRole.AGENT] },
+      { name: 'Забронировать причал', href: '/agent/book-berth', icon: Calendar, roles: [UserRole.AGENT] },
+      { name: 'Доп. услуги', href: '/agent/additional-services', icon: UtensilsCrossed, roles: [UserRole.AGENT] },
+      { name: 'Виджеты', href: '/agent/widgets', icon: Code, roles: [UserRole.AGENT] },
       // Пункты регистрации для гостей
       { name: 'Зарегистрироваться как Владелец клуба', href: '/register?role=club_owner', icon: UserPlus, roles: [UserRole.GUEST] },
       { name: 'Зарегистрироваться как Судовладелец', href: '/register?role=vessel_owner', icon: UserPlus, roles: [UserRole.GUEST] },

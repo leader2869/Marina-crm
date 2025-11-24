@@ -31,6 +31,13 @@ import VesselRefueling from './pages/VesselRefueling'
 import VesselService from './pages/VesselService'
 import VesselMaintenance from './pages/VesselMaintenance'
 import AgentOrders from './pages/AgentOrders'
+import CreateOrder from './pages/agent/CreateOrder'
+import CompletedOrders from './pages/agent/CompletedOrders'
+import AgentRoutes from './pages/agent/AgentRoutes'
+import VesselSelection from './pages/agent/VesselSelection'
+import BookBerth from './pages/agent/BookBerth'
+import AdditionalServices from './pages/agent/AdditionalServices'
+import AgentWidgets from './pages/agent/AgentWidgets'
 import { UserRole } from './types'
 
 // Компонент для редиректа на начальную страницу в зависимости от роли
@@ -206,6 +213,63 @@ function App() {
             <Route 
               path="agent-orders" 
               element={<AgentOrders />} 
+            />
+            {/* Роуты для Агента */}
+            <Route 
+              path="agent/create-order" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
+                  <CreateOrder />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="agent/completed-orders" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
+                  <CompletedOrders />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="agent/routes" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
+                  <AgentRoutes />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="agent/vessel-selection" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
+                  <VesselSelection />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="agent/book-berth" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
+                  <BookBerth />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="agent/additional-services" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
+                  <AdditionalServices />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="agent/widgets" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
+                  <AgentWidgets />
+                </RoleProtectedRoute>
+              } 
             />
             {/* Catch-all для несуществующих роутов */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
