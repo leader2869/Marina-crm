@@ -672,12 +672,12 @@ export default function VesselDetails() {
           </div>
         </div>
 
-        {/* Документы и фото */}
+        {/* Фотографии катера */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-              <FileText className="h-6 w-6 text-primary-600 mr-2" />
-              Документы и фото
+              <ImageIcon className="h-6 w-6 text-primary-600 mr-2" />
+              Фотографии катера
             </h2>
             {canEdit() && (
               <label className="flex items-center px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 cursor-pointer disabled:opacity-50">
@@ -767,7 +767,7 @@ export default function VesselDetails() {
             {!vessel.documentPath && photos.length === 0 && (
               <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                 <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 mb-2">Документы и фото не загружены</p>
+                <p className="text-gray-600 mb-2">Фотографии катера не загружены</p>
                 {canEdit() && (
                   <p className="text-sm text-gray-500">Нажмите "Загрузить фото" для добавления фотографий (максимум 7)</p>
                 )}
