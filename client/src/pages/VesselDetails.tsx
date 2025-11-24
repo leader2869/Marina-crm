@@ -24,6 +24,7 @@ export default function VesselDetails() {
     length: '',
     width: '',
     heightAboveWaterline: '',
+    passengerCapacity: '',
     registrationNumber: '',
     technicalSpecs: '',
   })
@@ -59,6 +60,7 @@ export default function VesselDetails() {
           length: data.length.toString(),
           width: data.width?.toString() || '',
           heightAboveWaterline: data.heightAboveWaterline?.toString() || '',
+          passengerCapacity: data.passengerCapacity?.toString() || '',
           registrationNumber: data.registrationNumber || '',
           technicalSpecs: data.technicalSpecs || '',
         })
@@ -139,8 +141,8 @@ export default function VesselDetails() {
   const handleSave = async () => {
     if (!vessel) return
 
-    if (!editForm.name || !editForm.type || !editForm.length || !editForm.width) {
-      setError('Заполните все обязательные поля: Название, Тип, Длина, Ширина')
+    if (!editForm.name || !editForm.type || !editForm.length || !editForm.width || !editForm.passengerCapacity) {
+      setError('Заполните все обязательные поля: Название, Тип, Длина, Ширина, Пассажировместимость')
       return
     }
 
@@ -154,6 +156,7 @@ export default function VesselDetails() {
         length: parseFloat(editForm.length),
         width: parseFloat(editForm.width),
         heightAboveWaterline: editForm.heightAboveWaterline ? parseFloat(editForm.heightAboveWaterline) : null,
+        passengerCapacity: parseInt(editForm.passengerCapacity),
         registrationNumber: editForm.registrationNumber || null,
         technicalSpecs: editForm.technicalSpecs || null,
       }
@@ -524,6 +527,20 @@ export default function VesselDetails() {
                 />
               </div>
               <div>
+                <label htmlFor="edit-passengerCapacity" className="block text-sm font-medium text-gray-700 mb-1">
+                  Пассажировместимость *
+                </label>
+                <input
+                  id="edit-passengerCapacity"
+                  type="number"
+                  min="1"
+                  required
+                  value={editForm.passengerCapacity}
+                  onChange={(e) => setEditForm({ ...editForm, passengerCapacity: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                />
+              </div>
+              <div>
                 <label htmlFor="edit-registrationNumber" className="block text-sm font-medium text-gray-700 mb-1">
                   Регистрационный номер
                 </label>
@@ -572,6 +589,10 @@ export default function VesselDetails() {
                   <span className="font-semibold text-gray-900">{vessel.heightAboveWaterline} м</span>
                 </div>
               )}
+              <div className="flex justify-between py-2 border-b border-gray-200">
+                <span className="text-gray-600">Пассажировместимость:</span>
+                <span className="font-semibold text-gray-900">{vessel.passengerCapacity} чел.</span>
+              </div>
               {vessel.registrationNumber && (
                 <div className="flex justify-between py-2 border-b border-gray-200">
                   <span className="text-gray-600">Регистрационный номер:</span>

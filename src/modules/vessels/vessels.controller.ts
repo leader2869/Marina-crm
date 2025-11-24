@@ -108,6 +108,7 @@ export class VesselsController {
         length,
         width,
         heightAboveWaterline,
+        passengerCapacity,
         registrationNumber,
         documentPath,
         technicalSpecs,
@@ -115,8 +116,8 @@ export class VesselsController {
         mainPhotoIndex,
       } = req.body;
 
-      if (!name || !type || !length || !width) {
-        throw new AppError('Все обязательные поля должны быть заполнены (название, тип, длина, ширина)', 400);
+      if (!name || !type || !length || !width || !passengerCapacity) {
+        throw new AppError('Все обязательные поля должны быть заполнены (название, тип, длина, ширина, пассажировместимость)', 400);
       }
 
       if (!req.userId) {
@@ -131,17 +132,33 @@ export class VesselsController {
         photosJson = JSON.stringify(photos);
       }
       
+      // Парсим числовые значения с проверкой
+      const parsedLength = parseFloat(length as string);
+      const parsedWidth = parseFloat(width as string);
+      const parsedPassengerCapacity = parseInt(passengerCapacity as string, 10);
+      
+      if (isNaN(parsedLength) || parsedLength <= 0) {
+        throw new AppError('Длина должна быть положительным числом', 400);
+      }
+      if (isNaN(parsedWidth) || parsedWidth <= 0) {
+        throw new AppError('Ширина должна быть положительным числом', 400);
+      }
+      if (isNaN(parsedPassengerCapacity) || parsedPassengerCapacity <= 0) {
+        throw new AppError('Пассажировместимость должна быть положительным целым числом', 400);
+      }
+      
       const vessel = vesselRepository.create({
         name: name as string,
         type: type as string,
-        length: parseFloat(length as string),
-        width: parseFloat(width as string),
+        length: parsedLength,
+        width: parsedWidth,
         heightAboveWaterline: heightAboveWaterline ? parseFloat(heightAboveWaterline as string) : undefined,
+        passengerCapacity: parsedPassengerCapacity,
         registrationNumber: registrationNumber as string | undefined,
         documentPath: documentPath as string | undefined,
         technicalSpecs: technicalSpecs ? JSON.stringify(technicalSpecs) : undefined,
         photos: photosJson,
-        mainPhotoIndex: mainPhotoIndex !== undefined ? parseInt(mainPhotoIndex as string) : undefined,
+        mainPhotoIndex: mainPhotoIndex !== undefined ? parseInt(mainPhotoIndex as string, 10) : undefined,
         ownerId: req.userId,
       });
 
@@ -218,6 +235,9 @@ export class VesselsController {
       if (otherFields.width !== undefined && (otherFields.width === null || otherFields.width === '' || otherFields.width === undefined)) {
         throw new AppError('Ширина судна обязательна', 400);
       }
+      if (otherFields.passengerCapacity !== undefined && (otherFields.passengerCapacity === null || otherFields.passengerCapacity === '' || otherFields.passengerCapacity === undefined)) {
+        throw new AppError('Пассажировместимость обязательна', 400);
+      }
       
       // Проверка: если судно скрыто, то оно не может быть опубликовано
       if (vessel.isActive === false) {
@@ -246,6 +266,7 @@ export class VesselsController {
         length: vessel.length,
         width: vessel.width,
         heightAboveWaterline: vessel.heightAboveWaterline,
+        passengerCapacity: vessel.passengerCapacity,
         registrationNumber: vessel.registrationNumber,
         technicalSpecs: vessel.technicalSpecs,
         isActive: vessel.isActive,
@@ -263,6 +284,13 @@ export class VesselsController {
       }
       if (otherFields.heightAboveWaterline !== undefined && otherFields.heightAboveWaterline !== null && otherFields.heightAboveWaterline !== '') {
         otherFields.heightAboveWaterline = parseFloat(otherFields.heightAboveWaterline as string);
+      }
+      if (otherFields.passengerCapacity !== undefined) {
+        const parsedPassengerCapacity = parseInt(otherFields.passengerCapacity as string, 10);
+        if (isNaN(parsedPassengerCapacity) || parsedPassengerCapacity <= 0) {
+          throw new AppError('Пассажировместимость должна быть положительным целым числом', 400);
+        }
+        otherFields.passengerCapacity = parsedPassengerCapacity;
       }
       
       Object.assign(vessel, otherFields);
@@ -310,6 +338,7 @@ export class VesselsController {
         length: updatedVessel!.length,
         width: updatedVessel!.width,
         heightAboveWaterline: updatedVessel!.heightAboveWaterline,
+        passengerCapacity: updatedVessel!.passengerCapacity,
         registrationNumber: updatedVessel!.registrationNumber,
         technicalSpecs: updatedVessel!.technicalSpecs,
         isActive: updatedVessel!.isActive,

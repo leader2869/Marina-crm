@@ -142,6 +142,7 @@ export interface Vessel {
   length: number
   width?: number
   heightAboveWaterline?: number
+  passengerCapacity: number // пассажировместимость (обязательное поле)
   registrationNumber?: string
   documentPath?: string
   technicalSpecs?: string

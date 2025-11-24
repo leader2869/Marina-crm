@@ -27,6 +27,7 @@ export default function Vessels() {
     length: '',
     width: '',
     heightAboveWaterline: '',
+    passengerCapacity: '',
     registrationNumber: '',
     technicalSpecs: '',
     ownerId: '',
@@ -104,6 +105,7 @@ export default function Vessels() {
       length: '',
       width: '',
       heightAboveWaterline: '',
+      passengerCapacity: '',
       registrationNumber: '',
       technicalSpecs: '',
       ownerId: user?.id?.toString() || '',
@@ -112,8 +114,8 @@ export default function Vessels() {
   }
 
   const handleCreate = async () => {
-    if (!addForm.name || !addForm.type || !addForm.length || !addForm.width) {
-      setError('Заполните все обязательные поля: Название, Тип, Длина, Ширина')
+    if (!addForm.name || !addForm.type || !addForm.length || !addForm.width || !addForm.passengerCapacity) {
+      setError('Заполните все обязательные поля: Название, Тип, Длина, Ширина, Пассажировместимость')
       return
     }
 
@@ -127,6 +129,7 @@ export default function Vessels() {
         length: parseFloat(addForm.length),
         width: parseFloat(addForm.width),
         heightAboveWaterline: addForm.heightAboveWaterline ? parseFloat(addForm.heightAboveWaterline) : null,
+        passengerCapacity: parseInt(addForm.passengerCapacity),
         registrationNumber: addForm.registrationNumber || null,
         technicalSpecs: addForm.technicalSpecs || null,
       }
@@ -208,6 +211,7 @@ export default function Vessels() {
           'Длина (м)': vessel.length || 0,
           'Ширина (м)': vessel.width || '-',
           'Высота над ватерлинией (м)': vessel.heightAboveWaterline || '-',
+          'Пассажировместимость': vessel.passengerCapacity || '-',
           'Регистрационный номер': vessel.registrationNumber || '-',
           'Владелец (Имя)': vessel.owner?.firstName || '-',
           'Владелец (Фамилия)': vessel.owner?.lastName || '-',
@@ -466,6 +470,10 @@ export default function Vessels() {
                         <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>{vessel.heightAboveWaterline} м</span>
                       </div>
                     )}
+                    <div className="flex justify-between text-sm">
+                      <span className={(vessel.photos && vessel.photos.length > 0) ? 'text-gray-200' : 'text-gray-600'}>Пассажировместимость:</span>
+                      <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>{vessel.passengerCapacity || '-'} чел.</span>
+                    </div>
                     {vessel.registrationNumber && (
                       <div className="flex justify-between text-sm">
                         <span className={(vessel.photos && vessel.photos.length > 0) ? 'text-gray-200' : 'text-gray-600'}>Рег. номер:</span>
@@ -587,6 +595,21 @@ export default function Vessels() {
                       step="0.1"
                       value={addForm.heightAboveWaterline}
                       onChange={(e) => setAddForm({ ...addForm, heightAboveWaterline: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="add-passengerCapacity" className="block text-sm font-medium text-gray-700">
+                      Пассажировместимость *
+                    </label>
+                    <input
+                      id="add-passengerCapacity"
+                      type="number"
+                      min="1"
+                      required
+                      value={addForm.passengerCapacity}
+                      onChange={(e) => setAddForm({ ...addForm, passengerCapacity: e.target.value })}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                     />
                   </div>

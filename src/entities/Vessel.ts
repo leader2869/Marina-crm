@@ -31,6 +31,9 @@ export class Vessel {
   @Column({ type: 'decimal', precision: 8, scale: 2, nullable: true })
   heightAboveWaterline: number; // высота над ватерлинией в метрах
 
+  @Column({ type: 'int' })
+  passengerCapacity: number; // пассажировместимость (обязательное поле)
+
   @Column({ nullable: true })
   registrationNumber: string;
 
