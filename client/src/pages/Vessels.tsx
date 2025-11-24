@@ -139,12 +139,17 @@ export default function Vessels() {
         length: parseFloat(addForm.length),
         width: parseFloat(addForm.width),
         heightAboveWaterline: addForm.heightAboveWaterline ? parseFloat(addForm.heightAboveWaterline) : null,
-        passengerCapacity: parseInt(addForm.passengerCapacity),
+        passengerCapacity: parseInt(addForm.passengerCapacity, 10),
         registrationNumber: addForm.registrationNumber || null,
         technicalSpecs: addForm.technicalSpecs || null,
       }
 
-      await vesselsService.create(createData)
+      console.log('[Frontend] Отправка данных для создания катера:', createData);
+
+      const createdVessel = await vesselsService.create(createData)
+      console.log('[Frontend] Катер создан, получен ответ:', createdVessel);
+      console.log('[Frontend] Пассажировместимость в ответе:', createdVessel?.passengerCapacity);
+      
       await loadVessels()
       handleCloseAdd()
     } catch (err: any) {

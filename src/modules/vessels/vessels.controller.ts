@@ -70,9 +70,17 @@ export class VesselsController {
         }
         // Убеждаемся, что passengerCapacity всегда присутствует
         if (vessel.passengerCapacity === undefined || vessel.passengerCapacity === null) {
-          console.warn(`⚠️  Катер ID ${vessel.id} не имеет пассажировместимости`);
+          console.warn(`⚠️  Катер ID ${vessel.id} (${vessel.name}) не имеет пассажировместимости`);
+        } else {
+          console.log(`✅ Катер ID ${vessel.id} (${vessel.name}) имеет пассажировместимость: ${vessel.passengerCapacity}`);
         }
         return vessel;
+      });
+      
+      console.log(`[Vessel GetAll] Возвращаем ${vesselsWithPhotos.length} катеров, пример первого:`, {
+        id: vesselsWithPhotos[0]?.id,
+        name: vesselsWithPhotos[0]?.name,
+        passengerCapacity: vesselsWithPhotos[0]?.passengerCapacity,
       });
 
       res.json(createPaginatedResponse(vesselsWithPhotos, total, page, limit));
@@ -172,6 +180,15 @@ export class VesselsController {
         throw new AppError('Пассажировместимость должна быть положительным целым числом', 400);
       }
       
+      console.log('[Vessel Create] Создание катера с данными:', {
+        name,
+        type,
+        length: parsedLength,
+        width: parsedWidth,
+        passengerCapacity: parsedPassengerCapacity,
+        ownerId: req.userId,
+      });
+
       const vessel = vesselRepository.create({
         name: name as string,
         type: type as string,
@@ -187,14 +204,50 @@ export class VesselsController {
         ownerId: req.userId,
       });
 
-      await vesselRepository.save(vessel);
-
-      const savedVessel = await vesselRepository.findOne({
-        where: { id: vessel.id },
-        relations: ['owner'],
+      const savedVessel = await vesselRepository.save(vessel);
+      console.log('[Vessel Create] Катер сохранен в БД:', {
+        id: savedVessel.id,
+        passengerCapacity: savedVessel.passengerCapacity,
       });
 
-      res.status(201).json(savedVessel);
+      const vesselWithRelations = await vesselRepository
+        .createQueryBuilder('vessel')
+        .leftJoinAndSelect('vessel.owner', 'owner')
+        .where('vessel.id = :id', { id: savedVessel.id })
+        .select([
+          'vessel.id',
+          'vessel.name',
+          'vessel.type',
+          'vessel.length',
+          'vessel.width',
+          'vessel.heightAboveWaterline',
+          'vessel.passengerCapacity',
+          'vessel.registrationNumber',
+          'vessel.documentPath',
+          'vessel.technicalSpecs',
+          'vessel.photos',
+          'vessel.mainPhotoIndex',
+          'vessel.isActive',
+          'vessel.isValidated',
+          'vessel.isSubmittedForValidation',
+          'vessel.rejectionComment',
+          'vessel.ownerId',
+          'vessel.createdAt',
+          'vessel.updatedAt',
+          'owner.id',
+          'owner.firstName',
+          'owner.lastName',
+          'owner.email',
+          'owner.phone',
+        ])
+        .getOne();
+
+      console.log('[Vessel Create] Катер загружен из БД для ответа:', {
+        id: vesselWithRelations?.id,
+        passengerCapacity: vesselWithRelations?.passengerCapacity,
+      });
+
+      res.status(201).json(vesselWithRelations);
     } catch (error) {
       next(error);
     }

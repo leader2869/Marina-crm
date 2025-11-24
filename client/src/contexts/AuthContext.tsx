@@ -35,10 +35,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.log('Profile loaded:', userData)
           console.log('User role from API:', userData.role)
           setUser(userData)
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error loading profile:', error)
-          localStorage.removeItem('token')
-          setToken(null)
+          // Если токен невалидный или истек, очищаем его
+          if (error?.error === 'Недействительный токен' || 
+              error?.error === 'Требуется аутентификация' ||
+              error?.response?.status === 401) {
+            console.log('Token invalid, clearing...')
+            localStorage.removeItem('token')
+            setToken(null)
+            setUser(null)
+          }
         }
       }
       setLoading(false)
