@@ -131,7 +131,7 @@ export default function CreateOrder() {
 
   const handleSelectVessel = async (orderId: number, responseId: number) => {
     try {
-      await agentOrdersService.selectVessel(orderId, responseId)
+      await agentOrdersService.selectVessel(orderId, { responseId })
       setShowResponsesModal(null)
       await loadOrders()
     } catch (err: any) {
