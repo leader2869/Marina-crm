@@ -245,7 +245,10 @@ app.use('/api/vessel-owner/cashes', autoActivityLogger, vesselOwnerCashesRoutes)
 app.use('/api/vessel-owner/income-categories', autoActivityLogger, incomeCategoriesRoutes);
 app.use('/api/vessel-owner/expense-categories', autoActivityLogger, expenseCategoriesRoutes);
 app.use('/api/vessel-owner/incomes', autoActivityLogger, incomesRoutes);
-app.use('/api/agent-orders', autoActivityLogger, agentOrdersRoutes);
+app.use('/api/agent-orders', (req, res, next) => {
+  console.log(`[Server] Agent Orders Route: ${req.method} ${req.path}`, { originalUrl: req.originalUrl });
+  next();
+}, autoActivityLogger, agentOrdersRoutes);
 
 // Error handler
 app.use(errorHandler);
