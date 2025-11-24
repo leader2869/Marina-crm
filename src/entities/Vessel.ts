@@ -43,7 +43,7 @@ export class Vessel {
   @Column({ type: 'text', nullable: true })
   photos: string | null; // JSON массив строк с base64 фотографиями
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   mainPhotoIndex: number | null; // Индекс главного фото в массиве photos
 
   @Column({ default: true })
