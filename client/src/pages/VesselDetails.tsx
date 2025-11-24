@@ -243,18 +243,18 @@ export default function VesselDetails() {
         mainPhotoIndex: newMainPhotoIndex 
       })
       
-      const response = await vesselsService.update(vessel.id, { 
+      const updatedVessel = await vesselsService.update(vessel.id, { 
         photos: newPhotos,
         mainPhotoIndex: newMainPhotoIndex
-      })
+      }) as Vessel
       
-      console.log('Ответ от сервера:', response)
+      console.log('Ответ от сервера:', updatedVessel)
       
       // Обновляем состояние на основе ответа сервера
-      if (response && response.photos) {
-        console.log('Обновление состояния из ответа сервера:', response.photos.length)
-        setPhotos(response.photos)
-        setMainPhotoIndex(response.mainPhotoIndex !== undefined ? response.mainPhotoIndex : null)
+      if (updatedVessel && updatedVessel.photos) {
+        console.log('Обновление состояния из ответа сервера:', updatedVessel.photos.length)
+        setPhotos(updatedVessel.photos)
+        setMainPhotoIndex(updatedVessel.mainPhotoIndex !== undefined ? updatedVessel.mainPhotoIndex : null)
       } else {
         // Если ответ не содержит photos, обновляем из локального состояния
         console.log('Обновление состояния из локальных данных')
@@ -265,8 +265,8 @@ export default function VesselDetails() {
       }
       
       // Обновляем vessel для синхронизации
-      if (response) {
-        setVessel(response as Vessel)
+      if (updatedVessel && updatedVessel.id) {
+        setVessel(updatedVessel)
       } else {
         // Перезагружаем данные с сервера для синхронизации
         await loadVessel()
@@ -422,7 +422,6 @@ export default function VesselDetails() {
             <button
               onClick={() => {
                 setEditing(false)
-                setPhotoPreview(null)
                 loadVessel()
               }}
               className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
