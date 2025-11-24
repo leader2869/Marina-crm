@@ -648,7 +648,7 @@ export default function Vessels() {
 
                   <div>
                     <label htmlFor="add-specs" className="block text-sm font-medium text-gray-700">
-                      Технические характеристики
+                      Описание катера
                     </label>
                     <textarea
                       id="add-specs"
