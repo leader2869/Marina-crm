@@ -1,5 +1,4 @@
 import { UtensilsCrossed } from 'lucide-react'
-import { LoadingAnimation } from '../../components/LoadingAnimation'
 import BackButton from '../../components/BackButton'
 
 export default function AdditionalServices() {
