@@ -47,7 +47,9 @@ export default function CreateOrder() {
     try {
       setLoading(true)
       const response = await agentOrdersService.getAll({ status: 'active', limit: 100 })
-      setOrders(response.data || [])
+      // API возвращает объект с пагинацией: { data: [...], total: number, page: number, limit: number }
+      const ordersData = Array.isArray(response) ? response : (response.data || response || [])
+      setOrders(ordersData)
     } catch (err: any) {
       console.error('Ошибка загрузки заказов:', err)
       setError(err.error || err.message || 'Ошибка загрузки заказов')
