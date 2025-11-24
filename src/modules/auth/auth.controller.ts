@@ -69,15 +69,21 @@ export class AuthController {
 
       const hashedPassword = await hashPassword(password);
       
-      // Валидация роли - разрешаем только vessel_owner или club_owner при регистрации
+      // Валидация роли - разрешаем vessel_owner, club_owner, agent, captain, mechanic при регистрации
       let userRole: UserRole;
       if (role === UserRole.VESSEL_OWNER) {
         userRole = UserRole.VESSEL_OWNER;
       } else if (role === UserRole.CLUB_OWNER) {
         // Для CLUB_OWNER присваиваем роль PENDING_VALIDATION до валидации
         userRole = UserRole.PENDING_VALIDATION;
+      } else if (role === UserRole.AGENT) {
+        userRole = UserRole.AGENT;
+      } else if (role === UserRole.CAPTAIN) {
+        userRole = UserRole.CAPTAIN;
+      } else if (role === UserRole.MECHANIC) {
+        userRole = UserRole.MECHANIC;
       } else {
-        throw new AppError('Неверная роль. Выберите: vessel_owner или club_owner', 400);
+        throw new AppError('Неверная роль. Выберите: vessel_owner, club_owner, agent, captain или mechanic', 400);
       }
 
       // Для PENDING_VALIDATION isValidated = false, для остальных = true

@@ -12,13 +12,13 @@ export default function Register() {
     firstName: '',
     lastName: '',
     phone: '+7',
-    role: (roleParam === 'club_owner' ? 'club_owner' : 'vessel_owner') as 'vessel_owner' | 'club_owner',
+    role: (roleParam === 'club_owner' ? 'club_owner' : roleParam === 'agent' ? 'agent' : roleParam === 'captain' ? 'captain' : roleParam === 'mechanic' ? 'mechanic' : 'vessel_owner') as 'vessel_owner' | 'club_owner' | 'agent' | 'captain' | 'mechanic',
   })
   
   // Обновляем роль при изменении query параметра
   useEffect(() => {
-    if (roleParam === 'club_owner' || roleParam === 'vessel_owner') {
-      setFormData(prev => ({ ...prev, role: roleParam as 'vessel_owner' | 'club_owner' }))
+    if (roleParam === 'club_owner' || roleParam === 'vessel_owner' || roleParam === 'agent' || roleParam === 'captain' || roleParam === 'mechanic') {
+      setFormData(prev => ({ ...prev, role: roleParam as 'vessel_owner' | 'club_owner' | 'agent' | 'captain' | 'mechanic' }))
     }
   }, [roleParam])
   const [error, setError] = useState('')
@@ -270,9 +270,12 @@ export default function Register() {
               >
                 <option value="vessel_owner">Судовладелец</option>
                 <option value="club_owner">Владелец яхт-клуба</option>
+                <option value="agent">Агент</option>
+                <option value="captain">Капитан</option>
+                <option value="mechanic">Механик</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                Выберите роль: Судовладелец - для бронирования мест, Владелец клуба - для управления клубом
+                Выберите роль для регистрации в системе
               </p>
             </div>
           </div>
