@@ -70,17 +70,20 @@ export class AuthController {
       const hashedPassword = await hashPassword(password);
       
       // Валидация роли - разрешаем vessel_owner, club_owner, agent, captain, mechanic при регистрации
+      // Проверяем как строковые значения, так и enum значения
       let userRole: UserRole;
-      if (role === UserRole.VESSEL_OWNER) {
+      const roleString = String(role).toLowerCase();
+      
+      if (role === UserRole.VESSEL_OWNER || roleString === 'vessel_owner' || roleString === UserRole.VESSEL_OWNER) {
         userRole = UserRole.VESSEL_OWNER;
-      } else if (role === UserRole.CLUB_OWNER) {
+      } else if (role === UserRole.CLUB_OWNER || roleString === 'club_owner' || roleString === UserRole.CLUB_OWNER) {
         // Для CLUB_OWNER присваиваем роль PENDING_VALIDATION до валидации
         userRole = UserRole.PENDING_VALIDATION;
-      } else if (role === UserRole.AGENT) {
+      } else if (role === UserRole.AGENT || roleString === 'agent' || roleString === UserRole.AGENT) {
         userRole = UserRole.AGENT;
-      } else if (role === UserRole.CAPTAIN) {
+      } else if (role === UserRole.CAPTAIN || roleString === 'captain' || roleString === UserRole.CAPTAIN) {
         userRole = UserRole.CAPTAIN;
-      } else if (role === UserRole.MECHANIC) {
+      } else if (role === UserRole.MECHANIC || roleString === 'mechanic' || roleString === UserRole.MECHANIC) {
         userRole = UserRole.MECHANIC;
       } else {
         throw new AppError('Неверная роль. Выберите: vessel_owner, club_owner, agent, captain или mechanic', 400);
