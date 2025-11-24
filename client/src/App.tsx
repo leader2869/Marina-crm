@@ -120,7 +120,7 @@ function App() {
             <Route 
               path="finances" 
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER]}>
+                <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.AGENT]}>
                   <Finances />
                 </RoleProtectedRoute>
               } 
