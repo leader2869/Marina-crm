@@ -27,8 +27,6 @@ import {
   User,
   Wrench,
   ShoppingCart,
-  FilePlus,
-  CheckCircle,
   Route,
   Search,
   UtensilsCrossed

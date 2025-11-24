@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, Ship, User, Calendar, DollarSign, MapPin, MessageSquare, CheckCircle, X } from 'lucide-react'
+import { FilePlus, Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X } from 'lucide-react'
 import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
@@ -139,7 +139,7 @@ export default function CreateOrder() {
     }
   }
 
-  const canRespond = (order: AgentOrder) => {
+  const canRespond = (_order: AgentOrder) => {
     // Могут откликаться только владельцы катеров
     return user?.role === 'vessel_owner' && userVessels.length > 0
   }

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { ShoppingCart, FilePlus, CheckCircle } from 'lucide-react'
-import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 import CreateOrder from './agent/CreateOrder'
 import CompletedOrders from './agent/CompletedOrders'
