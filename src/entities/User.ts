@@ -16,6 +16,7 @@ import { UserClub } from './UserClub';
 import { VesselOwnerCash } from './VesselOwnerCash';
 import { IncomeCategory } from './IncomeCategory';
 import { VesselOwnerExpenseCategory } from './VesselOwnerExpenseCategory';
+import { AgentOrder } from './AgentOrder';
 
 @Entity('users')
 export class User {
@@ -100,6 +101,9 @@ export class User {
 
   @OneToMany(() => VesselOwnerExpenseCategory, (category) => category.vesselOwner)
   expenseCategories: VesselOwnerExpenseCategory[];
+
+  @OneToMany(() => AgentOrder, (order) => order.createdBy)
+  agentOrders: AgentOrder[];
 }
 
 

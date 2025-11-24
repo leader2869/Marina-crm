@@ -21,6 +21,7 @@ import vesselOwnerCashesRoutes from './modules/vessel-owner-cashes/vessel-owner-
 import incomeCategoriesRoutes from './modules/incomes/income-categories.routes';
 import expenseCategoriesRoutes from './modules/incomes/expense-categories.routes';
 import incomesRoutes from './modules/incomes/incomes.routes';
+import agentOrdersRoutes from './modules/agent-orders/agent-orders.routes';
 
 const app: Express = express();
 
@@ -244,6 +245,7 @@ app.use('/api/vessel-owner/cashes', autoActivityLogger, vesselOwnerCashesRoutes)
 app.use('/api/vessel-owner/income-categories', autoActivityLogger, incomeCategoriesRoutes);
 app.use('/api/vessel-owner/expense-categories', autoActivityLogger, expenseCategoriesRoutes);
 app.use('/api/vessel-owner/incomes', autoActivityLogger, incomesRoutes);
+app.use('/api/agent-orders', autoActivityLogger, agentOrdersRoutes);
 
 // Error handler
 app.use(errorHandler);

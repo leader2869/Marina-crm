@@ -32,7 +32,8 @@
     "add-photos-columns": "ts-node src/database/add-photos-columns.ts",
     "add-passenger-capacity": "ts-node src/database/add-passenger-capacity.ts",
     "add-vessel-sort-order": "ts-node src/database/add-vessel-sort-order.ts",
-    "add-new-user-roles": "ts-node src/database/add-new-user-roles.ts"
+    "add-new-user-roles": "ts-node src/database/add-new-user-roles.ts",
+    "create-agent-orders-tables": "ts-node src/database/create-agent-orders-tables.ts"
   },
   "keywords": [
     "crm",

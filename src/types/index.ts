@@ -31,6 +31,19 @@ export enum PaymentStatus {
   CANCELLED = 'cancelled',
 }
 
+export enum AgentOrderStatus {
+  ACTIVE = 'active',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+}
+
+export enum AgentOrderResponseStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  REJECTED = 'rejected',
+}
+
 export enum PaymentMethod {
   CASH = 'cash',
   CARD = 'card',

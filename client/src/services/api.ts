@@ -142,6 +142,14 @@ export const bookingsService = {
   delete: (id: number) => api.delete(`/bookings/${id}`),
 }
 
+export const agentOrdersService = {
+  getAll: (params?: any) => api.get('/agent-orders', { params }),
+  getById: (id: number) => api.get(`/agent-orders/${id}`),
+  create: (data: any) => api.post('/agent-orders', data),
+  respond: (orderId: number, data: any) => api.post(`/agent-orders/${orderId}/respond`, data),
+  selectVessel: (orderId: number, responseId: number) => api.post(`/agent-orders/${orderId}/select-vessel`, { responseId }),
+}
+
 export const financesService = {
   getIncomes: (params?: any) => api.get('/finances/incomes', { params }),
   createIncome: (data: any) => api.post('/finances/incomes', data),
@@ -237,6 +245,14 @@ export const incomesService = {
   create: (data: any) => api.post('/vessel-owner/incomes', data),
   update: (id: number, data: any) => api.put(`/vessel-owner/incomes/${id}`, data),
   delete: (id: number) => api.delete(`/vessel-owner/incomes/${id}`),
+}
+
+export const agentOrdersService = {
+  getAll: (params?: any) => api.get('/agent-orders', { params }),
+  getById: (id: number) => api.get(`/agent-orders/${id}`),
+  create: (data: any) => api.post('/agent-orders', data),
+  respond: (orderId: number, data: any) => api.post(`/agent-orders/${orderId}/respond`, data),
+  selectVessel: (orderId: number, data: { responseId: number }) => api.post(`/agent-orders/${orderId}/select-vessel`, data),
 }
 
 export default api

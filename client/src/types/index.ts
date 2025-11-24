@@ -31,6 +31,19 @@ export enum PaymentStatus {
   CANCELLED = 'cancelled',
 }
 
+export enum AgentOrderStatus {
+  ACTIVE = 'active',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+}
+
+export enum AgentOrderResponseStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  REJECTED = 'rejected',
+}
+
 export enum CashTransactionType {
   INCOME = 'income',   // Приход
   EXPENSE = 'expense', // Расход
@@ -363,6 +376,41 @@ export interface Income {
   description?: string
   counterparty?: string
   documentPath?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AgentOrder {
+  id: number
+  title: string
+  description: string
+  startDate: string
+  endDate: string
+  passengerCount: number
+  budget?: number
+  route?: string
+  additionalRequirements?: string
+  status: AgentOrderStatus
+  selectedVesselId?: number
+  createdById: number
+  createdBy?: User
+  selectedVessel?: Vessel
+  responses?: AgentOrderResponse[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AgentOrderResponse {
+  id: number
+  orderId: number
+  order?: AgentOrder
+  vesselOwnerId: number
+  vesselOwner?: User
+  vesselId: number
+  vessel?: Vessel
+  message?: string
+  proposedPrice?: number
+  status: AgentOrderResponseStatus
   createdAt: string
   updatedAt: string
 }
