@@ -17,7 +17,7 @@ interface RegisterData {
   firstName: string
   lastName: string
   phone: string
-  role: 'vessel_owner' | 'club_owner'
+  role: 'vessel_owner' | 'club_owner' | 'agent' | 'captain' | 'mechanic'
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
