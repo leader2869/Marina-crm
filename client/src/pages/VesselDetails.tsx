@@ -27,7 +27,8 @@ export default function VesselDetails() {
     registrationNumber: '',
     technicalSpecs: '',
   })
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photos, setPhotos] = useState<string[]>([])
+  const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showChangeOwnerModal, setShowChangeOwnerModal] = useState(false)
   const [users, setUsers] = useState<User[]>([])
@@ -55,7 +56,8 @@ export default function VesselDetails() {
           registrationNumber: data.registrationNumber || '',
           technicalSpecs: data.technicalSpecs || '',
         })
-        setPhotoPreview(data.photo || null)
+        setPhotos(data.photos || [])
+        setMainPhotoIndex(data.mainPhotoIndex !== undefined ? data.mainPhotoIndex : null)
       }
     } catch (error: any) {
       console.error('Ошибка загрузки судна:', error)
@@ -158,29 +160,11 @@ export default function VesselDetails() {
     }
   }
 
-  const handlePhotoUpload = async (base64String: string) => {
-    if (!vessel) return
-
-    setError('')
-    setUploadingPhoto(true)
-
-    try {
-      await vesselsService.update(vessel.id, { photo: base64String })
-      await loadVessel()
-      setPhotoPreview(null)
-    } catch (err: any) {
-      setError(err.error || err.message || 'Ошибка загрузки фотографии')
-    } finally {
-      setUploadingPhoto(false)
-    }
-  }
-
-  const handlePhotoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
       // Проверяем тип файла
       if (!file.type.startsWith('image/')) {
-        setError('Файл должен быть изображением')
+        reject(new Error('Файл должен быть изображением'))
         return
       }
       
@@ -218,21 +202,135 @@ export default function VesselDetails() {
             ctx.drawImage(img, 0, 0, width, height)
             // Конвертируем в base64 с качеством 0.8 (80%)
             const base64String = canvas.toDataURL('image/jpeg', 0.8)
-            setPhotoPreview(base64String)
-            setError('')
-            // Автоматически сохраняем фото
-            handlePhotoUpload(base64String)
+            resolve(base64String)
+          } else {
+            reject(new Error('Не удалось создать контекст canvas'))
           }
         }
         img.onerror = () => {
-          setError('Ошибка загрузки изображения')
+          reject(new Error('Ошибка загрузки изображения'))
         }
         img.src = reader.result as string
       }
+      reader.onerror = () => {
+        reject(new Error('Ошибка чтения файла'))
+      }
       reader.readAsDataURL(file)
+    })
+  }
+
+  const handlePhotoUpload = async (newPhotos: string[]) => {
+    if (!vessel) return
+
+    setError('')
+    setUploadingPhoto(true)
+
+    try {
+      // Если это первое фото, делаем его главным
+      const newMainPhotoIndex = photos.length === 0 && newPhotos.length > 0 ? 0 : mainPhotoIndex
+      
+      await vesselsService.update(vessel.id, { 
+        photos: newPhotos,
+        mainPhotoIndex: newMainPhotoIndex
+      })
+      await loadVessel()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка загрузки фотографии')
+    } finally {
+      setUploadingPhoto(false)
     }
-    // Сбрасываем значение input, чтобы можно было выбрать тот же файл снова
-    e.target.value = ''
+  }
+
+  const handlePhotoFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    // Проверяем количество фотографий
+    if (photos.length + files.length > 7) {
+      setError(`Можно загрузить максимум 7 фотографий. У вас уже ${photos.length} фото.`)
+      e.target.value = ''
+      return
+    }
+
+    setError('')
+    setUploadingPhoto(true)
+
+    try {
+      const newPhotos: string[] = [...photos]
+      
+      // Обрабатываем все выбранные файлы
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        try {
+          const compressed = await compressImage(file)
+          newPhotos.push(compressed)
+        } catch (err: any) {
+          setError(err.message || 'Ошибка обработки изображения')
+          e.target.value = ''
+          setUploadingPhoto(false)
+          return
+        }
+      }
+
+      await handlePhotoUpload(newPhotos)
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка загрузки фотографий')
+    } finally {
+      setUploadingPhoto(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleDeletePhoto = async (index: number) => {
+    if (!vessel) return
+
+    if (!window.confirm('Вы уверены, что хотите удалить эту фотографию?')) {
+      return
+    }
+
+    setError('')
+    setUploadingPhoto(true)
+
+    try {
+      const newPhotos = photos.filter((_, i) => i !== index)
+      let newMainPhotoIndex = mainPhotoIndex
+
+      // Если удаляем главное фото, выбираем первое как главное
+      if (mainPhotoIndex === index) {
+        newMainPhotoIndex = newPhotos.length > 0 ? 0 : null
+      } else if (mainPhotoIndex !== null && mainPhotoIndex > index) {
+        // Если удаляем фото перед главным, уменьшаем индекс главного
+        newMainPhotoIndex = mainPhotoIndex - 1
+      }
+
+      await vesselsService.update(vessel.id, { 
+        photos: newPhotos,
+        mainPhotoIndex: newMainPhotoIndex
+      })
+      await loadVessel()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка удаления фотографии')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  const handleSetMainPhoto = async (index: number) => {
+    if (!vessel || mainPhotoIndex === index) return
+
+    setError('')
+    setUploadingPhoto(true)
+
+    try {
+      await vesselsService.update(vessel.id, { 
+        mainPhotoIndex: index
+      })
+      await loadVessel()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка установки главного фото')
+    } finally {
+      setUploadingPhoto(false)
+    }
   }
 
   if (loading) {
@@ -517,14 +615,15 @@ export default function VesselDetails() {
               Документы и фото
             </h2>
             {canEdit() && (
-              <label className="flex items-center px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 cursor-pointer">
+              <label className="flex items-center px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 cursor-pointer disabled:opacity-50">
                 <Upload className="h-4 w-4 mr-1.5" />
-                {uploadingPhoto ? 'Загрузка...' : 'Загрузить фото'}
+                {uploadingPhoto ? 'Загрузка...' : `Загрузить фото (${photos.length}/7)`}
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handlePhotoFileSelect}
-                  disabled={uploadingPhoto}
+                  disabled={uploadingPhoto || photos.length >= 7}
                   className="hidden"
                 />
               </label>
@@ -544,52 +643,68 @@ export default function VesselDetails() {
                 </a>
               </div>
             )}
-            {(photoPreview || vessel.photo) && (
+            {photos.length > 0 && (
               <div className="py-2">
-                <span className="text-gray-600 block mb-2">Фото судна (используется как фон карточки в списке):</span>
-                <div className="mt-2 relative">
-                  <img
-                    src={photoPreview || vessel.photo || ''}
-                    alt={vessel.name}
-                    className="w-full h-64 object-cover rounded-lg border border-gray-200"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                    }}
-                  />
-                  {canEdit() && vessel.photo && !photoPreview && (
-                    <button
-                      onClick={async () => {
-                        if (window.confirm('Вы уверены, что хотите удалить фотографию?')) {
-                          try {
-                            setUploadingPhoto(true)
-                            await vesselsService.update(vessel.id, { photo: null })
-                            await loadVessel()
-                          } catch (err: any) {
-                            setError(err.error || err.message || 'Ошибка удаления фотографии')
-                          } finally {
-                            setUploadingPhoto(false)
-                          }
-                        }
-                      }}
-                      className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                      title="Удалить фото"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
+                <span className="text-gray-600 block mb-2">
+                  Фотографии катера ({photos.length}/7):
+                </span>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
+                  {photos.map((photo, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={photo}
+                        alt={`${vessel.name} - фото ${index + 1}`}
+                        className="w-full h-48 object-cover rounded-lg border-2 border-gray-200"
+                        style={{
+                          borderColor: mainPhotoIndex === index ? '#2563eb' : undefined,
+                          borderWidth: mainPhotoIndex === index ? '3px' : '2px',
+                        }}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                        }}
+                      />
+                      {mainPhotoIndex === index && (
+                        <div className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                          Главное
+                        </div>
+                      )}
+                      {canEdit() && (
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                          {mainPhotoIndex !== index && (
+                            <button
+                              onClick={() => handleSetMainPhoto(index)}
+                              disabled={uploadingPhoto}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
+                              title="Сделать главным"
+                            >
+                              Главное
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeletePhoto(index)}
+                            disabled={uploadingPhoto}
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm disabled:opacity-50"
+                            title="Удалить"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
-                  Это фото будет отображаться как фон карточки катера в списке катеров
+                  Главное фото будет отображаться как фон карточки катера в списке катеров
                 </p>
               </div>
             )}
-            {!vessel.documentPath && !vessel.photo && !photoPreview && (
+            {!vessel.documentPath && photos.length === 0 && (
               <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                 <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-600 mb-2">Документы и фото не загружены</p>
                 {canEdit() && (
-                  <p className="text-sm text-gray-500">Нажмите "Загрузить фото" для добавления фотографии</p>
+                  <p className="text-sm text-gray-500">Нажмите "Загрузить фото" для добавления фотографий (максимум 7)</p>
                 )}
               </div>
             )}

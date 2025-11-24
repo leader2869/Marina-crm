@@ -362,14 +362,22 @@ export default function Vessels() {
               vessel.isActive === false ? 'opacity-60 border-2 border-gray-300' : ''
             }`}
             style={{
-              backgroundImage: vessel.photo ? `url(${vessel.photo})` : undefined,
+              backgroundImage: (() => {
+                if (vessel.photos && vessel.photos.length > 0) {
+                  const mainIndex = vessel.mainPhotoIndex !== undefined && vessel.mainPhotoIndex !== null 
+                    ? vessel.mainPhotoIndex 
+                    : 0
+                  return `url(${vessel.photos[mainIndex]})`
+                }
+                return undefined
+              })(),
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              backgroundColor: vessel.photo ? undefined : 'white',
+              backgroundColor: (vessel.photos && vessel.photos.length > 0) ? undefined : 'white',
             }}
           >
             {/* Затемнение для читаемости текста */}
-            {vessel.photo && (
+            {(vessel.photos && vessel.photos.length > 0) && (
               <div className="absolute inset-0 bg-black bg-opacity-40 z-0" />
             )}
             <div className="relative z-10">
@@ -378,13 +386,13 @@ export default function Vessels() {
                   to={`/vessels/${vessel.id}`}
                   className="flex items-center flex-1 hover:text-primary-400 transition-colors"
                 >
-                  <Ship className={`h-8 w-8 mr-3 ${vessel.photo ? 'text-white' : 'text-primary-600'}`} />
+                  <Ship className={`h-8 w-8 mr-3 ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-primary-600'}`} />
                   <div className="flex-1">
-                    <h3 className={`text-xl font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>
+                    <h3 className={`text-xl font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>
                       {vessel.name}
                       {vessel.isActive === false && (
                         <span className={`ml-2 text-xs px-2 py-1 rounded ${
-                          vessel.photo ? 'bg-gray-800 bg-opacity-60 text-white' : 'bg-gray-200 text-gray-600'
+                          (vessel.photos && vessel.photos.length > 0) ? 'bg-gray-800 bg-opacity-60 text-white' : 'bg-gray-200 text-gray-600'
                         }`}>
                           Скрыт
                         </span>
@@ -438,32 +446,32 @@ export default function Vessels() {
               </div>
               <Link to={`/vessels/${vessel.id}`} className="block">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Тип:</span>
-                    <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.type}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Длина:</span>
-                    <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.length} м</span>
-                  </div>
-                  {vessel.width && (
                     <div className="flex justify-between text-sm">
-                      <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Ширина:</span>
-                      <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.width} м</span>
+                      <span className={(vessel.photos && vessel.photos.length > 0) ? 'text-gray-200' : 'text-gray-600'}>Тип:</span>
+                      <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>{vessel.type}</span>
                     </div>
-                  )}
-                  {vessel.heightAboveWaterline && (
                     <div className="flex justify-between text-sm">
-                      <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Высота над ватерлинией:</span>
-                      <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.heightAboveWaterline} м</span>
+                      <span className={(vessel.photos && vessel.photos.length > 0) ? 'text-gray-200' : 'text-gray-600'}>Длина:</span>
+                      <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>{vessel.length} м</span>
                     </div>
-                  )}
-                  {vessel.registrationNumber && (
-                    <div className="flex justify-between text-sm">
-                      <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Рег. номер:</span>
-                      <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.registrationNumber}</span>
-                    </div>
-                  )}
+                    {vessel.width && (
+                      <div className="flex justify-between text-sm">
+                        <span className={(vessel.photos && vessel.photos.length > 0) ? 'text-gray-200' : 'text-gray-600'}>Ширина:</span>
+                        <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>{vessel.width} м</span>
+                      </div>
+                    )}
+                    {vessel.heightAboveWaterline && (
+                      <div className="flex justify-between text-sm">
+                        <span className={(vessel.photos && vessel.photos.length > 0) ? 'text-gray-200' : 'text-gray-600'}>Высота над ватерлинией:</span>
+                        <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>{vessel.heightAboveWaterline} м</span>
+                      </div>
+                    )}
+                    {vessel.registrationNumber && (
+                      <div className="flex justify-between text-sm">
+                        <span className={(vessel.photos && vessel.photos.length > 0) ? 'text-gray-200' : 'text-gray-600'}>Рег. номер:</span>
+                        <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>{vessel.registrationNumber}</span>
+                      </div>
+                    )}
                 </div>
               </Link>
             </div>

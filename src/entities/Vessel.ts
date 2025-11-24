@@ -40,8 +40,11 @@ export class Vessel {
   @Column({ type: 'text', nullable: true })
   technicalSpecs: string; // JSON с техническими характеристиками
 
+  @Column({ type: 'text', nullable: true })
+  photos: string; // JSON массив строк с base64 фотографиями
+
   @Column({ nullable: true })
-  photo: string;
+  mainPhotoIndex: number; // Индекс главного фото в массиве photos
 
   @Column({ default: true })
   isActive: boolean;

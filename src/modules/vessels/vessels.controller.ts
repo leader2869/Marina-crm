@@ -36,7 +36,21 @@ export class VesselsController {
         .take(limit)
         .getManyAndCount();
 
-      res.json(createPaginatedResponse(vessels, total, page, limit));
+      // Преобразуем JSON строки в массивы для фотографий
+      const vesselsWithPhotos = vessels.map((vessel: any) => {
+        if (vessel.photos) {
+          try {
+            vessel.photos = JSON.parse(vessel.photos);
+          } catch (e) {
+            vessel.photos = [];
+          }
+        } else {
+          vessel.photos = [];
+        }
+        return vessel;
+      });
+
+      res.json(createPaginatedResponse(vesselsWithPhotos, total, page, limit));
     } catch (error) {
       next(error);
     }
@@ -65,6 +79,17 @@ export class VesselsController {
         throw new AppError('Недостаточно прав доступа', 403);
       }
 
+      // Преобразуем JSON строку в массив для фотографий
+      if (vessel.photos) {
+        try {
+          (vessel as any).photos = JSON.parse(vessel.photos);
+        } catch (e) {
+          (vessel as any).photos = [];
+        }
+      } else {
+        (vessel as any).photos = [];
+      }
+
       res.json(vessel);
     } catch (error) {
       next(error);
@@ -86,7 +111,8 @@ export class VesselsController {
         registrationNumber,
         documentPath,
         technicalSpecs,
-        photo,
+        photos,
+        mainPhotoIndex,
       } = req.body;
 
       if (!name || !type || !length || !width) {
@@ -98,6 +124,13 @@ export class VesselsController {
       }
 
       const vesselRepository = AppDataSource.getRepository(Vessel);
+      
+      // Преобразуем массив фотографий в JSON строку
+      let photosJson: string | undefined = undefined;
+      if (photos && Array.isArray(photos)) {
+        photosJson = JSON.stringify(photos);
+      }
+      
       const vessel = vesselRepository.create({
         name: name as string,
         type: type as string,
@@ -107,7 +140,8 @@ export class VesselsController {
         registrationNumber: registrationNumber as string | undefined,
         documentPath: documentPath as string | undefined,
         technicalSpecs: technicalSpecs ? JSON.stringify(technicalSpecs) : undefined,
-        photo: photo as string | undefined,
+        photos: photosJson,
+        mainPhotoIndex: mainPhotoIndex !== undefined ? parseInt(mainPhotoIndex as string) : undefined,
         ownerId: req.userId,
       });
 
@@ -237,12 +271,37 @@ export class VesselsController {
         vessel.technicalSpecs = JSON.stringify(req.body.technicalSpecs);
       }
 
+      // Обработка фотографий
+      if (req.body.photos !== undefined) {
+        if (Array.isArray(req.body.photos)) {
+          vessel.photos = JSON.stringify(req.body.photos);
+        } else if (req.body.photos === null) {
+          vessel.photos = null;
+        }
+      }
+
+      // Обработка главного фото
+      if (req.body.mainPhotoIndex !== undefined) {
+        vessel.mainPhotoIndex = req.body.mainPhotoIndex !== null ? parseInt(req.body.mainPhotoIndex as string) : null;
+      }
+
       await vesselRepository.save(vessel);
 
       const updatedVessel = await vesselRepository.findOne({
         where: { id: vessel.id },
         relations: ['owner'],
       });
+
+      // Преобразуем JSON строку в массив для фотографий
+      if (updatedVessel?.photos) {
+        try {
+          (updatedVessel as any).photos = JSON.parse(updatedVessel.photos);
+        } catch (e) {
+          (updatedVessel as any).photos = [];
+        }
+      } else if (updatedVessel) {
+        (updatedVessel as any).photos = [];
+      }
 
       // Формируем новые значения для логирования
       const newValues = {

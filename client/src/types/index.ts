@@ -145,7 +145,8 @@ export interface Vessel {
   registrationNumber?: string
   documentPath?: string
   technicalSpecs?: string
-  photo?: string
+  photos?: string[] // Массив base64 фотографий
+  mainPhotoIndex?: number // Индекс главного фото
   ownerId: number
   owner?: User
   isActive?: boolean
