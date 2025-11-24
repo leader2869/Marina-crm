@@ -546,7 +546,7 @@ export default function VesselDetails() {
             )}
             {(photoPreview || vessel.photo) && (
               <div className="py-2">
-                <span className="text-gray-600 block mb-2">Фото судна:</span>
+                <span className="text-gray-600 block mb-2">Фото судна (используется как фон карточки в списке):</span>
                 <div className="mt-2 relative">
                   <img
                     src={photoPreview || vessel.photo || ''}
@@ -579,6 +579,9 @@ export default function VesselDetails() {
                     </button>
                   )}
                 </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Это фото будет отображаться как фон карточки катера в списке катеров
+                </p>
               </div>
             )}
             {!vessel.documentPath && !vessel.photo && !photoPreview && (
