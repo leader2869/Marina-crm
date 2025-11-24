@@ -221,11 +221,7 @@ function App() {
             />
             <Route 
               path="agent/completed-orders" 
-              element={
-                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
-                  <CompletedOrders />
-                </RoleProtectedRoute>
-              } 
+              element={<CompletedOrders />} 
             />
             <Route 
               path="agent/routes" 
