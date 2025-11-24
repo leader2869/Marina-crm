@@ -4,7 +4,7 @@ import { vesselsService, usersService } from '../services/api'
 import { Vessel, User } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
-import { Ship, User as UserIcon, Calendar, FileText, Edit2, X, Save, RefreshCw } from 'lucide-react'
+import { Ship, User as UserIcon, Calendar, FileText, Edit2, X, Save, RefreshCw, Upload, Image as ImageIcon } from 'lucide-react'
 import { format } from 'date-fns'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
@@ -26,9 +26,9 @@ export default function VesselDetails() {
     heightAboveWaterline: '',
     registrationNumber: '',
     technicalSpecs: '',
-    photo: '',
   })
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showChangeOwnerModal, setShowChangeOwnerModal] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
@@ -54,7 +54,6 @@ export default function VesselDetails() {
           heightAboveWaterline: data.heightAboveWaterline?.toString() || '',
           registrationNumber: data.registrationNumber || '',
           technicalSpecs: data.technicalSpecs || '',
-          photo: data.photo || '',
         })
         setPhotoPreview(data.photo || null)
       }
@@ -147,7 +146,6 @@ export default function VesselDetails() {
         heightAboveWaterline: editForm.heightAboveWaterline ? parseFloat(editForm.heightAboveWaterline) : null,
         registrationNumber: editForm.registrationNumber || null,
         technicalSpecs: editForm.technicalSpecs || null,
-        photo: editForm.photo || null,
       }
 
       await vesselsService.update(vessel.id, updateData)
@@ -158,6 +156,83 @@ export default function VesselDetails() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handlePhotoUpload = async (base64String: string) => {
+    if (!vessel) return
+
+    setError('')
+    setUploadingPhoto(true)
+
+    try {
+      await vesselsService.update(vessel.id, { photo: base64String })
+      await loadVessel()
+      setPhotoPreview(null)
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка загрузки фотографии')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  const handlePhotoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Проверяем тип файла
+      if (!file.type.startsWith('image/')) {
+        setError('Файл должен быть изображением')
+        return
+      }
+      
+      // Сжимаем изображение перед конвертацией в base64
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const img = new Image()
+        img.onload = () => {
+          // Создаем canvas для сжатия
+          const canvas = document.createElement('canvas')
+          const maxWidth = 1200
+          const maxHeight = 1200
+          let width = img.width
+          let height = img.height
+          
+          // Вычисляем новые размеры с сохранением пропорций
+          if (width > height) {
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width
+              width = maxWidth
+            }
+          } else {
+            if (height > maxHeight) {
+              width = (width * maxHeight) / height
+              height = maxHeight
+            }
+          }
+          
+          canvas.width = width
+          canvas.height = height
+          
+          // Рисуем сжатое изображение
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height)
+            // Конвертируем в base64 с качеством 0.8 (80%)
+            const base64String = canvas.toDataURL('image/jpeg', 0.8)
+            setPhotoPreview(base64String)
+            setError('')
+            // Автоматически сохраняем фото
+            handlePhotoUpload(base64String)
+          }
+        }
+        img.onerror = () => {
+          setError('Ошибка загрузки изображения')
+        }
+        img.src = reader.result as string
+      }
+      reader.readAsDataURL(file)
+    }
+    // Сбрасываем значение input, чтобы можно было выбрать тот же файл снова
+    e.target.value = ''
   }
 
   if (loading) {
@@ -330,89 +405,6 @@ export default function VesselDetails() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                 />
               </div>
-              <div>
-                <label htmlFor="edit-photo" className="block text-sm font-medium text-gray-700 mb-1">
-                  Фотография катера
-                </label>
-                <input
-                  id="edit-photo"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      // Проверяем тип файла
-                      if (!file.type.startsWith('image/')) {
-                        setError('Файл должен быть изображением')
-                        return
-                      }
-                      
-                      // Сжимаем изображение перед конвертацией в base64
-                      const reader = new FileReader()
-                      reader.onloadend = () => {
-                        const img = new Image()
-                        img.onload = () => {
-                          // Создаем canvas для сжатия
-                          const canvas = document.createElement('canvas')
-                          const maxWidth = 1200
-                          const maxHeight = 1200
-                          let width = img.width
-                          let height = img.height
-                          
-                          // Вычисляем новые размеры с сохранением пропорций
-                          if (width > height) {
-                            if (width > maxWidth) {
-                              height = (height * maxWidth) / width
-                              width = maxWidth
-                            }
-                          } else {
-                            if (height > maxHeight) {
-                              width = (width * maxHeight) / height
-                              height = maxHeight
-                            }
-                          }
-                          
-                          canvas.width = width
-                          canvas.height = height
-                          
-                          // Рисуем сжатое изображение
-                          const ctx = canvas.getContext('2d')
-                          if (ctx) {
-                            ctx.drawImage(img, 0, 0, width, height)
-                            // Конвертируем в base64 с качеством 0.8 (80%)
-                            const base64String = canvas.toDataURL('image/jpeg', 0.8)
-                            setEditForm({ ...editForm, photo: base64String })
-                            setPhotoPreview(base64String)
-                            setError('')
-                          }
-                        }
-                        img.onerror = () => {
-                          setError('Ошибка загрузки изображения')
-                        }
-                        img.src = reader.result as string
-                      }
-                      reader.readAsDataURL(file)
-                    }
-                  }}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Рекомендуемый размер: до 1200x1200px. Максимальный размер: 10MB
-                </p>
-                {(photoPreview || vessel.photo) && (
-                  <div className="mt-4">
-                    <img
-                      src={photoPreview || vessel.photo || ''}
-                      alt="Предпросмотр фотографии"
-                      className="w-full h-64 object-cover rounded-lg border border-gray-200"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.style.display = 'none'
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -519,10 +511,25 @@ export default function VesselDetails() {
 
         {/* Документы и фото */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <FileText className="h-6 w-6 text-primary-600 mr-2" />
-            Документы и фото
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+              <FileText className="h-6 w-6 text-primary-600 mr-2" />
+              Документы и фото
+            </h2>
+            {canEdit() && (
+              <label className="flex items-center px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 cursor-pointer">
+                <Upload className="h-4 w-4 mr-1.5" />
+                {uploadingPhoto ? 'Загрузка...' : 'Загрузить фото'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoFileSelect}
+                  disabled={uploadingPhoto}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
           <div className="space-y-4">
             {vessel.documentPath && (
               <div className="py-2 border-b border-gray-200">
@@ -537,20 +544,51 @@ export default function VesselDetails() {
                 </a>
               </div>
             )}
-            {vessel.photo && (
+            {(photoPreview || vessel.photo) && (
               <div className="py-2">
                 <span className="text-gray-600 block mb-2">Фото судна:</span>
-                <div className="mt-2">
+                <div className="mt-2 relative">
                   <img
-                    src={vessel.photo}
+                    src={photoPreview || vessel.photo || ''}
                     alt={vessel.name}
                     className="w-full h-64 object-cover rounded-lg border border-gray-200"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
                   />
+                  {canEdit() && vessel.photo && !photoPreview && (
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Вы уверены, что хотите удалить фотографию?')) {
+                          try {
+                            setUploadingPhoto(true)
+                            await vesselsService.update(vessel.id, { photo: null })
+                            await loadVessel()
+                          } catch (err: any) {
+                            setError(err.error || err.message || 'Ошибка удаления фотографии')
+                          } finally {
+                            setUploadingPhoto(false)
+                          }
+                        }
+                      }}
+                      className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      title="Удалить фото"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             )}
-            {!vessel.documentPath && !vessel.photo && (
-              <p className="text-gray-600">Документы и фото не загружены</p>
+            {!vessel.documentPath && !vessel.photo && !photoPreview && (
+              <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 mb-2">Документы и фото не загружены</p>
+                {canEdit() && (
+                  <p className="text-sm text-gray-500">Нажмите "Загрузить фото" для добавления фотографии</p>
+                )}
+              </div>
             )}
           </div>
         </div>
