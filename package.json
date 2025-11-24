@@ -28,7 +28,8 @@
     "add-vessel-id-to-cashes": "ts-node src/database/add-vessel-id-to-cashes.ts",
     "create-income-tables": "ts-node src/database/create-income-tables.ts",
     "add-category-id-to-cash-transactions": "ts-node src/database/add-category-id-to-cash-transactions.ts",
-    "add-expense-category-id-to-cash-transactions": "ts-node src/database/add-expense-category-id-to-cash-transactions.ts"
+    "add-expense-category-id-to-cash-transactions": "ts-node src/database/add-expense-category-id-to-cash-transactions.ts",
+    "add-photos-columns": "ts-node src/database/add-photos-columns.ts"
   },
   "keywords": [
     "crm",

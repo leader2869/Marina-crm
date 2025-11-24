@@ -330,6 +330,23 @@ const importData = async (importFile: string): Promise<void> => {
         }
 
         try {
+          // Преобразуем старое поле photo в photos массив, если нужно
+          let photos: string | null = null;
+          let mainPhotoIndex: number | null = null;
+          
+          if (vesselData.photos) {
+            // Если есть photos (массив или JSON строка), используем его
+            if (Array.isArray(vesselData.photos)) {
+              photos = JSON.stringify(vesselData.photos);
+            } else if (typeof vesselData.photos === 'string') {
+              photos = vesselData.photos; // Уже JSON строка
+            }
+          } else if (vesselData.photo) {
+            // Если есть старое поле photo, преобразуем в массив photos
+            photos = JSON.stringify([vesselData.photo]);
+            mainPhotoIndex = 0; // Первое фото становится главным
+          }
+          
           // Создаем судно только с нужными полями, исключая связанные объекты
           const vessel = vesselRepository.create({
             name: vesselData.name,
@@ -340,7 +357,8 @@ const importData = async (importFile: string): Promise<void> => {
             registrationNumber: vesselData.registrationNumber,
             documentPath: vesselData.documentPath,
             technicalSpecs: vesselData.technicalSpecs,
-            photo: vesselData.photo,
+            photos: photos,
+            mainPhotoIndex: vesselData.mainPhotoIndex !== undefined ? vesselData.mainPhotoIndex : mainPhotoIndex,
             ownerId: newOwnerId,
             // Исключаем id, createdAt, updatedAt, owner, bookings и другие связанные объекты
           });
