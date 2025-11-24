@@ -27,6 +27,9 @@ import NewGuests from './pages/NewGuests'
 import Validation from './pages/Validation'
 import Widget from './pages/Widget'
 import ActivityLogs from './pages/ActivityLogs'
+import VesselRefueling from './pages/VesselRefueling'
+import VesselService from './pages/VesselService'
+import AgentOrders from './pages/AgentOrders'
 import { UserRole } from './types'
 
 // Компонент для редиректа на начальную страницу в зависимости от роли
@@ -186,6 +189,18 @@ function App() {
                   <ActivityLogs />
                 </RoleProtectedRoute>
               } 
+            />
+            <Route 
+              path="vessel-refueling" 
+              element={<VesselRefueling />} 
+            />
+            <Route 
+              path="vessel-service" 
+              element={<VesselService />} 
+            />
+            <Route 
+              path="agent-orders" 
+              element={<AgentOrders />} 
             />
             {/* Catch-all для несуществующих роутов */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
