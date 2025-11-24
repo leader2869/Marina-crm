@@ -37,6 +37,7 @@ export class VesselsController {
           'vessel.technicalSpecs',
           'vessel.photos',
           'vessel.mainPhotoIndex',
+          'vessel.sortOrder',
           'vessel.isActive',
           'vessel.isValidated',
           'vessel.isSubmittedForValidation',
@@ -51,6 +52,10 @@ export class VesselsController {
       if (req.userId && req.userRole !== 'super_admin' && req.userRole !== 'admin') {
         queryBuilder.where('vessel.ownerId = :ownerId', { ownerId: req.userId });
       }
+
+      // Сортируем по sortOrder, затем по id
+      queryBuilder.orderBy('vessel.sortOrder', 'ASC')
+        .addOrderBy('vessel.id', 'ASC');
 
       const [vessels, total] = await queryBuilder
         .skip((page - 1) * limit)
@@ -189,6 +194,15 @@ export class VesselsController {
         ownerId: req.userId,
       });
 
+      // Получаем максимальный sortOrder для установки нового катера в конец
+      const maxSortOrder = await vesselRepository
+        .createQueryBuilder('vessel')
+        .where('vessel.ownerId = :ownerId', { ownerId: req.userId })
+        .select('MAX(vessel.sortOrder)', 'max')
+        .getRawOne();
+      
+      const newSortOrder = (maxSortOrder?.max ?? -1) + 1;
+
       const vessel = vesselRepository.create({
         name: name as string,
         type: type as string,
@@ -201,6 +215,7 @@ export class VesselsController {
         technicalSpecs: technicalSpecs ? JSON.stringify(technicalSpecs) : undefined,
         photos: photosJson,
         mainPhotoIndex: mainPhotoIndex !== undefined ? parseInt(mainPhotoIndex as string, 10) : undefined,
+        sortOrder: newSortOrder,
         ownerId: req.userId,
       });
 
@@ -227,6 +242,7 @@ export class VesselsController {
           'vessel.technicalSpecs',
           'vessel.photos',
           'vessel.mainPhotoIndex',
+          'vessel.sortOrder',
           'vessel.isActive',
           'vessel.isValidated',
           'vessel.isSubmittedForValidation',
@@ -837,6 +853,49 @@ export class VesselsController {
       await vesselRepository.save(vessel);
 
       res.json({ message: 'Судно успешно восстановлено' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateOrder(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.userId) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
+      const { vesselIds } = req.body; // Массив ID катеров в новом порядке
+
+      if (!Array.isArray(vesselIds) || vesselIds.length === 0) {
+        throw new AppError('Необходимо предоставить массив ID катеров', 400);
+      }
+
+      const vesselRepository = AppDataSource.getRepository(Vessel);
+
+      // Проверяем, что все катера принадлежат текущему пользователю (если не суперадмин)
+      if (req.userRole !== 'super_admin' && req.userRole !== 'admin') {
+        const vessels = await vesselRepository.find({
+          where: { id: In(vesselIds) },
+          select: ['id', 'ownerId'],
+        });
+
+        const invalidVessels = vessels.filter(v => v.ownerId !== req.userId);
+        if (invalidVessels.length > 0) {
+          throw new AppError('Недостаточно прав для изменения порядка этих катеров', 403);
+        }
+      }
+
+      // Обновляем sortOrder для каждого катера
+      const updatePromises = vesselIds.map((vesselId: number, index: number) => {
+        return vesselRepository.update(
+          { id: vesselId },
+          { sortOrder: index }
+        );
+      });
+
+      await Promise.all(updatePromises);
+
+      res.json({ message: 'Порядок катеров успешно обновлен' });
     } catch (error) {
       next(error);
     }

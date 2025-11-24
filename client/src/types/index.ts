@@ -148,6 +148,7 @@ export interface Vessel {
   technicalSpecs?: string
   photos?: string[] // Массив base64 фотографий
   mainPhotoIndex?: number // Индекс главного фото
+  sortOrder?: number // Порядок сортировки для ручного изменения порядка
   ownerId: number
   owner?: User
   isActive?: boolean

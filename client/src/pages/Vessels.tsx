@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { vesselsService, usersService } from '../services/api'
 import { Vessel, UserRole } from '../types'
-import { Ship, Plus, Trash2, Search, Download, X, EyeOff, Eye } from 'lucide-react'
+import { Ship, Plus, Trash2, Search, Download, X, EyeOff, Eye, ArrowUp, ArrowDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
@@ -60,11 +60,19 @@ export default function Vessels() {
         vesselsData = vesselsData.filter((v: Vessel) => v.isActive !== false)
       }
       
-      // Сортируем: сначала активные, потом скрытые
+      // Сортируем: сначала по sortOrder, затем активные, потом скрытые
       vesselsData.sort((a: Vessel, b: Vessel) => {
+        // Сначала по sortOrder (если есть)
+        if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+          if (a.sortOrder !== b.sortOrder) {
+            return a.sortOrder - b.sortOrder
+          }
+        }
+        // Затем активные перед скрытыми
         if (a.isActive && !b.isActive) return -1
         if (!a.isActive && b.isActive) return 1
-        return 0
+        // В конце по id для стабильности
+        return a.id - b.id
       })
       
       setVessels(vesselsData)
@@ -209,6 +217,72 @@ export default function Vessels() {
     if (isSuperAdmin) return true
     if (user?.role === UserRole.VESSEL_OWNER && vessel.ownerId === user.id) return true
     return false
+  }
+
+  const handleMoveUp = async (index: number) => {
+    if (index === 0) return // Уже наверху
+
+    // Используем filteredVessels для правильного индекса
+    const currentVessels = filteredVessels
+    const newVessels = [...currentVessels]
+    const temp = newVessels[index]
+    newVessels[index] = newVessels[index - 1]
+    newVessels[index - 1] = temp
+
+    // Обновляем порядок в БД
+    const vesselIds = newVessels.map(v => v.id)
+    try {
+      await vesselsService.updateOrder(vesselIds)
+      // Обновляем локальное состояние
+      const updatedVessels = [...vessels]
+      const movedVessel = updatedVessels.find(v => v.id === temp.id)
+      const prevVessel = updatedVessels.find(v => v.id === newVessels[index].id)
+      if (movedVessel && prevVessel) {
+        const movedIndex = updatedVessels.indexOf(movedVessel)
+        const prevIndex = updatedVessels.indexOf(prevVessel)
+        updatedVessels[movedIndex] = prevVessel
+        updatedVessels[prevIndex] = movedVessel
+        setVessels(updatedVessels)
+      } else {
+        await loadVessels() // Перезагружаем если не удалось найти
+      }
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка изменения порядка')
+      await loadVessels() // Восстанавливаем исходный порядок
+    }
+  }
+
+  const handleMoveDown = async (index: number) => {
+    if (index === filteredVessels.length - 1) return // Уже внизу
+
+    // Используем filteredVessels для правильного индекса
+    const currentVessels = filteredVessels
+    const newVessels = [...currentVessels]
+    const temp = newVessels[index]
+    newVessels[index] = newVessels[index + 1]
+    newVessels[index + 1] = temp
+
+    // Обновляем порядок в БД
+    const vesselIds = newVessels.map(v => v.id)
+    try {
+      await vesselsService.updateOrder(vesselIds)
+      // Обновляем локальное состояние
+      const updatedVessels = [...vessels]
+      const movedVessel = updatedVessels.find(v => v.id === temp.id)
+      const nextVessel = updatedVessels.find(v => v.id === newVessels[index].id)
+      if (movedVessel && nextVessel) {
+        const movedIndex = updatedVessels.indexOf(movedVessel)
+        const nextIndex = updatedVessels.indexOf(nextVessel)
+        updatedVessels[movedIndex] = nextVessel
+        updatedVessels[nextIndex] = movedVessel
+        setVessels(updatedVessels)
+      } else {
+        await loadVessels() // Перезагружаем если не удалось найти
+      }
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка изменения порядка')
+      await loadVessels() // Восстанавливаем исходный порядок
+    }
   }
 
   const exportToExcel = async () => {
@@ -421,6 +495,45 @@ export default function Vessels() {
                 </Link>
                 {canManageVessel(vessel) && (
                   <div className="flex gap-1">
+                    {/* Кнопки изменения порядка - только для VESSEL_OWNER */}
+                    {user?.role === UserRole.VESSEL_OWNER && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            const index = filteredVessels.findIndex(v => v.id === vessel.id)
+                            handleMoveUp(index)
+                          }}
+                          disabled={filteredVessels.findIndex(v => v.id === vessel.id) === 0}
+                          className={`p-1 rounded disabled:opacity-30 disabled:cursor-not-allowed ${
+                            (vessel.photos && vessel.photos.length > 0) 
+                              ? 'text-white hover:bg-white hover:bg-opacity-20' 
+                              : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
+                          }`}
+                          title="Переместить вверх"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            const index = filteredVessels.findIndex(v => v.id === vessel.id)
+                            handleMoveDown(index)
+                          }}
+                          disabled={filteredVessels.findIndex(v => v.id === vessel.id) === filteredVessels.length - 1}
+                          className={`p-1 rounded disabled:opacity-30 disabled:cursor-not-allowed ${
+                            (vessel.photos && vessel.photos.length > 0) 
+                              ? 'text-white hover:bg-white hover:bg-opacity-20' 
+                              : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
+                          }`}
+                          title="Переместить вниз"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                     {vessel.isActive ? (
                       <button
                         onClick={(e) => {
@@ -429,7 +542,11 @@ export default function Vessels() {
                           handleHide(vessel.id)
                         }}
                         disabled={hiding === vessel.id}
-                        className="p-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded disabled:opacity-50"
+                        className={`p-1 rounded disabled:opacity-50 ${
+                          (vessel.photos && vessel.photos.length > 0) 
+                            ? 'text-white hover:bg-white hover:bg-opacity-20' 
+                            : 'text-orange-600 hover:text-orange-700 hover:bg-orange-50'
+                        }`}
                         title="Скрыть катер"
                       >
                         <EyeOff className="h-5 w-5" />
@@ -442,7 +559,11 @@ export default function Vessels() {
                           handleRestore(vessel.id)
                         }}
                         disabled={restoring === vessel.id}
-                        className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
+                        className={`p-1 rounded disabled:opacity-50 ${
+                          (vessel.photos && vessel.photos.length > 0) 
+                            ? 'text-white hover:bg-white hover:bg-opacity-20' 
+                            : 'text-green-600 hover:text-green-700 hover:bg-green-50'
+                        }`}
                         title="Восстановить катер"
                       >
                         <Eye className="h-5 w-5" />
@@ -455,7 +576,11 @@ export default function Vessels() {
                         handleDelete(vessel.id)
                       }}
                       disabled={deleting}
-                      className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                      className={`p-1 rounded disabled:opacity-50 ${
+                        (vessel.photos && vessel.photos.length > 0) 
+                          ? 'text-white hover:bg-white hover:bg-opacity-20' 
+                          : 'text-red-600 hover:text-red-700 hover:bg-red-50'
+                      }`}
                       title="Удалить катер"
                     >
                       <Trash2 className="h-5 w-5" />

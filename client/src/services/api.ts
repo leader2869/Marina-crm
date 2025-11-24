@@ -129,6 +129,7 @@ export const vesselsService = {
   delete: (id: number) => api.delete(`/vessels/${id}`),
   hide: (id: number) => api.post(`/vessels/${id}/hide`),
   restore: (id: number) => api.post(`/vessels/${id}/restore`),
+  updateOrder: (vesselIds: number[]) => api.post('/vessels/update-order', { vesselIds }),
 }
 
 export const bookingsService = {

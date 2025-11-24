@@ -49,6 +49,9 @@ export class Vessel {
   @Column({ type: 'int', nullable: true })
   mainPhotoIndex: number | null; // Индекс главного фото в массиве photos
 
+  @Column({ type: 'int', default: 0 })
+  sortOrder: number; // Порядок сортировки для ручного изменения порядка катеров
+
   @Column({ default: true })
   isActive: boolean;
 
