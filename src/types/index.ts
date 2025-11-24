@@ -10,6 +10,9 @@ export enum UserRole {
   VESSEL_OWNER = 'vessel_owner',
   GUEST = 'guest',
   PENDING_VALIDATION = 'pending_validation', // Ожидает валидации суперадминистратором
+  AGENT = 'agent', // Агент
+  CAPTAIN = 'captain', // Капитан
+  MECHANIC = 'mechanic', // Механик
 }
 
 export enum BookingStatus {
