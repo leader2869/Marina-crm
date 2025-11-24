@@ -280,6 +280,9 @@ export default function UsersPage() {
       [UserRole.VESSEL_OWNER]: 'Судовладелец',
       [UserRole.GUEST]: 'Гость',
       [UserRole.PENDING_VALIDATION]: 'Ожидает валидации',
+      [UserRole.AGENT]: 'Агент',
+      [UserRole.CAPTAIN]: 'Капитан',
+      [UserRole.MECHANIC]: 'Механик',
     }
     return roleMap[role] || role
   }
@@ -292,6 +295,9 @@ export default function UsersPage() {
       [UserRole.VESSEL_OWNER]: 'bg-yellow-100 text-yellow-800',
       [UserRole.GUEST]: 'bg-gray-100 text-gray-800',
       [UserRole.PENDING_VALIDATION]: 'bg-red-500 text-white font-bold',
+      [UserRole.AGENT]: 'bg-indigo-100 text-indigo-800',
+      [UserRole.CAPTAIN]: 'bg-cyan-100 text-cyan-800',
+      [UserRole.MECHANIC]: 'bg-teal-100 text-teal-800',
     }
     return colorMap[role] || 'bg-gray-100 text-gray-800'
   }
