@@ -93,8 +93,8 @@ export default function Layout() {
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
       { name: 'Обслуживание катеров', href: '/vessel-maintenance', icon: Wrench, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Агентские заказы', href: '/agent-orders', icon: ShoppingCart, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
-      // Меню для Агента
-      { name: 'Разместить заказ', href: '/agent/create-order', icon: FilePlus, roles: [UserRole.AGENT] },
+      // Активные заказы - доступно для всех ролей
+      { name: 'Активные заказы', href: '/agent/create-order', icon: FilePlus, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.AGENT, UserRole.CAPTAIN, UserRole.MECHANIC, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Завершенные заказы', href: '/agent/completed-orders', icon: CheckCircle, roles: [UserRole.AGENT] },
       { name: 'Мои маршруты', href: '/agent/routes', icon: Route, roles: [UserRole.AGENT] },
       { name: 'Подборка катеров', href: '/agent/vessel-selection', icon: Search, roles: [UserRole.AGENT] },

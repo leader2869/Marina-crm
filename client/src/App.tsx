@@ -217,11 +217,7 @@ function App() {
             {/* Роуты для Агента */}
             <Route 
               path="agent/create-order" 
-              element={
-                <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>
-                  <CreateOrder />
-                </RoleProtectedRoute>
-              } 
+              element={<CreateOrder />} 
             />
             <Route 
               path="agent/completed-orders" 
