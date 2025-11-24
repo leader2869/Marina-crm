@@ -276,13 +276,13 @@ export class VesselsController {
         if (Array.isArray(req.body.photos)) {
           vessel.photos = JSON.stringify(req.body.photos);
         } else if (req.body.photos === null) {
-          vessel.photos = null as any;
+          vessel.photos = null;
         }
       }
 
       // Обработка главного фото
       if (req.body.mainPhotoIndex !== undefined) {
-        vessel.mainPhotoIndex = req.body.mainPhotoIndex !== null ? parseInt(req.body.mainPhotoIndex as string) : (null as any);
+        vessel.mainPhotoIndex = req.body.mainPhotoIndex !== null ? parseInt(req.body.mainPhotoIndex as string) : null;
       }
 
       await vesselRepository.save(vessel);
