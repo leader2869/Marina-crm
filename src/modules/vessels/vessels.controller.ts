@@ -860,6 +860,13 @@ export class VesselsController {
 
   async updateOrder(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      console.log('[Vessel UpdateOrder] Запрос получен:', {
+        method: req.method,
+        path: req.path,
+        url: req.url,
+        body: req.body,
+      });
+
       if (!req.userId) {
         throw new AppError('Требуется аутентификация', 401);
       }
@@ -869,6 +876,8 @@ export class VesselsController {
       if (!Array.isArray(vesselIds) || vesselIds.length === 0) {
         throw new AppError('Необходимо предоставить массив ID катеров', 400);
       }
+
+      console.log('[Vessel UpdateOrder] Обновление порядка для катеров:', vesselIds);
 
       const vesselRepository = AppDataSource.getRepository(Vessel);
 

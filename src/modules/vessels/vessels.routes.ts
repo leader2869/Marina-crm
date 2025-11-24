@@ -8,7 +8,11 @@ const vesselsController = new VesselsController();
 router.get('/', authenticate, vesselsController.getAll.bind(vesselsController));
 router.post('/', authenticate, vesselsController.create.bind(vesselsController));
 // ВАЖНО: Специфичные маршруты с дополнительными путями должны быть ПЕРЕД общими маршрутами с параметрами
-router.post('/update-order', authenticate, vesselsController.updateOrder.bind(vesselsController));
+// Маршрут update-order должен быть ПЕРЕД всеми маршрутами с :id
+router.post('/update-order', (req, res, next) => {
+  console.log('[Vessels Route] POST /update-order вызван');
+  next();
+}, authenticate, vesselsController.updateOrder.bind(vesselsController));
 router.post('/:id/hide', authenticate, vesselsController.hide.bind(vesselsController));
 router.post('/:id/restore', authenticate, vesselsController.restore.bind(vesselsController));
 router.get('/:id', authenticate, vesselsController.getById.bind(vesselsController));
