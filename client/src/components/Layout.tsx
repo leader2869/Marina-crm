@@ -196,7 +196,11 @@ export default function Layout() {
   }
 
   // Переключаем открытие/закрытие подменю
-  const toggleSubmenu = (menuName: string) => {
+  const toggleSubmenu = (menuName: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     setOpenSubmenus(prev => ({
       ...prev,
       [menuName]: !prev[menuName]
@@ -493,7 +497,7 @@ export default function Layout() {
                   return (
                     <div key={item.name}>
                       <button
-                        onClick={() => toggleSubmenu(item.name)}
+                        onClick={(e) => toggleSubmenu(item.name, e)}
                         className={`flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg ${
                           hasActiveSubmenu
                             ? 'bg-primary-50 text-primary-700'
@@ -600,7 +604,7 @@ export default function Layout() {
                   return (
                     <div key={item.name}>
                       <button
-                        onClick={() => toggleSubmenu(item.name)}
+                        onClick={(e) => toggleSubmenu(item.name, e)}
                         className={`flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg ${
                           hasActiveSubmenu
                             ? 'bg-primary-50 text-primary-700'
