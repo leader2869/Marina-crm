@@ -146,7 +146,7 @@ export default function Vessels() {
 
       console.log('[Frontend] Отправка данных для создания катера:', createData);
 
-      const createdVessel = await vesselsService.create(createData)
+      const createdVessel = await vesselsService.create(createData) as any
       console.log('[Frontend] Катер создан, получен ответ:', createdVessel);
       console.log('[Frontend] Пассажировместимость в ответе:', createdVessel?.passengerCapacity);
       
