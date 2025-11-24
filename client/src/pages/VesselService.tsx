@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Wrench, Plus, Search } from 'lucide-react'
+import { Wrench, Search } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 

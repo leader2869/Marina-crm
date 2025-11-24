@@ -26,7 +26,6 @@ import {
   ChevronRight,
   User,
   Wrench,
-  Fuel,
   ShoppingCart
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
