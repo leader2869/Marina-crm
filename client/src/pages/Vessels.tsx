@@ -46,6 +46,15 @@ export default function Vessels() {
       const response = await vesselsService.getAll({ limit: 100 })
       let vesselsData = response.data || []
       
+      // Отладочная информация
+      if (vesselsData.length > 0) {
+        console.log('📊 Загружены катера:', vesselsData.map((v: Vessel) => ({
+          id: v.id,
+          name: v.name,
+          passengerCapacity: v.passengerCapacity
+        })))
+      }
+      
       // Фильтруем скрытые катера на фронтенде, если не включен показ скрытых
       if (!showHiddenVessels) {
         vesselsData = vesselsData.filter((v: Vessel) => v.isActive !== false)
@@ -473,7 +482,11 @@ export default function Vessels() {
                     )}
                     <div className="flex justify-between text-sm">
                       <span className={(vessel.photos && vessel.photos.length > 0) ? 'text-gray-200' : 'text-gray-600'}>Пассажировместимость:</span>
-                      <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>{vessel.passengerCapacity || '-'} чел.</span>
+                      <span className={`font-semibold ${(vessel.photos && vessel.photos.length > 0) ? 'text-white' : 'text-gray-900'}`}>
+                        {vessel.passengerCapacity !== undefined && vessel.passengerCapacity !== null 
+                          ? `${vessel.passengerCapacity} чел.` 
+                          : '- чел.'}
+                      </span>
                     </div>
                     {vessel.registrationNumber && (
                       <div className="flex justify-between text-sm">

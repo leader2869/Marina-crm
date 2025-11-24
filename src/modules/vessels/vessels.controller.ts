@@ -24,6 +24,27 @@ export class VesselsController {
       const vesselRepository = AppDataSource.getRepository(Vessel);
       const queryBuilder = vesselRepository
         .createQueryBuilder('vessel')
+        .select([
+          'vessel.id',
+          'vessel.name',
+          'vessel.type',
+          'vessel.length',
+          'vessel.width',
+          'vessel.heightAboveWaterline',
+          'vessel.passengerCapacity',
+          'vessel.registrationNumber',
+          'vessel.documentPath',
+          'vessel.technicalSpecs',
+          'vessel.photos',
+          'vessel.mainPhotoIndex',
+          'vessel.isActive',
+          'vessel.isValidated',
+          'vessel.isSubmittedForValidation',
+          'vessel.rejectionComment',
+          'vessel.ownerId',
+          'vessel.createdAt',
+          'vessel.updatedAt',
+        ])
         .leftJoinAndSelect('vessel.owner', 'owner');
 
       // Если не суперадмин или админ, показываем только свои суда
@@ -46,6 +67,10 @@ export class VesselsController {
           }
         } else {
           vessel.photos = [];
+        }
+        // Убеждаемся, что passengerCapacity всегда присутствует
+        if (vessel.passengerCapacity === undefined || vessel.passengerCapacity === null) {
+          console.warn(`⚠️  Катер ID ${vessel.id} не имеет пассажировместимости`);
         }
         return vessel;
       });
