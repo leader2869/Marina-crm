@@ -243,19 +243,34 @@ export default function VesselDetails() {
         mainPhotoIndex: newMainPhotoIndex 
       })
       
-      await vesselsService.update(vessel.id, { 
+      const response = await vesselsService.update(vessel.id, { 
         photos: newPhotos,
         mainPhotoIndex: newMainPhotoIndex
       })
       
-      // Обновляем состояние сразу, не дожидаясь перезагрузки
-      setPhotos(newPhotos)
-      if (newMainPhotoIndex !== null && newMainPhotoIndex !== mainPhotoIndex) {
-        setMainPhotoIndex(newMainPhotoIndex)
+      console.log('Ответ от сервера:', response)
+      
+      // Обновляем состояние на основе ответа сервера
+      if (response && response.photos) {
+        console.log('Обновление состояния из ответа сервера:', response.photos.length)
+        setPhotos(response.photos)
+        setMainPhotoIndex(response.mainPhotoIndex !== undefined ? response.mainPhotoIndex : null)
+      } else {
+        // Если ответ не содержит photos, обновляем из локального состояния
+        console.log('Обновление состояния из локальных данных')
+        setPhotos(newPhotos)
+        if (newMainPhotoIndex !== null && newMainPhotoIndex !== mainPhotoIndex) {
+          setMainPhotoIndex(newMainPhotoIndex)
+        }
       }
       
-      // Перезагружаем данные с сервера для синхронизации
-      await loadVessel()
+      // Обновляем vessel для синхронизации
+      if (response) {
+        setVessel(response as Vessel)
+      } else {
+        // Перезагружаем данные с сервера для синхронизации
+        await loadVessel()
+      }
     } catch (err: any) {
       console.error('Ошибка загрузки фотографий:', err)
       setError(err.error || err.message || 'Ошибка загрузки фотографии')
