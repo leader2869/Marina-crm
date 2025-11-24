@@ -31,10 +31,7 @@ import {
   CheckCircle,
   Route,
   Search,
-  DollarSign,
-  Calendar,
-  UtensilsCrossed,
-  Code
+  UtensilsCrossed
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
