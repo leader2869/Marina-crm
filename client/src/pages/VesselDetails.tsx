@@ -243,10 +243,10 @@ export default function VesselDetails() {
         mainPhotoIndex: newMainPhotoIndex 
       })
       
-      const updatedVessel = await vesselsService.update(vessel.id, { 
+      const updatedVessel = (await vesselsService.update(vessel.id, { 
         photos: newPhotos,
         mainPhotoIndex: newMainPhotoIndex
-      }) as Vessel
+      })) as unknown as Vessel
       
       console.log('Ответ от сервера:', updatedVessel)
       
