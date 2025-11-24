@@ -92,15 +92,7 @@ export default function Layout() {
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.AGENT] },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER] },
       { name: 'Обслуживание катеров', href: '/vessel-maintenance', icon: Wrench, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
-      { 
-        name: 'Агентские заказы', 
-        icon: ShoppingCart, 
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.AGENT, UserRole.CAPTAIN, UserRole.MECHANIC, UserRole.GUEST, UserRole.PENDING_VALIDATION],
-        submenu: [
-          { name: 'Активные заказы', href: '/agent/create-order', icon: FilePlus },
-          { name: 'Завершенные заказы', href: '/agent/completed-orders', icon: CheckCircle }
-        ]
-      },
+      { name: 'Агентские заказы', href: '/agent-orders', icon: ShoppingCart, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.AGENT, UserRole.CAPTAIN, UserRole.MECHANIC, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Мои маршруты', href: '/agent/routes', icon: Route, roles: [UserRole.AGENT] },
       { name: 'Подборка катеров', href: '/agent/vessel-selection', icon: Search, roles: [UserRole.AGENT] },
       { name: 'Забронировать причал', href: '/agent/book-berth', icon: Calendar, roles: [UserRole.AGENT] },
