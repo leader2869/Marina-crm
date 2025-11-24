@@ -45,6 +45,12 @@ export default function VesselDetails() {
   const loadVessel = async () => {
     try {
       const data = (await vesselsService.getById(parseInt(id!))) as unknown as Vessel
+      console.log('Загруженные данные судна:', {
+        id: data?.id,
+        photosCount: data?.photos?.length || 0,
+        mainPhotoIndex: data?.mainPhotoIndex,
+        photos: data?.photos ? 'есть' : 'нет'
+      })
       setVessel(data)
       if (data) {
         setEditForm({
@@ -56,7 +62,9 @@ export default function VesselDetails() {
           registrationNumber: data.registrationNumber || '',
           technicalSpecs: data.technicalSpecs || '',
         })
-        setPhotos(data.photos || [])
+        const loadedPhotos = data.photos || []
+        console.log('Установка фотографий:', loadedPhotos.length)
+        setPhotos(loadedPhotos)
         setMainPhotoIndex(data.mainPhotoIndex !== undefined ? data.mainPhotoIndex : null)
       }
     } catch (error: any) {
@@ -229,12 +237,27 @@ export default function VesselDetails() {
       // Если это первое фото, делаем его главным
       const newMainPhotoIndex = photos.length === 0 && newPhotos.length > 0 ? 0 : mainPhotoIndex
       
+      console.log('Загрузка фотографий:', { 
+        vesselId: vessel.id, 
+        photosCount: newPhotos.length, 
+        mainPhotoIndex: newMainPhotoIndex 
+      })
+      
       await vesselsService.update(vessel.id, { 
         photos: newPhotos,
         mainPhotoIndex: newMainPhotoIndex
       })
+      
+      // Обновляем состояние сразу, не дожидаясь перезагрузки
+      setPhotos(newPhotos)
+      if (newMainPhotoIndex !== null && newMainPhotoIndex !== mainPhotoIndex) {
+        setMainPhotoIndex(newMainPhotoIndex)
+      }
+      
+      // Перезагружаем данные с сервера для синхронизации
       await loadVessel()
     } catch (err: any) {
+      console.error('Ошибка загрузки фотографий:', err)
       setError(err.error || err.message || 'Ошибка загрузки фотографии')
     } finally {
       setUploadingPhoto(false)
@@ -258,13 +281,18 @@ export default function VesselDetails() {
     try {
       const newPhotos: string[] = [...photos]
       
+      console.log('Начало обработки файлов:', files.length)
+      
       // Обрабатываем все выбранные файлы
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         try {
+          console.log(`Обработка файла ${i + 1}/${files.length}:`, file.name)
           const compressed = await compressImage(file)
           newPhotos.push(compressed)
+          console.log(`Файл ${i + 1} обработан, размер base64:`, compressed.length)
         } catch (err: any) {
+          console.error('Ошибка обработки изображения:', err)
           setError(err.message || 'Ошибка обработки изображения')
           e.target.value = ''
           setUploadingPhoto(false)
@@ -272,8 +300,10 @@ export default function VesselDetails() {
         }
       }
 
+      console.log('Все файлы обработаны, всего фото:', newPhotos.length)
       await handlePhotoUpload(newPhotos)
     } catch (err: any) {
+      console.error('Ошибка загрузки фотографий:', err)
       setError(err.error || err.message || 'Ошибка загрузки фотографий')
     } finally {
       setUploadingPhoto(false)
