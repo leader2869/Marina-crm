@@ -554,7 +554,7 @@ export default function VesselDetails() {
               </div>
               <div>
                 <label htmlFor="edit-technicalSpecs" className="block text-sm font-medium text-gray-700 mb-1">
-                  Технические характеристики
+                  Описание катера
                 </label>
                 <textarea
                   id="edit-technicalSpecs"
@@ -601,7 +601,7 @@ export default function VesselDetails() {
               )}
               {vessel.technicalSpecs && (
                 <div className="py-2 border-b border-gray-200">
-                  <span className="text-gray-600 block mb-2">Технические характеристики:</span>
+                  <span className="text-gray-600 block mb-2">Описание катера:</span>
                   <p className="text-gray-900 whitespace-pre-wrap">{vessel.technicalSpecs}</p>
                 </div>
               )}
