@@ -392,81 +392,80 @@ export default function Vessels() {
                     </h3>
                   </div>
                 </Link>
-              {canManageVessel(vessel) && (
-                <div className="flex gap-1">
-                  {vessel.isActive ? (
+                {canManageVessel(vessel) && (
+                  <div className="flex gap-1">
+                    {vessel.isActive ? (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleHide(vessel.id)
+                        }}
+                        disabled={hiding === vessel.id}
+                        className="p-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded disabled:opacity-50"
+                        title="Скрыть катер"
+                      >
+                        <EyeOff className="h-5 w-5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleRestore(vessel.id)
+                        }}
+                        disabled={restoring === vessel.id}
+                        className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
+                        title="Восстановить катер"
+                      >
+                        <Eye className="h-5 w-5" />
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
-                        handleHide(vessel.id)
+                        handleDelete(vessel.id)
                       }}
-                      disabled={hiding === vessel.id}
-                      className="p-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded disabled:opacity-50"
-                      title="Скрыть катер"
+                      disabled={deleting}
+                      className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                      title="Удалить катер"
                     >
-                      <EyeOff className="h-5 w-5" />
+                      <Trash2 className="h-5 w-5" />
                     </button>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        handleRestore(vessel.id)
-                      }}
-                      disabled={restoring === vessel.id}
-                      className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50"
-                      title="Восстановить катер"
-                    >
-                      <Eye className="h-5 w-5" />
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      handleDelete(vessel.id)
-                    }}
-                    disabled={deleting}
-                    className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
-                    title="Удалить катер"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-              )}
-            </div>
-                <Link to={`/vessels/${vessel.id}`} className="block">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Тип:</span>
-                      <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.type}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Длина:</span>
-                      <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.length} м</span>
-                    </div>
-                    {vessel.width && (
-                      <div className="flex justify-between text-sm">
-                        <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Ширина:</span>
-                        <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.width} м</span>
-                      </div>
-                    )}
-                    {vessel.heightAboveWaterline && (
-                      <div className="flex justify-between text-sm">
-                        <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Высота над ватерлинией:</span>
-                        <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.heightAboveWaterline} м</span>
-                      </div>
-                    )}
-                    {vessel.registrationNumber && (
-                      <div className="flex justify-between text-sm">
-                        <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Рег. номер:</span>
-                        <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.registrationNumber}</span>
-                      </div>
-                    )}
                   </div>
-                </Link>
+                )}
               </div>
+              <Link to={`/vessels/${vessel.id}`} className="block">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Тип:</span>
+                    <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.type}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Длина:</span>
+                    <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.length} м</span>
+                  </div>
+                  {vessel.width && (
+                    <div className="flex justify-between text-sm">
+                      <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Ширина:</span>
+                      <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.width} м</span>
+                    </div>
+                  )}
+                  {vessel.heightAboveWaterline && (
+                    <div className="flex justify-between text-sm">
+                      <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Высота над ватерлинией:</span>
+                      <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.heightAboveWaterline} м</span>
+                    </div>
+                  )}
+                  {vessel.registrationNumber && (
+                    <div className="flex justify-between text-sm">
+                      <span className={vessel.photo ? 'text-gray-200' : 'text-gray-600'}>Рег. номер:</span>
+                      <span className={`font-semibold ${vessel.photo ? 'text-white' : 'text-gray-900'}`}>{vessel.registrationNumber}</span>
+                    </div>
+                  )}
+                </div>
+              </Link>
             </div>
           </div>
         ))}
