@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { AppDataSource } from '../config/database';
+import { DataSource } from 'typeorm';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -9,11 +9,24 @@ dotenv.config();
  * Добавляет роли: agent, captain, mechanic
  */
 const addNewUserRoles = async (): Promise<void> => {
+  const dataSource = new DataSource({
+    type: 'postgres',
+    url: process.env.DATABASE_URL || undefined,
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432'),
+    username: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    synchronize: false,
+    logging: false,
+  });
+
   try {
-    await AppDataSource.initialize();
+    await dataSource.initialize();
     console.log('✅ База данных подключена');
 
-    const queryRunner = AppDataSource.createQueryRunner();
+    const queryRunner = dataSource.createQueryRunner();
+    await queryRunner.connect();
 
     // Проверяем текущие значения enum
     const enumValues = await queryRunner.query(`
@@ -51,7 +64,7 @@ const addNewUserRoles = async (): Promise<void> => {
     }
 
     await queryRunner.release();
-    await AppDataSource.destroy();
+    await dataSource.destroy();
     console.log('✅ Миграция завершена успешно');
   } catch (error) {
     console.error('❌ Ошибка при выполнении миграции:', error);
