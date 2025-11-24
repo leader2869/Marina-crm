@@ -35,11 +35,13 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  const fullURL = config.baseURL ? `${config.baseURL}${config.url}` : config.url
   console.log('[API Request]', {
-    method: config.method,
+    method: config.method?.toUpperCase(),
     url: config.url,
     baseURL: config.baseURL,
-    fullURL: `${config.baseURL}${config.url}`,
+    fullURL: fullURL,
+    headers: config.headers,
   })
   return config
 })
@@ -48,12 +50,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    const fullURL = error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url
     console.error('API Error:', {
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
       message: error.message,
       url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      fullURL: fullURL,
       method: error.config?.method
     })
     
