@@ -90,6 +90,7 @@ export default function Vessels() {
       length: '',
       width: '',
       heightAboveWaterline: '',
+      passengerCapacity: '',
       registrationNumber: '',
       technicalSpecs: '',
       ownerId: user?.id?.toString() || '',
