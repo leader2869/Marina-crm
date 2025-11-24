@@ -224,7 +224,14 @@ app.use('/api/auth', (req, res, next) => {
 }, authRoutes);
 // Применяем автоматическое логирование ко всем API роутам (кроме auth и activity-logs)
 app.use('/api/clubs', autoActivityLogger, clubsRoutes);
-app.use('/api/vessels', autoActivityLogger, vesselsRoutes);
+app.use('/api/vessels', (req, res, next) => {
+  console.log(`[Vessels Middleware] ${req.method} ${req.path}`, {
+    originalUrl: req.originalUrl,
+    url: req.url,
+    baseUrl: req.baseUrl,
+  });
+  next();
+}, autoActivityLogger, vesselsRoutes);
 app.use('/api/bookings', autoActivityLogger, bookingsRoutes);
 app.use('/api/finances', autoActivityLogger, financesRoutes);
 app.use('/api/payments', autoActivityLogger, paymentsRoutes);
