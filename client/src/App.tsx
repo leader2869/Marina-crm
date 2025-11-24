@@ -29,6 +29,7 @@ import Widget from './pages/Widget'
 import ActivityLogs from './pages/ActivityLogs'
 import VesselRefueling from './pages/VesselRefueling'
 import VesselService from './pages/VesselService'
+import VesselMaintenance from './pages/VesselMaintenance'
 import AgentOrders from './pages/AgentOrders'
 import { UserRole } from './types'
 
@@ -189,6 +190,10 @@ function App() {
                   <ActivityLogs />
                 </RoleProtectedRoute>
               } 
+            />
+            <Route 
+              path="vessel-maintenance" 
+              element={<VesselMaintenance />} 
             />
             <Route 
               path="vessel-refueling" 
