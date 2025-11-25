@@ -161,7 +161,7 @@ export default function OrderResponses() {
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
-      const margin = 15
+      const margin = 5 // Минимальные отступы
       const contentWidth = pageWidth - 2 * margin
 
       // Функция для создания изображения шапки
@@ -173,14 +173,14 @@ export default function OrderResponses() {
         headerContainer.style.top = '0'
         headerContainer.style.width = '1200px'
         headerContainer.style.backgroundColor = '#ffffff'
-        headerContainer.style.padding = '30px'
+        headerContainer.style.padding = '10px'
         headerContainer.style.fontFamily = 'system-ui, -apple-system, sans-serif'
         document.body.appendChild(headerContainer)
 
         // Создаем шапку
         const header = document.createElement('div')
-        header.style.marginBottom = '20px'
-        header.style.paddingBottom = '20px'
+        header.style.marginBottom = '8px'
+        header.style.paddingBottom = '8px'
         header.style.borderBottom = '2px solid #e5e7eb'
         const creatorName = order.createdBy 
           ? `${order.createdBy.firstName || ''} ${order.createdBy.lastName || ''}`.trim() 
@@ -188,15 +188,15 @@ export default function OrderResponses() {
         const creatorPhone = order.createdBy?.phone || 'Не указано'
 
         header.innerHTML = `
-          <h1 style="font-size: 36px; font-weight: bold; color: #111827; margin: 0 0 24px 0;">Предложения по заказу</h1>
-          <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 18px; color: #6b7280;">
+          <h1 style="font-size: 36px; font-weight: bold; color: #111827; margin: 0 0 8px 0;">Предложения по заказу</h1>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 18px; color: #6b7280;">
             <div>📅 Дата начала: ${format(new Date(order.startDate), 'dd.MM.yyyy')}</div>
             <div>🕐 Время начала: ${startTimeText}</div>
             <div>⏱️ Количество часов: ${hoursText}</div>
             <div>👥 Пассажиров: ${order.passengerCount}</div>
             ${order.route ? `<div>📍 Маршрут: ${order.route}</div>` : ''}
           </div>
-          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 20px; flex-wrap: wrap; font-size: 18px; color: #374151;">
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; flex-wrap: wrap; font-size: 18px; color: #374151;">
             <div style="font-weight: 600;">👤 Ваш персональный менеджер:</div>
             <div>${creatorName}</div>
             <div>📞 ${creatorPhone}</div>
@@ -242,7 +242,7 @@ export default function OrderResponses() {
         container.style.top = '0'
         container.style.width = '1200px'
         container.style.backgroundColor = '#ffffff'
-        container.style.padding = '30px'
+        container.style.padding = '10px'
         container.style.fontFamily = 'system-ui, -apple-system, sans-serif'
         document.body.appendChild(container)
 
@@ -252,15 +252,15 @@ export default function OrderResponses() {
         card.style.borderRadius = '12px'
         card.style.overflow = 'hidden'
         card.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)'
-        card.style.padding = '30px'
+        card.style.padding = '10px'
 
         // Заголовок карточки с ценой
         const cardHeader = document.createElement('div')
         cardHeader.style.display = 'flex'
         cardHeader.style.justifyContent = 'space-between'
         cardHeader.style.alignItems = 'center'
-        cardHeader.style.marginBottom = '24px'
-        cardHeader.style.paddingBottom = '16px'
+        cardHeader.style.marginBottom = '8px'
+        cardHeader.style.paddingBottom = '8px'
         cardHeader.style.borderBottom = '2px solid #e5e7eb'
         
         const title = document.createElement('h3')
@@ -290,13 +290,13 @@ export default function OrderResponses() {
         // Фотографии катера
         if (fullVessel?.photos && fullVessel.photos.length > 0) {
           const photosSection = document.createElement('div')
-          photosSection.style.marginBottom = '24px'
+          photosSection.style.marginBottom = '8px'
           
           const photosTitle = document.createElement('h4')
           photosTitle.style.fontSize = '16px'
           photosTitle.style.fontWeight = '600'
           photosTitle.style.color = '#374151'
-          photosTitle.style.marginBottom = '16px'
+          photosTitle.style.marginBottom = '6px'
           photosTitle.textContent = 'Фотографии катера'
           photosSection.appendChild(photosTitle)
 
@@ -310,15 +310,15 @@ export default function OrderResponses() {
           // Главная фотография - большая и по центру
           if (mainPhoto) {
             const mainPhotoWrapper = document.createElement('div')
-            mainPhotoWrapper.style.marginBottom = '16px'
+            mainPhotoWrapper.style.marginBottom = '6px'
             mainPhotoWrapper.style.textAlign = 'center'
             
             const mainImg = document.createElement('img')
             mainImg.src = mainPhoto
             mainImg.style.width = '100%'
-            mainImg.style.maxWidth = '900px'
+            mainImg.style.maxWidth = '100%'
             mainImg.style.height = 'auto'
-            mainImg.style.maxHeight = '500px'
+            mainImg.style.maxHeight = '600px'
             mainImg.style.objectFit = 'contain'
             mainImg.style.borderRadius = '12px'
             mainImg.style.border = '3px solid #2563eb'
@@ -349,7 +349,7 @@ export default function OrderResponses() {
             const photosGrid = document.createElement('div')
             photosGrid.style.display = 'grid'
             photosGrid.style.gridTemplateColumns = 'repeat(2, 1fr)'
-            photosGrid.style.gap = '16px'
+            photosGrid.style.gap = '6px'
             
             otherPhotos.forEach((photo) => {
               const photoWrapper = document.createElement('div')
@@ -358,7 +358,7 @@ export default function OrderResponses() {
               const img = document.createElement('img')
               img.src = photo
               img.style.width = '100%'
-              img.style.height = '300px'
+              img.style.height = '400px'
               img.style.objectFit = 'cover'
               img.style.borderRadius = '8px'
               img.style.border = '2px solid #e5e7eb'
@@ -377,12 +377,12 @@ export default function OrderResponses() {
 
         // Характеристики катера
         const specsSection = document.createElement('div')
-        specsSection.style.marginBottom = '24px'
+        specsSection.style.marginBottom = '8px'
         
         const specsGrid = document.createElement('div')
         specsGrid.style.display = 'grid'
         specsGrid.style.gridTemplateColumns = 'repeat(3, 1fr)'
-        specsGrid.style.gap = '16px'
+        specsGrid.style.gap = '8px'
 
         const addSpec = (label: string, value: string | number | undefined) => {
           if (value === undefined || value === null || value === '') return
@@ -418,7 +418,7 @@ export default function OrderResponses() {
         // Описание катера
         if (fullVessel?.technicalSpecs) {
           const descriptionSection = document.createElement('div')
-          descriptionSection.style.marginBottom = '24px'
+          descriptionSection.style.marginBottom = '8px'
           
           const descriptionLabel = document.createElement('div')
           descriptionLabel.style.fontSize = '14px'
@@ -491,7 +491,7 @@ export default function OrderResponses() {
 
         // Добавляем изображение шапки в PDF (JPEG)
         pdf.addImage(headerImageData, 'JPEG', margin, yPosition, finalHeaderWidth, finalHeaderHeight)
-        yPosition += finalHeaderHeight + 5
+        yPosition += finalHeaderHeight + 2 // Минимальный отступ между шапкой и карточкой
 
         // Вычисляем размеры изображения карточки катера для PDF
         const cardImgWidth = canvas.width * 0.264583 // Конвертация пикселей в мм
