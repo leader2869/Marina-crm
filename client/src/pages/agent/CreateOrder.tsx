@@ -275,7 +275,7 @@ export default function CreateOrder() {
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="flex items-center gap-2">
-                  {order.responses && order.responses.length > 0 && (
+                  {isOrderCreator(order) && order.responses && order.responses.length > 0 && (
                     <span className="text-sm text-gray-600">
                       Откликов: {order.responses.length}
                     </span>
