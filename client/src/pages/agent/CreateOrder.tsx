@@ -532,55 +532,129 @@ export default function CreateOrder() {
 
                   return (
                     <div className="space-y-4">
-                      {order.responses.map((response: AgentOrderResponse) => (
-                        <div key={response.id} className="border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <div className="flex items-center mb-2">
-                                <Ship className="h-5 w-5 text-primary-600 mr-2" />
-                                <span className="font-semibold text-gray-900">{response.vessel?.name}</span>
+                      {order.responses.map((response: AgentOrderResponse) => {
+                        const vessel = response.vessel
+                        const mainPhotoIndex = vessel?.mainPhotoIndex !== undefined && vessel?.mainPhotoIndex !== null 
+                          ? vessel.mainPhotoIndex 
+                          : 0
+                        const mainPhoto = vessel?.photos && vessel.photos.length > 0 
+                          ? vessel.photos[mainPhotoIndex] 
+                          : null
+                        
+                        return (
+                          <div key={response.id} className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                            {/* Фото катера */}
+                            {mainPhoto ? (
+                              <div className="relative h-48 bg-gray-200">
+                                <img
+                                  src={mainPhoto}
+                                  alt={vessel?.name || 'Катер'}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.style.display = 'none'
+                                  }}
+                                />
+                                <div className="absolute top-2 right-2">
+                                  {response.status === 'accepted' && (
+                                    <span className="px-2 py-1 bg-green-500 text-white rounded text-xs font-semibold shadow">
+                                      Выбран
+                                    </span>
+                                  )}
+                                  {response.status === 'rejected' && (
+                                    <span className="px-2 py-1 bg-red-500 text-white rounded text-xs font-semibold shadow">
+                                      Отклонен
+                                    </span>
+                                  )}
+                                  {response.status === 'pending' && (
+                                    <span className="px-2 py-1 bg-yellow-500 text-white rounded text-xs font-semibold shadow">
+                                      Ожидает
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-sm text-gray-600">
-                                <span>Владелец: {response.vesselOwner?.firstName} {response.vesselOwner?.lastName}</span>
-                                <span className="mx-2">•</span>
-                                <span>Пассажировместимость: {response.vessel?.passengerCapacity}</span>
+                            ) : (
+                              <div className="relative h-48 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                                <Ship className="h-16 w-16 text-blue-400" />
+                                <div className="absolute top-2 right-2">
+                                  {response.status === 'accepted' && (
+                                    <span className="px-2 py-1 bg-green-500 text-white rounded text-xs font-semibold shadow">
+                                      Выбран
+                                    </span>
+                                  )}
+                                  {response.status === 'rejected' && (
+                                    <span className="px-2 py-1 bg-red-500 text-white rounded text-xs font-semibold shadow">
+                                      Отклонен
+                                    </span>
+                                  )}
+                                  {response.status === 'pending' && (
+                                    <span className="px-2 py-1 bg-yellow-500 text-white rounded text-xs font-semibold shadow">
+                                      Ожидает
+                                    </span>
+                                  )}
+                                </div>
                               </div>
+                            )}
+
+                            {/* Информация о катере */}
+                            <div className="p-4">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <h4 className="text-lg font-semibold text-gray-900 mb-1 flex items-center">
+                                    <Ship className="h-5 w-5 text-primary-600 mr-2" />
+                                    {vessel?.name || 'Катер'}
+                                  </h4>
+                                  <div className="text-sm text-gray-600 mb-2">
+                                    <span>Владелец: {response.vesselOwner?.firstName} {response.vesselOwner?.lastName}</span>
+                                    <span className="mx-2">•</span>
+                                    <span>Пассажировместимость: {vessel?.passengerCapacity || '-'} чел.</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Краткое описание катера */}
+                              {vessel?.technicalSpecs && (
+                                <div className="mb-3">
+                                  <p className="text-sm text-gray-700 line-clamp-2">
+                                    {vessel.technicalSpecs.length > 150 
+                                      ? `${vessel.technicalSpecs.substring(0, 150)}...` 
+                                      : vessel.technicalSpecs}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Предложенная цена */}
+                              {response.proposedPrice && (
+                                <div className="mb-3 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-gray-700">Предложенная цена:</span>
+                                    <span className="text-lg font-bold text-primary-600">
+                                      {response.proposedPrice.toLocaleString('ru-RU')} ₽
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Сообщение от владельца */}
+                              {response.message && (
+                                <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                                  <p className="text-sm text-gray-700 italic">"{response.message}"</p>
+                                </div>
+                              )}
+
+                              {/* Кнопка выбора */}
+                              {order.status === 'active' && response.status === 'pending' && (
+                                <button
+                                  onClick={() => handleSelectVessel(order.id, response.id)}
+                                  className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium transition-colors"
+                                >
+                                  Выбрать этот катер
+                                </button>
+                              )}
                             </div>
-                            {response.status === 'accepted' && (
-                              <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">
-                                Выбран
-                              </span>
-                            )}
-                            {response.status === 'rejected' && (
-                              <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
-                                Отклонен
-                              </span>
-                            )}
                           </div>
-
-                          {response.proposedPrice && (
-                            <div className="mb-2">
-                              <span className="text-sm font-medium text-gray-700">Предложенная цена: </span>
-                              <span className="text-sm text-gray-900">{response.proposedPrice.toLocaleString()} ₽</span>
-                            </div>
-                          )}
-
-                          {response.message && (
-                            <div className="mb-3">
-                              <p className="text-sm text-gray-600">{response.message}</p>
-                            </div>
-                          )}
-
-                          {order.status === 'active' && response.status === 'pending' && (
-                            <button
-                              onClick={() => handleSelectVessel(order.id, response.id)}
-                              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
-                            >
-                              Выбрать этот катер
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )
                 })()}
