@@ -868,8 +868,12 @@ export default function OrderResponses() {
                           if (pdfBlob) {
                             const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
                             
-                            // Используем Web Share API, если доступен
-                            if (navigator.share && navigator.canShare) {
+                            // Проверяем поддержку Web Share API с файлами (обычно только на мобильных)
+                            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+                            const hasShareAPI = typeof navigator !== 'undefined' && 'share' in navigator
+                            const hasCanShare = typeof navigator !== 'undefined' && 'canShare' in navigator
+                            
+                            if (hasShareAPI && hasCanShare && isMobile) {
                               try {
                                 const file = new File([pdfBlob], fileName, { type: 'application/pdf' })
                                 if (navigator.canShare({ files: [file] })) {
@@ -878,22 +882,48 @@ export default function OrderResponses() {
                                     text: 'Предложения по заказу',
                                     files: [file],
                                   })
+                                  setShowShareModal(false)
                                   return
                                 }
                               } catch (error: any) {
                                 if (error.name !== 'AbortError') {
                                   console.error('Ошибка отправки через Web Share API:', error)
+                                  // Продолжаем с альтернативным способом
+                                } else {
+                                  // Пользователь отменил
+                                  return
                                 }
                               }
                             }
                             
-                            // Если Web Share API не поддерживается, скачиваем файл
+                            // Для десктопа или если Web Share API не поддерживается
+                            // Создаем ссылку для скачивания
+                            const pdfUrl = URL.createObjectURL(pdfBlob)
+                            
+                            // Создаем временную ссылку для скачивания
                             const link = document.createElement('a')
-                            link.href = URL.createObjectURL(pdfBlob)
+                            link.href = pdfUrl
                             link.download = fileName
+                            document.body.appendChild(link)
                             link.click()
-                            URL.revokeObjectURL(link.href)
-                            alert('Файл скачан. Вы можете отправить его клиенту вручную через мессенджер или email.')
+                            document.body.removeChild(link)
+                            
+                            // Показываем сообщение с инструкциями
+                            const userChoice = window.confirm(
+                              'Файл скачан. Хотите открыть почтовый клиент для отправки файла?'
+                            )
+                            
+                            if (userChoice) {
+                              const mailtoLink = `mailto:?subject=Предложения по заказу "${order?.title}"&body=Добрый день! Предоставляю предложения по вашему заказу.`
+                              window.location.href = mailtoLink
+                            }
+                            
+                            // Очищаем URL через некоторое время
+                            setTimeout(() => {
+                              URL.revokeObjectURL(pdfUrl)
+                            }, 1000)
+                            
+                            setShowShareModal(false)
                           }
                         }}
                         className="flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-md"
