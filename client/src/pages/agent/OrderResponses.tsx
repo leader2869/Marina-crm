@@ -175,37 +175,70 @@ export default function OrderResponses() {
             const mainPhotoIndex = vessel.mainPhotoIndex !== undefined && vessel.mainPhotoIndex !== null 
               ? vessel.mainPhotoIndex 
               : 0
-            const photoUrl = vessel.photos[mainPhotoIndex]
+            let photoUrl = vessel.photos[mainPhotoIndex]
 
-            // Создаем временный элемент для загрузки изображения
-            const img = new Image()
-            img.crossOrigin = 'anonymous'
+            // Если это base64, используем напрямую, иначе загружаем
+            let imageData = photoUrl
             
-            await new Promise((resolve, reject) => {
-              img.onload = resolve
-              img.onerror = reject
-              img.src = photoUrl
-            })
+            if (!photoUrl.startsWith('data:')) {
+              // Если не base64, пытаемся загрузить через canvas
+              const img = new Image()
+              img.crossOrigin = 'anonymous'
+              
+              await new Promise((resolve, reject) => {
+                img.onload = resolve
+                img.onerror = () => {
+                  console.warn('Не удалось загрузить изображение, пропускаем')
+                  resolve(null) // Продолжаем без изображения
+                }
+                img.src = photoUrl
+              })
 
-            // Вычисляем размеры изображения для PDF
-            const maxWidth = contentWidth
-            const maxHeight = 60
-            let imgWidth = img.width
-            let imgHeight = img.height
-            const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight)
-            imgWidth = imgWidth * ratio
-            imgHeight = imgHeight * ratio
-
-            // Проверяем, помещается ли изображение на странице
-            if (yPosition + imgHeight > pageHeight - margin) {
-              pdf.addPage()
-              yPosition = margin
+              if (img.complete && img.naturalWidth > 0) {
+                // Конвертируем в base64 через canvas
+                const canvas = document.createElement('canvas')
+                canvas.width = img.width
+                canvas.height = img.height
+                const ctx = canvas.getContext('2d')
+                if (ctx) {
+                  ctx.drawImage(img, 0, 0)
+                  imageData = canvas.toDataURL('image/jpeg', 0.8)
+                }
+              } else {
+                // Изображение не загрузилось, пропускаем
+                imageData = null
+              }
             }
 
-            pdf.addImage(photoUrl, 'JPEG', margin, yPosition, imgWidth, imgHeight)
-            yPosition += imgHeight + 5
+            if (imageData) {
+              // Вычисляем размеры изображения для PDF
+              const maxWidth = contentWidth
+              const maxHeight = 60
+              
+              // Получаем размеры изображения
+              const img = new Image()
+              await new Promise((resolve) => {
+                img.onload = resolve
+                img.src = imageData
+              })
+
+              let imgWidth = img.width * 0.264583 // Конвертация пикселей в мм (1px = 0.264583mm при 96 DPI)
+              let imgHeight = img.height * 0.264583
+              const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight)
+              imgWidth = imgWidth * ratio
+              imgHeight = imgHeight * ratio
+
+              // Проверяем, помещается ли изображение на странице
+              if (yPosition + imgHeight > pageHeight - margin) {
+                pdf.addPage()
+                yPosition = margin
+              }
+
+              pdf.addImage(imageData, 'JPEG', margin, yPosition, imgWidth, imgHeight)
+              yPosition += imgHeight + 5
+            }
           } catch (err) {
-            console.error('Ошибка загрузки изображения:', err)
+            console.error('Ошибка обработки изображения:', err)
           }
         }
 
