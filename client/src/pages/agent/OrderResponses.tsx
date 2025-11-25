@@ -849,7 +849,7 @@ export default function OrderResponses() {
                         onClick={async () => {
                           const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
                           if (pdfBlob) {
-                            const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                            const fileName = `Заказ №${order?.id} от ${format(new Date(order?.createdAt || new Date()), 'dd.MM.yyyy')}.pdf`
                             const link = document.createElement('a')
                             link.href = URL.createObjectURL(pdfBlob)
                             link.download = fileName
@@ -866,7 +866,7 @@ export default function OrderResponses() {
                         onClick={async () => {
                           const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
                           if (pdfBlob) {
-                            const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                            const fileName = `Заказ №${order?.id} от ${format(new Date(order?.createdAt || new Date()), 'dd.MM.yyyy')}.pdf`
                             
                             // Проверяем поддержку Web Share API с файлами (обычно только на мобильных)
                             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
