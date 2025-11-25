@@ -41,7 +41,26 @@ export class AgentOrdersController {
         .take(limit)
         .getManyAndCount();
 
-      res.json(createPaginatedResponse(orders, total, page, limit));
+      // Парсим JSON строки в массивы для фотографий катеров в откликах
+      const ordersWithParsedPhotos = orders.map((order: any) => {
+        if (order.responses && Array.isArray(order.responses)) {
+          order.responses = order.responses.map((response: any) => {
+            if (response.vessel && response.vessel.photos) {
+              try {
+                response.vessel.photos = JSON.parse(response.vessel.photos);
+              } catch (e) {
+                response.vessel.photos = [];
+              }
+            } else if (response.vessel) {
+              response.vessel.photos = [];
+            }
+            return response;
+          });
+        }
+        return order;
+      });
+
+      res.json(createPaginatedResponse(ordersWithParsedPhotos, total, page, limit));
     } catch (error) {
       next(error);
     }
@@ -59,6 +78,22 @@ export class AgentOrdersController {
 
       if (!order) {
         throw new AppError('Заказ не найден', 404);
+      }
+
+      // Парсим JSON строки в массивы для фотографий катеров в откликах
+      if ((order as any).responses && Array.isArray((order as any).responses)) {
+        (order as any).responses = (order as any).responses.map((response: any) => {
+          if (response.vessel && response.vessel.photos) {
+            try {
+              response.vessel.photos = JSON.parse(response.vessel.photos);
+            } catch (e) {
+              response.vessel.photos = [];
+            }
+          } else if (response.vessel) {
+            response.vessel.photos = [];
+          }
+          return response;
+        });
       }
 
       res.json(order);
@@ -264,6 +299,22 @@ export class AgentOrdersController {
         where: { id: parseInt(orderId) },
         relations: ['createdBy', 'selectedVessel', 'responses', 'responses.vessel', 'responses.vesselOwner'],
       });
+
+      // Парсим JSON строки в массивы для фотографий катеров в откликах
+      if (updatedOrder && (updatedOrder as any).responses && Array.isArray((updatedOrder as any).responses)) {
+        (updatedOrder as any).responses = (updatedOrder as any).responses.map((response: any) => {
+          if (response.vessel && response.vessel.photos) {
+            try {
+              response.vessel.photos = JSON.parse(response.vessel.photos);
+            } catch (e) {
+              response.vessel.photos = [];
+            }
+          } else if (response.vessel) {
+            response.vessel.photos = [];
+          }
+          return response;
+        });
+      }
 
       res.json(updatedOrder);
     } catch (error) {
