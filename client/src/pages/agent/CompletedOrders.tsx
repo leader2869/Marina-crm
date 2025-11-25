@@ -129,6 +129,9 @@ export default function CompletedOrders() {
                 <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
                   Завершен
                 </span>
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                  Исполнитель
+                </span>
               </div>
               {isOrderCreator(order) && order.responses && order.responses.length > 0 && (
                 <button
