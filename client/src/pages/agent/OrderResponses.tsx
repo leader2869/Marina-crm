@@ -16,6 +16,7 @@ export default function OrderResponses() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedResponses, setSelectedResponses] = useState<Set<number>>(new Set())
+  const [clientPrices, setClientPrices] = useState<Map<number, number>>(new Map())
   const [showShareModal, setShowShareModal] = useState(false)
   const [showVesselModal, setShowVesselModal] = useState<Vessel | null>(null)
   const [vesselDetails, setVesselDetails] = useState<Vessel | null>(null)
@@ -104,6 +105,12 @@ export default function OrderResponses() {
       const newSet = new Set(prev)
       if (newSet.has(responseId)) {
         newSet.delete(responseId)
+        // Удаляем цену при снятии выбора
+        setClientPrices(prevPrices => {
+          const newPrices = new Map(prevPrices)
+          newPrices.delete(responseId)
+          return newPrices
+        })
         console.log('[OrderResponses] Removed from selection:', responseId)
       } else {
         newSet.add(responseId)
@@ -114,7 +121,20 @@ export default function OrderResponses() {
     })
   }
 
-  const generateVesselCardsImage = async (responses: AgentOrderResponse[]) => {
+  const updateClientPrice = (responseId: number, price: string) => {
+    const numPrice = parseFloat(price)
+    setClientPrices(prev => {
+      const newPrices = new Map(prev)
+      if (isNaN(numPrice) || numPrice <= 0) {
+        newPrices.delete(responseId)
+      } else {
+        newPrices.set(responseId, numPrice)
+      }
+      return newPrices
+    })
+  }
+
+  const generateVesselCardsImage = async (responses: AgentOrderResponse[], prices: Map<number, number>) => {
     if (!order) return
 
     try {
@@ -202,7 +222,9 @@ export default function OrderResponses() {
         title.textContent = `${i + 1}. ${fullVessel?.name || 'Катер'}`
         cardHeader.appendChild(title)
 
-        if (response.proposedPrice) {
+        // Используем агентскую цену для клиента, если указана
+        const clientPrice = prices.get(response.id)
+        if (clientPrice) {
           const priceBadge = document.createElement('div')
           priceBadge.style.backgroundColor = '#2563eb'
           priceBadge.style.color = '#ffffff'
@@ -210,7 +232,7 @@ export default function OrderResponses() {
           priceBadge.style.borderRadius = '8px'
           priceBadge.style.fontWeight = 'bold'
           priceBadge.style.fontSize = '20px'
-          priceBadge.textContent = `${response.proposedPrice.toLocaleString('ru-RU')} ₽`
+          priceBadge.textContent = `${clientPrice.toLocaleString('ru-RU')} ₽`
           cardHeader.appendChild(priceBadge)
         }
         
@@ -642,6 +664,27 @@ export default function OrderResponses() {
                       </button>
                     )}
                   </div>
+
+                  {/* Поле ввода цены для клиента (только для создателя заказа и выбранного катера) */}
+                  {isOrderCreator() && isSelected && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Цена для клиента (₽)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={clientPrices.get(response.id) || ''}
+                        onChange={(e) => updateClientPrice(response.id, e.target.value)}
+                        placeholder="Укажите цену с комиссией"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Эта цена будет отображаться в изображении для клиента
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -683,7 +726,7 @@ export default function OrderResponses() {
 
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={() => generateVesselCardsImage(selectedResponsesList)}
+                        onClick={() => generateVesselCardsImage(selectedResponsesList, clientPrices)}
                         className="flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-md"
                       >
                         <Download className="h-5 w-5 mr-2" />
