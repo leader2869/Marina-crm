@@ -182,9 +182,7 @@ export default function OrderResponses() {
         header.style.marginBottom = '8px'
         header.style.paddingBottom = '8px'
         header.style.borderBottom = '2px solid #e5e7eb'
-        const creatorName = order.createdBy 
-          ? `${order.createdBy.firstName || ''} ${order.createdBy.lastName || ''}`.trim() 
-          : 'Не указано'
+        const creatorName = order.createdBy?.firstName || 'Не указано'
         const creatorPhone = order.createdBy?.phone || 'Не указано'
 
         header.innerHTML = `
@@ -489,8 +487,11 @@ export default function OrderResponses() {
         const finalHeaderWidth = headerWidth * headerRatio
         const finalHeaderHeight = headerHeight * headerRatio
 
-        // Добавляем изображение шапки в PDF (JPEG)
-        pdf.addImage(headerImageData, 'JPEG', margin, yPosition, finalHeaderWidth, finalHeaderHeight)
+        // Центрируем шапку на странице
+        const headerXPosition = (pageWidth - finalHeaderWidth) / 2
+
+        // Добавляем изображение шапки в PDF (JPEG) по центру
+        pdf.addImage(headerImageData, 'JPEG', headerXPosition, yPosition, finalHeaderWidth, finalHeaderHeight)
         yPosition += finalHeaderHeight + 2 // Минимальный отступ между шапкой и карточкой
 
         // Вычисляем размеры изображения карточки катера для PDF
@@ -502,8 +503,11 @@ export default function OrderResponses() {
         const finalCardWidth = cardImgWidth * ratio
         const finalCardHeight = cardImgHeight * ratio
 
-        // Добавляем изображение карточки катера в PDF (JPEG)
-        pdf.addImage(cardImageData, 'JPEG', margin, yPosition, finalCardWidth, finalCardHeight)
+        // Центрируем карточку катера на странице
+        const cardXPosition = (pageWidth - finalCardWidth) / 2
+
+        // Добавляем изображение карточки катера в PDF (JPEG) по центру
+        pdf.addImage(cardImageData, 'JPEG', cardXPosition, yPosition, finalCardWidth, finalCardHeight)
       }
 
       // Возвращаем PDF как Blob для возможности поделиться
