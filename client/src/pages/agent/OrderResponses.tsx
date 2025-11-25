@@ -286,50 +286,82 @@ export default function OrderResponses() {
           photosTitle.style.fontSize = '16px'
           photosTitle.style.fontWeight = '600'
           photosTitle.style.color = '#374151'
-          photosTitle.style.marginBottom = '12px'
+          photosTitle.style.marginBottom = '16px'
           photosTitle.textContent = 'Фотографии катера'
           photosSection.appendChild(photosTitle)
 
-          const photosGrid = document.createElement('div')
-          photosGrid.style.display = 'grid'
-          photosGrid.style.gridTemplateColumns = 'repeat(3, 1fr)'
-          photosGrid.style.gap = '12px'
-          
-          fullVessel.photos.forEach((photo, index) => {
-            const photoWrapper = document.createElement('div')
-            photoWrapper.style.position = 'relative'
-            
-            const img = document.createElement('img')
-            img.src = photo
-            img.style.width = '100%'
-            img.style.height = '200px'
-            img.style.objectFit = 'cover'
-            img.style.borderRadius = '8px'
-            img.style.border = '2px solid #e5e7eb'
-            img.onerror = () => {
-              img.style.display = 'none'
-            }
-            photoWrapper.appendChild(img)
+          // Определяем главную фотографию
+          const mainPhotoIndex = fullVessel.mainPhotoIndex !== undefined && fullVessel.mainPhotoIndex !== null 
+            ? fullVessel.mainPhotoIndex 
+            : 0
+          const mainPhoto = fullVessel.photos[mainPhotoIndex]
+          const otherPhotos = fullVessel.photos.filter((_, index) => index !== mainPhotoIndex)
 
-            if (fullVessel.mainPhotoIndex === index) {
-              const badge = document.createElement('div')
-              badge.style.position = 'absolute'
-              badge.style.top = '8px'
-              badge.style.left = '8px'
-              badge.style.backgroundColor = '#2563eb'
-              badge.style.color = '#ffffff'
-              badge.style.padding = '4px 8px'
-              badge.style.borderRadius = '4px'
-              badge.style.fontSize = '12px'
-              badge.style.fontWeight = '600'
-              badge.textContent = 'Главное'
-              photoWrapper.appendChild(badge)
+          // Главная фотография - большая и по центру
+          if (mainPhoto) {
+            const mainPhotoWrapper = document.createElement('div')
+            mainPhotoWrapper.style.marginBottom = '16px'
+            mainPhotoWrapper.style.textAlign = 'center'
+            
+            const mainImg = document.createElement('img')
+            mainImg.src = mainPhoto
+            mainImg.style.width = '100%'
+            mainImg.style.maxWidth = '900px'
+            mainImg.style.height = 'auto'
+            mainImg.style.maxHeight = '500px'
+            mainImg.style.objectFit = 'contain'
+            mainImg.style.borderRadius = '12px'
+            mainImg.style.border = '3px solid #2563eb'
+            mainImg.style.margin = '0 auto'
+            mainImg.style.display = 'block'
+            mainImg.onerror = () => {
+              mainImg.style.display = 'none'
             }
             
-            photosGrid.appendChild(photoWrapper)
-          })
+            const mainBadge = document.createElement('div')
+            mainBadge.style.display = 'inline-block'
+            mainBadge.style.backgroundColor = '#2563eb'
+            mainBadge.style.color = '#ffffff'
+            mainBadge.style.padding = '6px 12px'
+            mainBadge.style.borderRadius = '6px'
+            mainBadge.style.fontSize = '14px'
+            mainBadge.style.fontWeight = '600'
+            mainBadge.style.marginTop = '8px'
+            mainBadge.textContent = 'Главное фото'
+            
+            mainPhotoWrapper.appendChild(mainImg)
+            mainPhotoWrapper.appendChild(mainBadge)
+            photosSection.appendChild(mainPhotoWrapper)
+          }
+
+          // Остальные фотографии - в сетке, увеличенные
+          if (otherPhotos.length > 0) {
+            const photosGrid = document.createElement('div')
+            photosGrid.style.display = 'grid'
+            photosGrid.style.gridTemplateColumns = 'repeat(2, 1fr)'
+            photosGrid.style.gap = '16px'
+            
+            otherPhotos.forEach((photo) => {
+              const photoWrapper = document.createElement('div')
+              photoWrapper.style.position = 'relative'
+              
+              const img = document.createElement('img')
+              img.src = photo
+              img.style.width = '100%'
+              img.style.height = '300px'
+              img.style.objectFit = 'cover'
+              img.style.borderRadius = '8px'
+              img.style.border = '2px solid #e5e7eb'
+              img.onerror = () => {
+                img.style.display = 'none'
+              }
+              photoWrapper.appendChild(img)
+              photosGrid.appendChild(photoWrapper)
+            })
+            
+            photosSection.appendChild(photosGrid)
+          }
           
-          photosSection.appendChild(photosGrid)
           card.appendChild(photosSection)
         }
 
