@@ -672,7 +672,7 @@ export default function CreateOrder() {
                         return (
                           <div 
                             key={response.id} 
-                            className={`border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all ${
+                            className={`relative border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all ${
                               isSelected 
                                 ? 'border-primary-500 bg-primary-50' 
                                 : 'border-gray-200'
@@ -689,7 +689,8 @@ export default function CreateOrder() {
                                   isSelected 
                                     ? 'bg-primary-600 text-white' 
                                     : 'bg-white text-gray-400 hover:bg-gray-100'
-                                } shadow-lg`}
+                                } shadow-lg transition-colors`}
+                                title={isSelected ? 'Снять выбор' : 'Выбрать катер'}
                               >
                                 {isSelected ? (
                                   <CheckSquare className="h-5 w-5" />
