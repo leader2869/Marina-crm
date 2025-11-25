@@ -225,6 +225,10 @@ function App() {
               element={<CompletedOrders />} 
             />
             <Route 
+              path="agent/orders/:orderId/responses" 
+              element={<OrderResponses />} 
+            />
+            <Route 
               path="agent/routes" 
               element={
                 <RoleProtectedRoute allowedRoles={[UserRole.AGENT]}>

@@ -4,13 +4,12 @@ import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
 import { format } from 'date-fns'
-import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2, CheckCircle } from 'lucide-react'
+import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2 } from 'lucide-react'
 import { LoadingAnimation } from '../../components/LoadingAnimation'
 import BackButton from '../../components/BackButton'
 
 export default function OrderResponses() {
   const { orderId } = useParams<{ orderId: string }>()
-  const navigate = useNavigate()
   const { user } = useAuth()
   const [order, setOrder] = useState<AgentOrder | null>(null)
   const [loading, setLoading] = useState(true)
