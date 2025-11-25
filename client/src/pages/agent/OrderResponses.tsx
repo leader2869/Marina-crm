@@ -197,10 +197,10 @@ export default function OrderResponses() {
         // Небольшая задержка для рендеринга
         await new Promise(resolve => setTimeout(resolve, 200))
 
-        // Делаем скриншот шапки
+        // Делаем скриншот шапки с уменьшенным качеством для сжатия
         const canvas = await html2canvas(headerContainer, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          scale: 1.5, // Уменьшено с 2 для сжатия
           logging: false,
           useCORS: true,
           allowTaint: true,
@@ -209,8 +209,8 @@ export default function OrderResponses() {
         // Удаляем временный контейнер
         document.body.removeChild(headerContainer)
 
-        // Возвращаем изображение в base64
-        return canvas.toDataURL('image/png')
+        // Возвращаем изображение в base64 (JPEG для лучшего сжатия)
+        return canvas.toDataURL('image/jpeg', 0.75) // JPEG с качеством 75%
       }
 
       // Создаем изображение шапки один раз
@@ -417,10 +417,10 @@ export default function OrderResponses() {
         // Небольшая задержка для рендеринга
         await new Promise(resolve => setTimeout(resolve, 300))
 
-        // Делаем скриншот карточки катера
+        // Делаем скриншот карточки катера с уменьшенным качеством для сжатия
         const canvas = await html2canvas(container, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          scale: 1.5, // Уменьшено с 2 для сжатия
           logging: false,
           useCORS: true,
           allowTaint: true,
@@ -429,8 +429,8 @@ export default function OrderResponses() {
         // Удаляем временный контейнер
         document.body.removeChild(container)
 
-        // Получаем изображение карточки катера в base64
-        const cardImageData = canvas.toDataURL('image/png')
+        // Получаем изображение карточки катера в base64 (JPEG для лучшего сжатия)
+        const cardImageData = canvas.toDataURL('image/jpeg', 0.75) // JPEG с качеством 75%
 
         // Добавляем шапку на страницу
         let yPosition = margin
@@ -447,8 +447,8 @@ export default function OrderResponses() {
         const finalHeaderWidth = headerWidth * headerRatio
         const finalHeaderHeight = headerHeight * headerRatio
 
-        // Добавляем изображение шапки в PDF
-        pdf.addImage(headerImageData, 'PNG', margin, yPosition, finalHeaderWidth, finalHeaderHeight)
+        // Добавляем изображение шапки в PDF (JPEG)
+        pdf.addImage(headerImageData, 'JPEG', margin, yPosition, finalHeaderWidth, finalHeaderHeight)
         yPosition += finalHeaderHeight + 5
 
         // Вычисляем размеры изображения карточки катера для PDF
@@ -460,11 +460,11 @@ export default function OrderResponses() {
         const finalCardWidth = cardImgWidth * ratio
         const finalCardHeight = cardImgHeight * ratio
 
-        // Добавляем изображение карточки катера в PDF
-        pdf.addImage(cardImageData, 'PNG', margin, yPosition, finalCardWidth, finalCardHeight)
+        // Добавляем изображение карточки катера в PDF (JPEG)
+        pdf.addImage(cardImageData, 'JPEG', margin, yPosition, finalCardWidth, finalCardHeight)
       }
 
-      // Сохраняем PDF как blob и возвращаем его
+      // Возвращаем PDF как Blob для возможности поделиться
       const pdfBlob = pdf.output('blob')
       return pdfBlob
     } catch (error) {
@@ -801,7 +801,6 @@ export default function OrderResponses() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={async () => {
-                          // Скачиваем PDF
                           const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
                           if (pdfBlob) {
                             const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
@@ -819,7 +818,6 @@ export default function OrderResponses() {
                       </button>
                       <button
                         onClick={async () => {
-                          // Пытаемся поделиться PDF
                           const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
                           if (pdfBlob) {
                             const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
@@ -839,14 +837,7 @@ export default function OrderResponses() {
                               } catch (error: any) {
                                 if (error.name !== 'AbortError') {
                                   console.error('Ошибка отправки через Web Share API:', error)
-                                  // Если не получилось поделиться, скачиваем файл
-                                  const link = document.createElement('a')
-                                  link.href = URL.createObjectURL(pdfBlob)
-                                  link.download = fileName
-                                  link.click()
-                                  URL.revokeObjectURL(link.href)
                                 }
-                                return
                               }
                             }
                             
