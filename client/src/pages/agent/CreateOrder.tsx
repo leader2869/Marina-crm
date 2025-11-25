@@ -3,7 +3,7 @@ import { FilePlus, Ship, User, Calendar, DollarSign, MapPin, X, User as UserIcon
 import { useNavigate } from 'react-router-dom'
 import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
-import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
+import { AgentOrder, Vessel } from '../../types'
 import { format } from 'date-fns'
 import { LoadingAnimation } from '../../components/LoadingAnimation'
 
