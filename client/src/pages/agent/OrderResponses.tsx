@@ -7,7 +7,7 @@ import { format } from 'date-fns'
 import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2, XCircle, Download } from 'lucide-react'
 import { LoadingAnimation } from '../../components/LoadingAnimation'
 import BackButton from '../../components/BackButton'
-import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 export default function OrderResponses() {
   const { orderId } = useParams<{ orderId: string }>()
