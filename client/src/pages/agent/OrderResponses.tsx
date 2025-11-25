@@ -4,7 +4,7 @@ import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
 import { format } from 'date-fns'
-import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2, XCircle, Download } from 'lucide-react'
+import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2, XCircle, Download, Mail } from 'lucide-react'
 import { LoadingAnimation } from '../../components/LoadingAnimation'
 import BackButton from '../../components/BackButton'
 import html2canvas from 'html2canvas'
@@ -862,75 +862,143 @@ export default function OrderResponses() {
                         <Download className="h-5 w-5 mr-2" />
                         Скачать PDF
                       </button>
-                      <button
-                        onClick={async () => {
-                          const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
-                          if (pdfBlob) {
-                            const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
-                            
-                            // Проверяем поддержку Web Share API с файлами (обычно только на мобильных)
-                            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-                            const hasShareAPI = typeof navigator !== 'undefined' && 'share' in navigator
-                            const hasCanShare = typeof navigator !== 'undefined' && 'canShare' in navigator
-                            
-                            if (hasShareAPI && hasCanShare && isMobile) {
-                              try {
-                                const file = new File([pdfBlob], fileName, { type: 'application/pdf' })
-                                if (navigator.canShare({ files: [file] })) {
-                                  await navigator.share({
-                                    title: `Предложения по заказу "${order?.title}"`,
-                                    text: 'Предложения по заказу',
-                                    files: [file],
-                                  })
-                                  setShowShareModal(false)
-                                  return
-                                }
-                              } catch (error: any) {
-                                if (error.name !== 'AbortError') {
-                                  console.error('Ошибка отправки через Web Share API:', error)
-                                  // Продолжаем с альтернативным способом
-                                } else {
-                                  // Пользователь отменил
-                                  return
+                      <div className="flex flex-wrap gap-3">
+                        {/* Telegram */}
+                        <button
+                          onClick={async () => {
+                            const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
+                            if (pdfBlob) {
+                              const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                              
+                              // Скачиваем файл
+                              const pdfUrl = URL.createObjectURL(pdfBlob)
+                              const link = document.createElement('a')
+                              link.href = pdfUrl
+                              link.download = fileName
+                              document.body.appendChild(link)
+                              link.click()
+                              document.body.removeChild(link)
+                              
+                              // Открываем Telegram с текстом
+                              const message = encodeURIComponent(`Добрый день! Предоставляю предложения по заказу "${order?.title}". Файл уже скачан - прикрепите его к сообщению.`)
+                              const telegramUrl = `https://t.me/share/url?url=&text=${message}`
+                              window.open(telegramUrl, '_blank')
+                              
+                              setTimeout(() => {
+                                URL.revokeObjectURL(pdfUrl)
+                              }, 1000)
+                              
+                              setShowShareModal(false)
+                            }
+                          }}
+                          className="flex items-center px-4 py-2 bg-[#0088cc] text-white rounded-lg hover:bg-[#0077b5] text-sm font-medium shadow-md"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          Telegram
+                        </button>
+
+                        {/* WhatsApp */}
+                        <button
+                          onClick={async () => {
+                            const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
+                            if (pdfBlob) {
+                              const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                              
+                              // Скачиваем файл
+                              const pdfUrl = URL.createObjectURL(pdfBlob)
+                              const link = document.createElement('a')
+                              link.href = pdfUrl
+                              link.download = fileName
+                              document.body.appendChild(link)
+                              link.click()
+                              document.body.removeChild(link)
+                              
+                              // Открываем WhatsApp Web с текстом
+                              const message = encodeURIComponent(`Добрый день! Предоставляю предложения по заказу "${order?.title}". Файл уже скачан - прикрепите его к сообщению.`)
+                              const whatsappUrl = `https://web.whatsapp.com/send?text=${message}`
+                              window.open(whatsappUrl, '_blank')
+                              
+                              setTimeout(() => {
+                                URL.revokeObjectURL(pdfUrl)
+                              }, 1000)
+                              
+                              setShowShareModal(false)
+                            }
+                          }}
+                          className="flex items-center px-4 py-2 bg-[#25D366] text-white rounded-lg hover:bg-[#20BA5A] text-sm font-medium shadow-md"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          WhatsApp
+                        </button>
+
+                        {/* Email */}
+                        <button
+                          onClick={async () => {
+                            const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
+                            if (pdfBlob) {
+                              const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                              
+                              // Скачиваем файл
+                              const pdfUrl = URL.createObjectURL(pdfBlob)
+                              const link = document.createElement('a')
+                              link.href = pdfUrl
+                              link.download = fileName
+                              document.body.appendChild(link)
+                              link.click()
+                              document.body.removeChild(link)
+                              
+                              // Открываем почтовый клиент
+                              const subject = encodeURIComponent(`Предложения по заказу "${order?.title}"`)
+                              const body = encodeURIComponent('Добрый день! Предоставляю предложения по вашему заказу. Файл уже скачан - прикрепите его к письму.')
+                              const mailtoLink = `mailto:?subject=${subject}&body=${body}`
+                              window.location.href = mailtoLink
+                              
+                              setTimeout(() => {
+                                URL.revokeObjectURL(pdfUrl)
+                              }, 1000)
+                              
+                              setShowShareModal(false)
+                            }
+                          }}
+                          className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium shadow-md"
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          Email
+                        </button>
+
+                        {/* Web Share API для мобильных */}
+                        {typeof navigator !== 'undefined' && 'share' in navigator && (
+                          <button
+                            onClick={async () => {
+                              const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
+                              if (pdfBlob) {
+                                const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                                
+                                try {
+                                  const file = new File([pdfBlob], fileName, { type: 'application/pdf' })
+                                  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                                    await navigator.share({
+                                      title: `Предложения по заказу "${order?.title}"`,
+                                      text: 'Предложения по заказу',
+                                      files: [file],
+                                    })
+                                    setShowShareModal(false)
+                                    return
+                                  }
+                                } catch (error: any) {
+                                  if (error.name !== 'AbortError') {
+                                    console.error('Ошибка отправки через Web Share API:', error)
+                                  }
                                 }
                               }
-                            }
-                            
-                            // Для десктопа или если Web Share API не поддерживается
-                            // Создаем ссылку для скачивания
-                            const pdfUrl = URL.createObjectURL(pdfBlob)
-                            
-                            // Создаем временную ссылку для скачивания
-                            const link = document.createElement('a')
-                            link.href = pdfUrl
-                            link.download = fileName
-                            document.body.appendChild(link)
-                            link.click()
-                            document.body.removeChild(link)
-                            
-                            // Показываем сообщение с инструкциями
-                            const userChoice = window.confirm(
-                              'Файл скачан. Хотите открыть почтовый клиент для отправки файла?'
-                            )
-                            
-                            if (userChoice) {
-                              const mailtoLink = `mailto:?subject=Предложения по заказу "${order?.title}"&body=Добрый день! Предоставляю предложения по вашему заказу.`
-                              window.location.href = mailtoLink
-                            }
-                            
-                            // Очищаем URL через некоторое время
-                            setTimeout(() => {
-                              URL.revokeObjectURL(pdfUrl)
-                            }, 1000)
-                            
-                            setShowShareModal(false)
-                          }
-                        }}
-                        className="flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-md"
-                      >
-                        <Share2 className="h-5 w-5 mr-2" />
-                        Поделиться
-                      </button>
+                            }}
+                            className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-md"
+                          >
+                            <Share2 className="h-4 w-4 mr-2" />
+                            Поделиться
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
