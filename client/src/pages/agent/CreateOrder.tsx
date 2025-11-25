@@ -277,11 +277,6 @@ export default function CreateOrder() {
                     </div>
                   )}
 
-                  <div className="flex items-center text-sm text-gray-500">
-                    <span>Создал: {order.createdBy?.firstName} {order.createdBy?.lastName}</span>
-                    <span className="mx-2">•</span>
-                    <span>{format(new Date(order.createdAt), 'dd.MM.yyyy HH:mm')}</span>
-                  </div>
                 </div>
               </div>
 
