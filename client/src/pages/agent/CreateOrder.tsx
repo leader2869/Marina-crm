@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon } from 'lucide-react'
+import { FilePlus, Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2 } from 'lucide-react'
 import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
@@ -21,6 +21,8 @@ export default function CreateOrder() {
   const [creating, setCreating] = useState(false)
   const [responding, setResponding] = useState(false)
   const [error, setError] = useState('')
+  const [selectedResponses, setSelectedResponses] = useState<Set<number>>(new Set())
+  const [showShareModal, setShowShareModal] = useState<number | null>(null)
 
   const [createForm, setCreateForm] = useState({
     title: '',
@@ -160,6 +162,82 @@ export default function CreateOrder() {
     } finally {
       setLoadingVesselDetails(false)
     }
+  }
+
+  const toggleResponseSelection = (responseId: number) => {
+    setSelectedResponses(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(responseId)) {
+        newSet.delete(responseId)
+      } else {
+        newSet.add(responseId)
+      }
+      return newSet
+    })
+  }
+
+  const handleShareProposals = (orderId: number) => {
+    setShowShareModal(orderId)
+  }
+
+  const generateProposalText = (order: AgentOrder, responses: AgentOrderResponse[]): string => {
+    let text = `🚢 Предложения по заказу: ${order.title}\n\n`
+    text += `📅 Даты: ${format(new Date(order.startDate), 'dd.MM.yyyy')} - ${format(new Date(order.endDate), 'dd.MM.yyyy')}\n`
+    text += `👥 Пассажиров: ${order.passengerCount}\n`
+    if (order.budget) {
+      text += `💰 Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽\n`
+    }
+    if (order.route) {
+      text += `📍 Маршрут: ${order.route}\n`
+    }
+    text += `\n📋 Предложенные катера:\n\n`
+
+    responses.forEach((response, index) => {
+      const vessel = response.vessel
+      text += `${index + 1}. ${vessel?.name || 'Катер'}\n`
+      text += `   👤 Владелец: ${response.vesselOwner?.firstName} ${response.vesselOwner?.lastName}\n`
+      text += `   👥 Пассажировместимость: ${vessel?.passengerCapacity || '-'} чел.\n`
+      if (response.proposedPrice) {
+        text += `   💰 Цена: ${response.proposedPrice.toLocaleString('ru-RU')} ₽\n`
+      }
+      if (response.message) {
+        text += `   💬 ${response.message}\n`
+      }
+      if (vessel?.technicalSpecs) {
+        const shortDesc = vessel.technicalSpecs.length > 100 
+          ? `${vessel.technicalSpecs.substring(0, 100)}...` 
+          : vessel.technicalSpecs
+        text += `   📝 ${shortDesc}\n`
+      }
+      text += `\n`
+    })
+
+    return text
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Текст скопирован в буфер обмена!')
+    }).catch(err => {
+      console.error('Ошибка копирования:', err)
+      alert('Не удалось скопировать текст')
+    })
+  }
+
+  const shareViaTelegram = (text: string) => {
+    const encodedText = encodeURIComponent(text)
+    window.open(`https://t.me/share/url?url=&text=${encodedText}`, '_blank')
+  }
+
+  const shareViaWhatsApp = (text: string) => {
+    const encodedText = encodeURIComponent(text)
+    window.open(`https://wa.me/?text=${encodedText}`, '_blank')
+  }
+
+  const shareViaEmail = (text: string, order: AgentOrder) => {
+    const subject = encodeURIComponent(`Предложения по заказу: ${order.title}`)
+    const body = encodeURIComponent(text)
+    window.location.href = `mailto:?subject=${subject}&body=${body}`
   }
 
   const canRespond = () => {
@@ -551,8 +629,35 @@ export default function CreateOrder() {
                     )
                   }
 
+                  const selectedResponsesList = order.responses.filter((r: AgentOrderResponse) => 
+                    selectedResponses.has(r.id)
+                  )
+
                   return (
                     <div className="space-y-4">
+                      {/* Кнопка отправки предложений */}
+                      {selectedResponses.size > 0 && (
+                        <div className="mb-4 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                Выбрано катеров: {selectedResponses.size}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                Отправьте предложения клиенту через мессенджеры
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleShareProposals(order.id)}
+                              className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
+                            >
+                              <Send className="h-4 w-4 mr-2" />
+                              Отправить предложения
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {order.responses.map((response: AgentOrderResponse) => {
                         const vessel = response.vessel
                         const mainPhotoIndex = vessel?.mainPhotoIndex !== undefined && vessel?.mainPhotoIndex !== null 
@@ -562,8 +667,38 @@ export default function CreateOrder() {
                           ? vessel.photos[mainPhotoIndex] 
                           : null
                         
+                        const isSelected = selectedResponses.has(response.id)
+                        
                         return (
-                          <div key={response.id} className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                          <div 
+                            key={response.id} 
+                            className={`border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all ${
+                              isSelected 
+                                ? 'border-primary-500 bg-primary-50' 
+                                : 'border-gray-200'
+                            }`}
+                          >
+                            {/* Чекбокс выбора */}
+                            <div className="absolute top-2 left-2 z-10">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleResponseSelection(response.id)
+                                }}
+                                className={`p-2 rounded-full ${
+                                  isSelected 
+                                    ? 'bg-primary-600 text-white' 
+                                    : 'bg-white text-gray-400 hover:bg-gray-100'
+                                } shadow-lg`}
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="h-5 w-5" />
+                                ) : (
+                                  <Square className="h-5 w-5" />
+                                )}
+                              </button>
+                            </div>
+
                             {/* Фото катера */}
                             {mainPhoto ? (
                               <div className="relative h-48 bg-gray-200">
@@ -693,6 +828,104 @@ export default function CreateOrder() {
                 <button
                   type="button"
                   onClick={() => setShowResponsesModal(null)}
+                  className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно отправки предложений */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => setShowShareModal(null)} />
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                    <Share2 className="h-6 w-6 text-primary-600 mr-2" />
+                    Отправить предложения клиенту
+                  </h3>
+                  <button onClick={() => setShowShareModal(null)} className="text-gray-400 hover:text-gray-500">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {(() => {
+                  const order = orders.find(o => o.id === showShareModal)
+                  if (!order) return null
+
+                  const selectedResponsesList = order.responses?.filter((r: AgentOrderResponse) => 
+                    selectedResponses.has(r.id)
+                  ) || []
+
+                  if (selectedResponsesList.length === 0) {
+                    return (
+                      <div className="text-center py-8">
+                        <p className="text-gray-600">Выберите катеры для отправки</p>
+                      </div>
+                    )
+                  }
+
+                  const proposalText = generateProposalText(order, selectedResponsesList)
+
+                  return (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Текст предложения:
+                        </label>
+                        <textarea
+                          readOnly
+                          value={proposalText}
+                          rows={12}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm font-mono"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => copyToClipboard(proposalText)}
+                          className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium"
+                        >
+                          <Square className="h-4 w-4 mr-2" />
+                          Копировать текст
+                        </button>
+                        <button
+                          onClick={() => shareViaTelegram(proposalText)}
+                          className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          Telegram
+                        </button>
+                        <button
+                          onClick={() => shareViaWhatsApp(proposalText)}
+                          className="flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          WhatsApp
+                        </button>
+                        <button
+                          onClick={() => shareViaEmail(proposalText, order)}
+                          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          Email
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => setShowShareModal(null)}
                   className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Закрыть
