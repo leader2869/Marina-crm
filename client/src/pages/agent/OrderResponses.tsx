@@ -164,36 +164,57 @@ export default function OrderResponses() {
       const margin = 15
       const contentWidth = pageWidth - 2 * margin
 
-      // Функция для добавления шапки на страницу
-      const addHeader = (yPos: number): number => {
-        pdf.setFontSize(20)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('Предложения по заказу', margin, yPos)
-        yPos += 8
+      // Функция для создания изображения шапки
+      const createHeaderImage = async (): Promise<string> => {
+        // Создаем временный контейнер для шапки
+        const headerContainer = document.createElement('div')
+        headerContainer.style.position = 'absolute'
+        headerContainer.style.left = '-9999px'
+        headerContainer.style.top = '0'
+        headerContainer.style.width = '1200px'
+        headerContainer.style.backgroundColor = '#ffffff'
+        headerContainer.style.padding = '30px'
+        headerContainer.style.fontFamily = 'system-ui, -apple-system, sans-serif'
+        document.body.appendChild(headerContainer)
 
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(`Дата начала: ${format(new Date(order.startDate), 'dd.MM.yyyy')}`, margin, yPos)
-        yPos += 6
-        pdf.text(`Время начала: ${startTimeText}`, margin, yPos)
-        yPos += 6
-        pdf.text(`Количество часов: ${hoursText}`, margin, yPos)
-        yPos += 6
-        pdf.text(`Пассажиров: ${order.passengerCount}`, margin, yPos)
-        yPos += 6
-        if (order.route) {
-          pdf.text(`Маршрут: ${order.route}`, margin, yPos)
-          yPos += 6
-        }
-        yPos += 5
+        // Создаем шапку
+        const header = document.createElement('div')
+        header.style.marginBottom = '20px'
+        header.style.paddingBottom = '20px'
+        header.style.borderBottom = '2px solid #e5e7eb'
+        header.innerHTML = `
+          <h1 style="font-size: 28px; font-weight: bold; color: #111827; margin: 0 0 20px 0;">Предложения по заказу</h1>
+          <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: #6b7280;">
+            <div>📅 Дата начала: ${format(new Date(order.startDate), 'dd.MM.yyyy')}</div>
+            <div>🕐 Время начала: ${startTimeText}</div>
+            <div>⏱️ Количество часов: ${hoursText}</div>
+            <div>👥 Пассажиров: ${order.passengerCount}</div>
+            ${order.route ? `<div>📍 Маршрут: ${order.route}</div>` : ''}
+          </div>
+        `
+        headerContainer.appendChild(header)
 
-        // Разделительная линия
-        pdf.setDrawColor(200, 200, 200)
-        pdf.line(margin, yPos, pageWidth - margin, yPos)
-        yPos += 8
+        // Небольшая задержка для рендеринга
+        await new Promise(resolve => setTimeout(resolve, 200))
 
-        return yPos
+        // Делаем скриншот шапки
+        const canvas = await html2canvas(headerContainer, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          logging: false,
+          useCORS: true,
+          allowTaint: true,
+        })
+
+        // Удаляем временный контейнер
+        document.body.removeChild(headerContainer)
+
+        // Возвращаем изображение в base64
+        return canvas.toDataURL('image/png')
       }
+
+      // Создаем изображение шапки один раз
+      const headerImageData = await createHeaderImage()
 
       // Обрабатываем каждый катер отдельно
       for (let i = 0; i < vesselCards.length; i++) {
@@ -408,24 +429,39 @@ export default function OrderResponses() {
         // Удаляем временный контейнер
         document.body.removeChild(container)
 
-        // Получаем изображение в base64
-        const imgData = canvas.toDataURL('image/png')
+        // Получаем изображение карточки катера в base64
+        const cardImageData = canvas.toDataURL('image/png')
 
         // Добавляем шапку на страницу
         let yPosition = margin
-        yPosition = addHeader(yPosition)
+        
+        // Вычисляем размеры изображения шапки
+        const headerImg = new Image()
+        await new Promise<void>((resolve) => {
+          headerImg.onload = () => resolve()
+          headerImg.src = headerImageData
+        })
+        const headerWidth = headerImg.width * 0.264583
+        const headerHeight = headerImg.height * 0.264583
+        const headerRatio = Math.min(contentWidth / headerWidth, 1)
+        const finalHeaderWidth = headerWidth * headerRatio
+        const finalHeaderHeight = headerHeight * headerRatio
 
-        // Вычисляем размеры изображения для PDF
-        const imgWidth = canvas.width * 0.264583 // Конвертация пикселей в мм
-        const imgHeight = canvas.height * 0.264583
+        // Добавляем изображение шапки в PDF
+        pdf.addImage(headerImageData, 'PNG', margin, yPosition, finalHeaderWidth, finalHeaderHeight)
+        yPosition += finalHeaderHeight + 5
+
+        // Вычисляем размеры изображения карточки катера для PDF
+        const cardImgWidth = canvas.width * 0.264583 // Конвертация пикселей в мм
+        const cardImgHeight = canvas.height * 0.264583
         const maxWidth = contentWidth
         const maxHeight = pageHeight - yPosition - margin // Оставляем место снизу
-        const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight)
-        const finalWidth = imgWidth * ratio
-        const finalHeight = imgHeight * ratio
+        const ratio = Math.min(maxWidth / cardImgWidth, maxHeight / cardImgHeight)
+        const finalCardWidth = cardImgWidth * ratio
+        const finalCardHeight = cardImgHeight * ratio
 
         // Добавляем изображение карточки катера в PDF
-        pdf.addImage(imgData, 'PNG', margin, yPosition, finalWidth, finalHeight)
+        pdf.addImage(cardImageData, 'PNG', margin, yPosition, finalCardWidth, finalCardHeight)
       }
 
       // Сохраняем PDF
