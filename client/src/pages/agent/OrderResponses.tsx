@@ -135,8 +135,8 @@ export default function OrderResponses() {
     })
   }
 
-  const generateVesselCardsImage = async (responses: AgentOrderResponse[], prices: Map<number, number>) => {
-    if (!order) return
+  const generateVesselCardsImage = async (responses: AgentOrderResponse[], prices: Map<number, number>): Promise<Blob | null> => {
+    if (!order) return null
 
     try {
       // Получаем время начала и количество часов из данных заказа
@@ -464,12 +464,13 @@ export default function OrderResponses() {
         pdf.addImage(cardImageData, 'PNG', margin, yPosition, finalCardWidth, finalCardHeight)
       }
 
-      // Сохраняем PDF
-      const fileName = `Предложения_${order.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
-      pdf.save(fileName)
+      // Сохраняем PDF как blob и возвращаем его
+      const pdfBlob = pdf.output('blob')
+      return pdfBlob
     } catch (error) {
       console.error('Ошибка генерации PDF:', error)
       alert('Ошибка при создании PDF файла с карточками катеров')
+      return null
     }
   }
 
@@ -790,20 +791,78 @@ export default function OrderResponses() {
                   <div className="space-y-4">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <p className="text-sm text-gray-700 mb-2">
-                        Будет создано изображение с карточками всех выбранных катеров ({selectedResponsesList.length}).
+                        Будет создан PDF файл с карточками всех выбранных катеров ({selectedResponsesList.length}).
                       </p>
                       <p className="text-xs text-gray-600">
-                        В изображение будут включены: фотографии катеров, характеристики, предложенные цены и описания.
+                        Каждый катер будет на отдельной странице с полной информацией: фотографии, характеристики и описания.
                       </p>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={() => generateVesselCardsImage(selectedResponsesList, clientPrices)}
-                        className="flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-md"
+                        onClick={async () => {
+                          // Скачиваем PDF
+                          const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
+                          if (pdfBlob) {
+                            const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                            const link = document.createElement('a')
+                            link.href = URL.createObjectURL(pdfBlob)
+                            link.download = fileName
+                            link.click()
+                            URL.revokeObjectURL(link.href)
+                          }
+                        }}
+                        className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium shadow-md"
                       >
                         <Download className="h-5 w-5 mr-2" />
-                        Скачать изображение с карточками катеров
+                        Скачать PDF
+                      </button>
+                      <button
+                        onClick={async () => {
+                          // Пытаемся поделиться PDF
+                          const pdfBlob = await generateVesselCardsImage(selectedResponsesList, clientPrices)
+                          if (pdfBlob) {
+                            const fileName = `Предложения_${order?.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                            
+                            // Используем Web Share API, если доступен
+                            if (navigator.share && navigator.canShare) {
+                              try {
+                                const file = new File([pdfBlob], fileName, { type: 'application/pdf' })
+                                if (navigator.canShare({ files: [file] })) {
+                                  await navigator.share({
+                                    title: `Предложения по заказу "${order?.title}"`,
+                                    text: 'Предложения по заказу',
+                                    files: [file],
+                                  })
+                                  return
+                                }
+                              } catch (error: any) {
+                                if (error.name !== 'AbortError') {
+                                  console.error('Ошибка отправки через Web Share API:', error)
+                                  // Если не получилось поделиться, скачиваем файл
+                                  const link = document.createElement('a')
+                                  link.href = URL.createObjectURL(pdfBlob)
+                                  link.download = fileName
+                                  link.click()
+                                  URL.revokeObjectURL(link.href)
+                                }
+                                return
+                              }
+                            }
+                            
+                            // Если Web Share API не поддерживается, скачиваем файл
+                            const link = document.createElement('a')
+                            link.href = URL.createObjectURL(pdfBlob)
+                            link.download = fileName
+                            link.click()
+                            URL.revokeObjectURL(link.href)
+                            alert('Файл скачан. Вы можете отправить его клиенту вручную через мессенджер или email.')
+                          }
+                        }}
+                        className="flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-md"
+                      >
+                        <Share2 className="h-5 w-5 mr-2" />
+                        Поделиться
                       </button>
                     </div>
                   </div>

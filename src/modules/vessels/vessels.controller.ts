@@ -202,7 +202,7 @@ export class VesselsController {
         .getRawOne();
       
       const newSortOrder = (maxSortOrder?.max ?? -1) + 1;
-
+      
       const vessel = vesselRepository.create({
         name: name as string,
         type: type as string,
