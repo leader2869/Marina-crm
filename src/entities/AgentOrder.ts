@@ -33,6 +33,12 @@ export class AgentOrder {
   @Column({ type: 'date' })
   startDate: Date; // Дата начала
 
+  @Column({ type: 'time', nullable: true })
+  startTime: string | null; // Время начала
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  hoursCount: number | null; // Количество часов
+
   @Column({ type: 'date' })
   endDate: Date; // Дата окончания
 

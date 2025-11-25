@@ -97,6 +97,8 @@ export default function CreateOrder() {
         title: createForm.title,
         description: createForm.description,
         startDate: createForm.startDate,
+        startTime: createForm.startTime,
+        hoursCount: parseFloat(createForm.hoursCount) || 0,
         endDate: endDate,
         passengerCount: parseInt(createForm.passengerCount),
         route: createForm.route || null,

@@ -385,6 +385,8 @@ export interface AgentOrder {
   title: string
   description: string
   startDate: string
+  startTime?: string | null
+  hoursCount?: number | null
   endDate: string
   passengerCount: number
   budget?: number

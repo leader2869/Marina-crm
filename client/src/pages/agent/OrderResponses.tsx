@@ -123,11 +123,15 @@ export default function OrderResponses() {
       container.style.position = 'absolute'
       container.style.left = '-9999px'
       container.style.top = '0'
-      container.style.width = '1200px'
+      container.style.width = '1400px'
       container.style.backgroundColor = '#f3f4f6'
       container.style.padding = '40px'
       container.style.fontFamily = 'system-ui, -apple-system, sans-serif'
       document.body.appendChild(container)
+
+      // Получаем время начала и количество часов из данных заказа
+      const startTimeText = order.startTime || 'Не указано'
+      const hoursText = order.hoursCount ? `${order.hoursCount} ч.` : 'Не указано'
 
       // Заголовок документа
       const header = document.createElement('div')
@@ -135,10 +139,11 @@ export default function OrderResponses() {
       header.style.paddingBottom = '20px'
       header.style.borderBottom = '2px solid #e5e7eb'
       header.innerHTML = `
-        <h1 style="font-size: 28px; font-weight: bold; color: #111827; margin: 0 0 10px 0;">Предложения по заказу</h1>
-        <h2 style="font-size: 20px; font-weight: 600; color: #374151; margin: 0 0 15px 0;">${order.title}</h2>
+        <h1 style="font-size: 28px; font-weight: bold; color: #111827; margin: 0 0 20px 0;">Предложения по заказу</h1>
         <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: #6b7280;">
-          <div>📅 Даты: ${format(new Date(order.startDate), 'dd.MM.yyyy')} - ${format(new Date(order.endDate), 'dd.MM.yyyy')}</div>
+          <div>📅 Дата начала: ${format(new Date(order.startDate), 'dd.MM.yyyy')}</div>
+          <div>🕐 Время начала: ${startTimeText}</div>
+          <div>⏱️ Количество часов: ${hoursText}</div>
           <div>👥 Пассажиров: ${order.passengerCount}</div>
           ${order.budget ? `<div>💰 Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽</div>` : ''}
           ${order.route ? `<div>📍 Маршрут: ${order.route}</div>` : ''}
@@ -146,146 +151,235 @@ export default function OrderResponses() {
       `
       container.appendChild(header)
 
-      // Создаем карточки катеров
+      // Загружаем полную информацию о каждом катере
+      const vesselCards: Array<{ response: AgentOrderResponse; fullVessel: Vessel }> = []
+      
+      for (const response of responses) {
+        if (!response.vessel) continue
+        try {
+          const fullVessel = await vesselsService.getById(response.vessel.id) as unknown as Vessel
+          vesselCards.push({ response, fullVessel })
+        } catch (err) {
+          console.error('Ошибка загрузки деталей катера:', err)
+          vesselCards.push({ response, fullVessel: response.vessel })
+        }
+      }
+
+      // Создаем карточки катеров в формате модального окна
       const cardsContainer = document.createElement('div')
-      cardsContainer.style.display = 'grid'
-      cardsContainer.style.gridTemplateColumns = 'repeat(2, 1fr)'
-      cardsContainer.style.gap = '30px'
+      cardsContainer.style.display = 'flex'
+      cardsContainer.style.flexDirection = 'column'
+      cardsContainer.style.gap = '40px'
       container.appendChild(cardsContainer)
 
       // Ждем, пока все изображения загрузятся
       const imagePromises: Promise<void>[] = []
 
-      for (let i = 0; i < responses.length; i++) {
-        const response = responses[i]
-        const vessel = response.vessel
-        const mainPhotoIndex = vessel?.mainPhotoIndex !== undefined && vessel?.mainPhotoIndex !== null 
-          ? vessel.mainPhotoIndex 
-          : 0
-        const mainPhoto = vessel?.photos && vessel.photos.length > 0 
-          ? vessel.photos[mainPhotoIndex] 
-          : null
-
+      for (let i = 0; i < vesselCards.length; i++) {
+        const { response, fullVessel } = vesselCards[i]
+        
+        // Создаем карточку в стиле модального окна
         const card = document.createElement('div')
         card.style.backgroundColor = '#ffffff'
         card.style.borderRadius = '12px'
         card.style.overflow = 'hidden'
         card.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)'
-        card.style.position = 'relative'
-        card.style.minHeight = '400px'
+        card.style.padding = '30px'
 
-        // Фон с изображением или градиентом
-        if (mainPhoto) {
-          card.style.backgroundImage = `url(${mainPhoto})`
-          card.style.backgroundSize = 'cover'
-          card.style.backgroundPosition = 'center'
-          const overlay = document.createElement('div')
-          overlay.style.position = 'absolute'
-          overlay.style.inset = '0'
-          overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.4)'
-          overlay.style.zIndex = '0'
-          card.appendChild(overlay)
-        } else {
-          card.style.background = 'linear-gradient(to bottom right, #dbeafe, #bfdbfe)'
-        }
-
-        const content = document.createElement('div')
-        content.style.position = 'relative'
-        content.style.zIndex = '10'
-        content.style.padding = '24px'
-        content.style.color = mainPhoto ? '#ffffff' : '#111827'
-        content.style.height = '100%'
-        content.style.display = 'flex'
-        content.style.flexDirection = 'column'
-
-        // Цена сверху по центру
-        if (response.proposedPrice) {
-          const priceBadge = document.createElement('div')
-          priceBadge.style.position = 'absolute'
-          priceBadge.style.top = '16px'
-          priceBadge.style.left = '50%'
-          priceBadge.style.transform = 'translateX(-50%)'
-          priceBadge.style.backgroundColor = mainPhoto ? 'rgba(255, 255, 255, 0.95)' : '#2563eb'
-          priceBadge.style.color = mainPhoto ? '#2563eb' : '#ffffff'
-          priceBadge.style.padding = '8px 16px'
-          priceBadge.style.borderRadius = '8px'
-          priceBadge.style.fontWeight = 'bold'
-          priceBadge.style.fontSize = '18px'
-          priceBadge.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)'
-          priceBadge.innerHTML = `
-            <div style="font-size: 11px; margin-bottom: 2px;">Цена</div>
-            <div>${response.proposedPrice.toLocaleString('ru-RU')} ₽</div>
-          `
-          content.appendChild(priceBadge)
-        }
-
-        // Название катера
+        // Заголовок карточки с ценой
+        const cardHeader = document.createElement('div')
+        cardHeader.style.display = 'flex'
+        cardHeader.style.justifyContent = 'space-between'
+        cardHeader.style.alignItems = 'center'
+        cardHeader.style.marginBottom = '24px'
+        cardHeader.style.paddingBottom = '16px'
+        cardHeader.style.borderBottom = '2px solid #e5e7eb'
+        
         const title = document.createElement('h3')
         title.style.fontSize = '24px'
         title.style.fontWeight = 'bold'
-        title.style.margin = response.proposedPrice ? '60px 0 16px 0' : '0 0 16px 0'
-        title.style.color = mainPhoto ? '#ffffff' : '#111827'
-        title.textContent = `${i + 1}. ${vessel?.name || 'Катер'}`
-        content.appendChild(title)
+        title.style.color = '#111827'
+        title.style.margin = '0'
+        title.textContent = `${i + 1}. ${fullVessel?.name || 'Катер'}`
+        cardHeader.appendChild(title)
 
-        // Характеристики
-        const specs = document.createElement('div')
-        specs.style.fontSize = '14px'
-        specs.style.marginBottom = '16px'
-        specs.style.color = mainPhoto ? 'rgba(255, 255, 255, 0.9)' : '#4b5563'
-        specs.innerHTML = `
-          <div style="margin-bottom: 8px;">👥 Пассажировместимость: <strong>${vessel?.passengerCapacity || '-'} чел.</strong></div>
-          ${vessel?.type ? `<div style="margin-bottom: 8px;">Тип: ${vessel.type}</div>` : ''}
-          ${vessel?.length ? `<div style="margin-bottom: 8px;">Длина: ${vessel.length} м</div>` : ''}
-          ${vessel?.width ? `<div style="margin-bottom: 8px;">Ширина: ${vessel.width} м</div>` : ''}
-        `
-        content.appendChild(specs)
+        if (response.proposedPrice) {
+          const priceBadge = document.createElement('div')
+          priceBadge.style.backgroundColor = '#2563eb'
+          priceBadge.style.color = '#ffffff'
+          priceBadge.style.padding = '12px 20px'
+          priceBadge.style.borderRadius = '8px'
+          priceBadge.style.fontWeight = 'bold'
+          priceBadge.style.fontSize = '20px'
+          priceBadge.textContent = `${response.proposedPrice.toLocaleString('ru-RU')} ₽`
+          cardHeader.appendChild(priceBadge)
+        }
+        
+        card.appendChild(cardHeader)
+
+        // Фотографии катера
+        if (fullVessel?.photos && fullVessel.photos.length > 0) {
+          const photosSection = document.createElement('div')
+          photosSection.style.marginBottom = '24px'
+          
+          const photosTitle = document.createElement('h4')
+          photosTitle.style.fontSize = '16px'
+          photosTitle.style.fontWeight = '600'
+          photosTitle.style.color = '#374151'
+          photosTitle.style.marginBottom = '12px'
+          photosTitle.textContent = 'Фотографии катера'
+          photosSection.appendChild(photosTitle)
+
+          const photosGrid = document.createElement('div')
+          photosGrid.style.display = 'grid'
+          photosGrid.style.gridTemplateColumns = 'repeat(3, 1fr)'
+          photosGrid.style.gap = '12px'
+          
+          fullVessel.photos.forEach((photo, index) => {
+            const photoWrapper = document.createElement('div')
+            photoWrapper.style.position = 'relative'
+            
+            const img = document.createElement('img')
+            img.src = photo
+            img.style.width = '100%'
+            img.style.height = '200px'
+            img.style.objectFit = 'cover'
+            img.style.borderRadius = '8px'
+            img.style.border = '2px solid #e5e7eb'
+            img.onerror = () => {
+              img.style.display = 'none'
+            }
+            photoWrapper.appendChild(img)
+
+            if (fullVessel.mainPhotoIndex === index) {
+              const badge = document.createElement('div')
+              badge.style.position = 'absolute'
+              badge.style.top = '8px'
+              badge.style.left = '8px'
+              badge.style.backgroundColor = '#2563eb'
+              badge.style.color = '#ffffff'
+              badge.style.padding = '4px 8px'
+              badge.style.borderRadius = '4px'
+              badge.style.fontSize = '12px'
+              badge.style.fontWeight = '600'
+              badge.textContent = 'Главное'
+              photoWrapper.appendChild(badge)
+            }
+            
+            photosGrid.appendChild(photoWrapper)
+
+            // Ждем загрузки изображения
+            const imgPromise = new Promise<void>((resolve) => {
+              const imgEl = new Image()
+              imgEl.onload = () => resolve()
+              imgEl.onerror = () => resolve()
+              imgEl.src = photo
+            })
+            imagePromises.push(imgPromise)
+          })
+          
+          photosSection.appendChild(photosGrid)
+          card.appendChild(photosSection)
+        }
+
+        // Характеристики катера
+        const specsSection = document.createElement('div')
+        specsSection.style.marginBottom = '24px'
+        
+        const specsGrid = document.createElement('div')
+        specsGrid.style.display = 'grid'
+        specsGrid.style.gridTemplateColumns = 'repeat(3, 1fr)'
+        specsGrid.style.gap = '16px'
+
+        const addSpec = (label: string, value: string | number | undefined) => {
+          if (value === undefined || value === null || value === '') return
+          
+          const specItem = document.createElement('div')
+          const specLabel = document.createElement('div')
+          specLabel.style.fontSize = '12px'
+          specLabel.style.fontWeight = '600'
+          specLabel.style.color = '#6b7280'
+          specLabel.style.marginBottom = '4px'
+          specLabel.textContent = label
+          specItem.appendChild(specLabel)
+          
+          const specValue = document.createElement('div')
+          specValue.style.fontSize = '14px'
+          specValue.style.color = '#111827'
+          specValue.textContent = String(value)
+          specItem.appendChild(specValue)
+          
+          specsGrid.appendChild(specItem)
+        }
+
+        addSpec('Тип', fullVessel?.type)
+        addSpec('Длина', fullVessel?.length ? `${fullVessel.length} м` : undefined)
+        addSpec('Ширина', fullVessel?.width ? `${fullVessel.width} м` : undefined)
+        addSpec('Высота над ватерлинией', fullVessel?.heightAboveWaterline ? `${fullVessel.heightAboveWaterline} м` : undefined)
+        addSpec('Пассажировместимость', fullVessel?.passengerCapacity ? `${fullVessel.passengerCapacity} чел.` : undefined)
+        addSpec('Регистрационный номер', fullVessel?.registrationNumber)
+
+        specsSection.appendChild(specsGrid)
+        card.appendChild(specsSection)
+
+        // Описание катера
+        if (fullVessel?.technicalSpecs) {
+          const descriptionSection = document.createElement('div')
+          descriptionSection.style.marginBottom = '24px'
+          
+          const descriptionLabel = document.createElement('div')
+          descriptionLabel.style.fontSize = '14px'
+          descriptionLabel.style.fontWeight = '600'
+          descriptionLabel.style.color = '#374151'
+          descriptionLabel.style.marginBottom = '8px'
+          descriptionLabel.textContent = 'Описание катера'
+          descriptionSection.appendChild(descriptionLabel)
+          
+          const descriptionText = document.createElement('div')
+          descriptionText.style.fontSize = '14px'
+          descriptionText.style.color = '#4b5563'
+          descriptionText.style.lineHeight = '1.6'
+          descriptionText.style.whiteSpace = 'pre-wrap'
+          descriptionText.textContent = fullVessel.technicalSpecs
+          descriptionSection.appendChild(descriptionText)
+          
+          card.appendChild(descriptionSection)
+        }
 
         // Сообщение от владельца
         if (response.message) {
-          const message = document.createElement('div')
-          message.style.backgroundColor = mainPhoto ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.05)'
-          message.style.padding = '12px'
-          message.style.borderRadius = '8px'
-          message.style.marginBottom = '16px'
-          message.style.fontStyle = 'italic'
-          message.style.fontSize = '13px'
-          message.style.color = mainPhoto ? '#ffffff' : '#374151'
-          message.textContent = `"${response.message}"`
-          content.appendChild(message)
+          const messageSection = document.createElement('div')
+          messageSection.style.backgroundColor = '#f3f4f6'
+          messageSection.style.padding = '16px'
+          messageSection.style.borderRadius = '8px'
+          messageSection.style.borderLeft = '4px solid #2563eb'
+          
+          const messageLabel = document.createElement('div')
+          messageLabel.style.fontSize = '12px'
+          messageLabel.style.fontWeight = '600'
+          messageLabel.style.color = '#6b7280'
+          messageLabel.style.marginBottom = '8px'
+          messageLabel.textContent = 'Сообщение от владельца'
+          messageSection.appendChild(messageLabel)
+          
+          const messageText = document.createElement('div')
+          messageText.style.fontSize = '14px'
+          messageText.style.color = '#374151'
+          messageText.style.fontStyle = 'italic'
+          messageText.textContent = `"${response.message}"`
+          messageSection.appendChild(messageText)
+          
+          card.appendChild(messageSection)
         }
 
-        // Описание катера
-        if (vessel?.technicalSpecs) {
-          const description = document.createElement('div')
-          description.style.fontSize = '13px'
-          description.style.color = mainPhoto ? 'rgba(255, 255, 255, 0.9)' : '#6b7280'
-          description.style.lineHeight = '1.6'
-          description.style.flexGrow = '1'
-          const shortSpecs = vessel.technicalSpecs.length > 200 
-            ? `${vessel.technicalSpecs.substring(0, 200)}...` 
-            : vessel.technicalSpecs
-          description.textContent = shortSpecs
-          content.appendChild(description)
-        }
-
-        card.appendChild(content)
         cardsContainer.appendChild(card)
-
-        // Ждем загрузки изображения, если есть
-        if (mainPhoto) {
-          const img = new Image()
-          const promise = new Promise<void>((resolve) => {
-            img.onload = () => resolve()
-            img.onerror = () => resolve() // Продолжаем даже если изображение не загрузилось
-            img.src = mainPhoto
-          })
-          imagePromises.push(promise)
-        }
       }
 
       // Ждем загрузки всех изображений
       await Promise.all(imagePromises)
+
+      // Небольшая задержка для рендеринга
+      await new Promise(resolve => setTimeout(resolve, 500))
 
       // Делаем скриншот всего контейнера
       const canvas = await html2canvas(container, {

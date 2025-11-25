@@ -33,7 +33,8 @@
     "add-passenger-capacity": "ts-node src/database/add-passenger-capacity.ts",
     "add-vessel-sort-order": "ts-node src/database/add-vessel-sort-order.ts",
     "add-new-user-roles": "ts-node src/database/add-new-user-roles.ts",
-    "create-agent-orders-tables": "ts-node src/database/create-agent-orders-tables.ts"
+    "create-agent-orders-tables": "ts-node src/database/create-agent-orders-tables.ts",
+    "add-start-time-hours-to-agent-orders": "ts-node src/database/add-start-time-hours-to-agent-orders.ts"
   },
   "keywords": [
     "crm",
