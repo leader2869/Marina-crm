@@ -6,6 +6,7 @@ import { Vessel } from '../../entities/Vessel';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
+import { notificationService } from '../../services/notification.service';
 
 export class AgentOrdersController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -108,6 +109,27 @@ export class AgentOrdersController {
         where: { id: savedOrder.id },
         relations: ['createdBy', 'selectedVessel', 'responses'],
       });
+
+      // Отправляем уведомления всем пользователям о новом заказе
+      if (orderWithRelations) {
+        notificationService.notifyNewAgentOrder({
+          id: orderWithRelations.id,
+          title: orderWithRelations.title,
+          description: orderWithRelations.description,
+          startDate: orderWithRelations.startDate,
+          endDate: orderWithRelations.endDate,
+          passengerCount: orderWithRelations.passengerCount,
+          budget: orderWithRelations.budget ? parseFloat(orderWithRelations.budget.toString()) : undefined,
+          route: orderWithRelations.route || undefined,
+          createdBy: orderWithRelations.createdBy ? {
+            firstName: orderWithRelations.createdBy.firstName,
+            lastName: orderWithRelations.createdBy.lastName,
+          } : undefined,
+        }).catch(error => {
+          console.error('Ошибка отправки уведомлений о новом заказе:', error);
+          // Не прерываем выполнение, если уведомления не отправились
+        });
+      }
 
       res.status(201).json(orderWithRelations);
     } catch (error) {
