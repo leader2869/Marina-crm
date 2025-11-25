@@ -114,195 +114,199 @@ export default function OrderResponses() {
     })
   }
 
-  const generatePDF = async (responses: AgentOrderResponse[]) => {
+  const generateVesselCardsImage = async (responses: AgentOrderResponse[]) => {
     if (!order) return
 
     try {
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-      const margin = 15
-      const contentWidth = pageWidth - 2 * margin
-      let yPosition = margin
+      // Создаем временный контейнер для карточек
+      const container = document.createElement('div')
+      container.style.position = 'absolute'
+      container.style.left = '-9999px'
+      container.style.top = '0'
+      container.style.width = '1200px'
+      container.style.backgroundColor = '#f3f4f6'
+      container.style.padding = '40px'
+      container.style.fontFamily = 'system-ui, -apple-system, sans-serif'
+      document.body.appendChild(container)
 
       // Заголовок документа
-      pdf.setFontSize(18)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Предложения по заказу', margin, yPosition)
-      yPosition += 10
+      const header = document.createElement('div')
+      header.style.marginBottom = '30px'
+      header.style.paddingBottom = '20px'
+      header.style.borderBottom = '2px solid #e5e7eb'
+      header.innerHTML = `
+        <h1 style="font-size: 28px; font-weight: bold; color: #111827; margin: 0 0 10px 0;">Предложения по заказу</h1>
+        <h2 style="font-size: 20px; font-weight: 600; color: #374151; margin: 0 0 15px 0;">${order.title}</h2>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: #6b7280;">
+          <div>📅 Даты: ${format(new Date(order.startDate), 'dd.MM.yyyy')} - ${format(new Date(order.endDate), 'dd.MM.yyyy')}</div>
+          <div>👥 Пассажиров: ${order.passengerCount}</div>
+          ${order.budget ? `<div>💰 Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽</div>` : ''}
+          ${order.route ? `<div>📍 Маршрут: ${order.route}</div>` : ''}
+        </div>
+      `
+      container.appendChild(header)
 
-      pdf.setFontSize(12)
-      pdf.setFont('helvetica', 'normal')
-      pdf.text(`Заказ: ${order.title}`, margin, yPosition)
-      yPosition += 7
+      // Создаем карточки катеров
+      const cardsContainer = document.createElement('div')
+      cardsContainer.style.display = 'grid'
+      cardsContainer.style.gridTemplateColumns = 'repeat(2, 1fr)'
+      cardsContainer.style.gap = '30px'
+      container.appendChild(cardsContainer)
 
-      pdf.setFontSize(10)
-      pdf.text(`Даты: ${format(new Date(order.startDate), 'dd.MM.yyyy')} - ${format(new Date(order.endDate), 'dd.MM.yyyy')}`, margin, yPosition)
-      yPosition += 5
-      pdf.text(`Пассажиров: ${order.passengerCount}`, margin, yPosition)
-      yPosition += 5
-      if (order.budget) {
-        pdf.text(`Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽`, margin, yPosition)
-        yPosition += 5
-      }
-      if (order.route) {
-        pdf.text(`Маршрут: ${order.route}`, margin, yPosition)
-        yPosition += 5
-      }
-      yPosition += 5
+      // Ждем, пока все изображения загрузятся
+      const imagePromises: Promise<void>[] = []
 
-      // Карточки катеров
       for (let i = 0; i < responses.length; i++) {
         const response = responses[i]
         const vessel = response.vessel
+        const mainPhotoIndex = vessel?.mainPhotoIndex !== undefined && vessel?.mainPhotoIndex !== null 
+          ? vessel.mainPhotoIndex 
+          : 0
+        const mainPhoto = vessel?.photos && vessel.photos.length > 0 
+          ? vessel.photos[mainPhotoIndex] 
+          : null
 
-        // Проверяем, нужна ли новая страница
-        if (yPosition > pageHeight - 100) {
-          pdf.addPage()
-          yPosition = margin
+        const card = document.createElement('div')
+        card.style.backgroundColor = '#ffffff'
+        card.style.borderRadius = '12px'
+        card.style.overflow = 'hidden'
+        card.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)'
+        card.style.position = 'relative'
+        card.style.minHeight = '400px'
+
+        // Фон с изображением или градиентом
+        if (mainPhoto) {
+          card.style.backgroundImage = `url(${mainPhoto})`
+          card.style.backgroundSize = 'cover'
+          card.style.backgroundPosition = 'center'
+          const overlay = document.createElement('div')
+          overlay.style.position = 'absolute'
+          overlay.style.inset = '0'
+          overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.4)'
+          overlay.style.zIndex = '0'
+          card.appendChild(overlay)
+        } else {
+          card.style.background = 'linear-gradient(to bottom right, #dbeafe, #bfdbfe)'
         }
 
-        // Заголовок карточки катера
-        pdf.setFontSize(14)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`${i + 1}. ${vessel?.name || 'Катер'}`, margin, yPosition)
-        yPosition += 8
+        const content = document.createElement('div')
+        content.style.position = 'relative'
+        content.style.zIndex = '10'
+        content.style.padding = '24px'
+        content.style.color = mainPhoto ? '#ffffff' : '#111827'
+        content.style.height = '100%'
+        content.style.display = 'flex'
+        content.style.flexDirection = 'column'
 
-        // Фотография катера (если есть)
-        if (vessel?.photos && vessel.photos.length > 0) {
-          try {
-            const mainPhotoIndex = vessel.mainPhotoIndex !== undefined && vessel.mainPhotoIndex !== null 
-              ? vessel.mainPhotoIndex 
-              : 0
-            let photoUrl = vessel.photos[mainPhotoIndex]
-
-            // Если это base64, используем напрямую, иначе загружаем
-            let imageData: string | null = photoUrl
-            
-            if (!photoUrl.startsWith('data:')) {
-            // Если не base64, пытаемся загрузить через canvas
-            const img = new Image()
-            img.crossOrigin = 'anonymous'
-            
-            await new Promise<void>((resolve) => {
-              img.onload = () => resolve()
-              img.onerror = () => {
-                console.warn('Не удалось загрузить изображение, пропускаем')
-                resolve() // Продолжаем без изображения
-              }
-              img.src = photoUrl
-            })
-
-            if (img.complete && img.naturalWidth > 0) {
-              // Конвертируем в base64 через canvas
-              const canvas = document.createElement('canvas')
-              canvas.width = img.width
-              canvas.height = img.height
-              const ctx = canvas.getContext('2d')
-              if (ctx) {
-                ctx.drawImage(img, 0, 0)
-                imageData = canvas.toDataURL('image/jpeg', 0.8)
-              } else {
-                imageData = null
-              }
-            } else {
-              // Изображение не загрузилось, пропускаем
-              imageData = null
-            }
-            }
-
-            if (imageData) {
-              // Вычисляем размеры изображения для PDF
-              const maxWidth = contentWidth
-              const maxHeight = 60
-              
-              // Получаем размеры изображения
-              const img = new Image()
-              await new Promise((resolve) => {
-                img.onload = resolve
-                img.src = imageData
-              })
-
-              let imgWidth = img.width * 0.264583 // Конвертация пикселей в мм (1px = 0.264583mm при 96 DPI)
-              let imgHeight = img.height * 0.264583
-              const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight)
-              imgWidth = imgWidth * ratio
-              imgHeight = imgHeight * ratio
-
-              // Проверяем, помещается ли изображение на странице
-              if (yPosition + imgHeight > pageHeight - margin) {
-                pdf.addPage()
-                yPosition = margin
-              }
-
-              pdf.addImage(imageData, 'JPEG', margin, yPosition, imgWidth, imgHeight)
-              yPosition += imgHeight + 5
-            }
-          } catch (err) {
-            console.error('Ошибка обработки изображения:', err)
-          }
-        }
-
-        // Информация о катере
-        pdf.setFontSize(10)
-        pdf.setFont('helvetica', 'normal')
-        
+        // Цена сверху по центру
         if (response.proposedPrice) {
-          pdf.setFont('helvetica', 'bold')
-          pdf.text(`Цена: ${response.proposedPrice.toLocaleString('ru-RU')} ₽`, margin, yPosition)
-          yPosition += 6
-          pdf.setFont('helvetica', 'normal')
+          const priceBadge = document.createElement('div')
+          priceBadge.style.position = 'absolute'
+          priceBadge.style.top = '16px'
+          priceBadge.style.left = '50%'
+          priceBadge.style.transform = 'translateX(-50%)'
+          priceBadge.style.backgroundColor = mainPhoto ? 'rgba(255, 255, 255, 0.95)' : '#2563eb'
+          priceBadge.style.color = mainPhoto ? '#2563eb' : '#ffffff'
+          priceBadge.style.padding = '8px 16px'
+          priceBadge.style.borderRadius = '8px'
+          priceBadge.style.fontWeight = 'bold'
+          priceBadge.style.fontSize = '18px'
+          priceBadge.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)'
+          priceBadge.innerHTML = `
+            <div style="font-size: 11px; margin-bottom: 2px;">Цена</div>
+            <div>${response.proposedPrice.toLocaleString('ru-RU')} ₽</div>
+          `
+          content.appendChild(priceBadge)
         }
 
-        pdf.text(`Пассажировместимость: ${vessel?.passengerCapacity || '-'} чел.`, margin, yPosition)
-        yPosition += 5
+        // Название катера
+        const title = document.createElement('h3')
+        title.style.fontSize = '24px'
+        title.style.fontWeight = 'bold'
+        title.style.margin = response.proposedPrice ? '60px 0 16px 0' : '0 0 16px 0'
+        title.style.color = mainPhoto ? '#ffffff' : '#111827'
+        title.textContent = `${i + 1}. ${vessel?.name || 'Катер'}`
+        content.appendChild(title)
 
-        if (vessel?.type) {
-          pdf.text(`Тип: ${vessel.type}`, margin, yPosition)
-          yPosition += 5
-        }
+        // Характеристики
+        const specs = document.createElement('div')
+        specs.style.fontSize = '14px'
+        specs.style.marginBottom = '16px'
+        specs.style.color = mainPhoto ? 'rgba(255, 255, 255, 0.9)' : '#4b5563'
+        specs.innerHTML = `
+          <div style="margin-bottom: 8px;">👥 Пассажировместимость: <strong>${vessel?.passengerCapacity || '-'} чел.</strong></div>
+          ${vessel?.type ? `<div style="margin-bottom: 8px;">Тип: ${vessel.type}</div>` : ''}
+          ${vessel?.length ? `<div style="margin-bottom: 8px;">Длина: ${vessel.length} м</div>` : ''}
+          ${vessel?.width ? `<div style="margin-bottom: 8px;">Ширина: ${vessel.width} м</div>` : ''}
+        `
+        content.appendChild(specs)
 
-        if (vessel?.length) {
-          pdf.text(`Длина: ${vessel.length} м`, margin, yPosition)
-          yPosition += 5
-        }
-
-        if (vessel?.width) {
-          pdf.text(`Ширина: ${vessel.width} м`, margin, yPosition)
-          yPosition += 5
-        }
-
+        // Сообщение от владельца
         if (response.message) {
-          pdf.setFont('helvetica', 'italic')
-          const messageLines = pdf.splitTextToSize(`Сообщение: "${response.message}"`, contentWidth)
-          pdf.text(messageLines, margin, yPosition)
-          yPosition += messageLines.length * 5
-          pdf.setFont('helvetica', 'normal')
+          const message = document.createElement('div')
+          message.style.backgroundColor = mainPhoto ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.05)'
+          message.style.padding = '12px'
+          message.style.borderRadius = '8px'
+          message.style.marginBottom = '16px'
+          message.style.fontStyle = 'italic'
+          message.style.fontSize = '13px'
+          message.style.color = mainPhoto ? '#ffffff' : '#374151'
+          message.textContent = `"${response.message}"`
+          content.appendChild(message)
         }
 
+        // Описание катера
         if (vessel?.technicalSpecs) {
-          const specs = vessel.technicalSpecs.length > 200 
+          const description = document.createElement('div')
+          description.style.fontSize = '13px'
+          description.style.color = mainPhoto ? 'rgba(255, 255, 255, 0.9)' : '#6b7280'
+          description.style.lineHeight = '1.6'
+          description.style.flexGrow = '1'
+          const shortSpecs = vessel.technicalSpecs.length > 200 
             ? `${vessel.technicalSpecs.substring(0, 200)}...` 
             : vessel.technicalSpecs
-          const specsLines = pdf.splitTextToSize(`Описание: ${specs}`, contentWidth)
-          pdf.text(specsLines, margin, yPosition)
-          yPosition += specsLines.length * 5
+          description.textContent = shortSpecs
+          content.appendChild(description)
         }
 
-        yPosition += 10
+        card.appendChild(content)
+        cardsContainer.appendChild(card)
 
-        // Разделительная линия
-        pdf.setDrawColor(200, 200, 200)
-        pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-        yPosition += 10
+        // Ждем загрузки изображения, если есть
+        if (mainPhoto) {
+          const img = new Image()
+          const promise = new Promise<void>((resolve) => {
+            img.onload = () => resolve()
+            img.onerror = () => resolve() // Продолжаем даже если изображение не загрузилось
+            img.src = mainPhoto
+          })
+          imagePromises.push(promise)
+        }
       }
 
-      // Сохраняем PDF
-      const fileName = `Предложения_${order.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
-      pdf.save(fileName)
+      // Ждем загрузки всех изображений
+      await Promise.all(imagePromises)
+
+      // Делаем скриншот всего контейнера
+      const canvas = await html2canvas(container, {
+        backgroundColor: '#f3f4f6',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+      })
+
+      // Скачиваем изображение
+      const link = document.createElement('a')
+      link.download = `Предложения_${order.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+
+      // Удаляем временный контейнер
+      document.body.removeChild(container)
     } catch (error) {
-      console.error('Ошибка генерации PDF:', error)
-      alert('Ошибка при создании PDF файла')
+      console.error('Ошибка генерации изображения:', error)
+      alert('Ошибка при создании изображения с карточками катеров')
     }
   }
 
@@ -602,20 +606,20 @@ export default function OrderResponses() {
                   <div className="space-y-4">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <p className="text-sm text-gray-700 mb-2">
-                        Будет создан PDF файл с карточками всех выбранных катеров ({selectedResponsesList.length}).
+                        Будет создано изображение с карточками всех выбранных катеров ({selectedResponsesList.length}).
                       </p>
                       <p className="text-xs text-gray-600">
-                        В PDF будут включены: фотографии катеров, характеристики, предложенные цены и описания.
+                        В изображение будут включены: фотографии катеров, характеристики, предложенные цены и описания.
                       </p>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={() => generatePDF(selectedResponsesList)}
+                        onClick={() => generateVesselCardsImage(selectedResponsesList)}
                         className="flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-md"
                       >
                         <Download className="h-5 w-5 mr-2" />
-                        Скачать PDF с карточками катеров
+                        Скачать изображение с карточками катеров
                       </button>
                     </div>
                   </div>
