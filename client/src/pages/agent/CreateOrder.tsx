@@ -27,9 +27,11 @@ export default function CreateOrder() {
     title: '',
     description: '',
     startDate: '',
-    endDate: '',
+    startTime: '',
+    hoursCount: '',
     passengerCount: '',
-    budget: '',
+    budgetFrom: '',
+    budgetTo: '',
     route: '',
     additionalRequirements: '',
   })
@@ -77,24 +79,56 @@ export default function CreateOrder() {
   }
 
   const handleCreateOrder = async () => {
-    if (!createForm.title || !createForm.description || !createForm.startDate || !createForm.endDate || !createForm.passengerCount) {
+    if (!createForm.title || !createForm.description || !createForm.startDate || !createForm.startTime || !createForm.hoursCount || !createForm.passengerCount) {
       setError('Заполните все обязательные поля')
       return
     }
+
+    // Вычисляем дату окончания на основе даты начала, времени начала и количества часов
+    const startDateTime = new Date(`${createForm.startDate}T${createForm.startTime}`)
+    const hours = parseInt(createForm.hoursCount) || 0
+    const endDateTime = new Date(startDateTime.getTime() + hours * 60 * 60 * 1000)
+    const endDate = endDateTime.toISOString().split('T')[0]
 
     setCreating(true)
     setError('')
 
     try {
-      await agentOrdersService.create(createForm)
+      // Формируем данные для отправки
+      const orderData: any = {
+        title: createForm.title,
+        description: createForm.description,
+        startDate: createForm.startDate,
+        endDate: endDate,
+        passengerCount: parseInt(createForm.passengerCount),
+        route: createForm.route || null,
+        additionalRequirements: createForm.additionalRequirements || null,
+      }
+
+      // Если указан бюджет, используем среднее значение или диапазон
+      if (createForm.budgetFrom || createForm.budgetTo) {
+        const from = parseFloat(createForm.budgetFrom) || 0
+        const to = parseFloat(createForm.budgetTo) || 0
+        if (from > 0 && to > 0) {
+          orderData.budget = (from + to) / 2
+        } else if (from > 0) {
+          orderData.budget = from
+        } else if (to > 0) {
+          orderData.budget = to
+        }
+      }
+
+      await agentOrdersService.create(orderData)
       setShowCreateModal(false)
       setCreateForm({
         title: '',
         description: '',
         startDate: '',
-        endDate: '',
+        startTime: '',
+        hoursCount: '',
         passengerCount: '',
-        budget: '',
+        budgetFrom: '',
+        budgetTo: '',
         route: '',
         additionalRequirements: '',
       })
@@ -337,12 +371,12 @@ export default function CreateOrder() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Дата окончания *
+                        Время начала *
                       </label>
                       <input
-                        type="date"
-                        value={createForm.endDate}
-                        onChange={(e) => setCreateForm({ ...createForm, endDate: e.target.value })}
+                        type="time"
+                        value={createForm.startTime}
+                        onChange={(e) => setCreateForm({ ...createForm, startTime: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                         required
                       />
@@ -350,6 +384,21 @@ export default function CreateOrder() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Количество часов *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={createForm.hoursCount}
+                        onChange={(e) => setCreateForm({ ...createForm, hoursCount: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Например: 2, 4, 8"
+                        required
+                      />
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Количество пассажиров *
@@ -363,17 +412,35 @@ export default function CreateOrder() {
                         required
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Бюджет (₽)
+                        Бюджет от (₽)
                       </label>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
-                        value={createForm.budget}
-                        onChange={(e) => setCreateForm({ ...createForm, budget: e.target.value })}
+                        value={createForm.budgetFrom}
+                        onChange={(e) => setCreateForm({ ...createForm, budgetFrom: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Минимальная цена"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Бюджет до (₽)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={createForm.budgetTo}
+                        onChange={(e) => setCreateForm({ ...createForm, budgetTo: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Максимальная цена"
                       />
                     </div>
                   </div>
