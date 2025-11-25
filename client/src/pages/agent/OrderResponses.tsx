@@ -4,7 +4,7 @@ import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
 import { format } from 'date-fns'
-import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2 } from 'lucide-react'
+import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2, XCircle } from 'lucide-react'
 import { LoadingAnimation } from '../../components/LoadingAnimation'
 import BackButton from '../../components/BackButton'
 
@@ -19,6 +19,7 @@ export default function OrderResponses() {
   const [showVesselModal, setShowVesselModal] = useState<Vessel | null>(null)
   const [vesselDetails, setVesselDetails] = useState<Vessel | null>(null)
   const [loadingVesselDetails, setLoadingVesselDetails] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     if (orderId) {
@@ -57,6 +58,26 @@ export default function OrderResponses() {
       await loadOrder()
     } catch (err: any) {
       setError(err.error || err.message || 'Ошибка выбора катера')
+    }
+  }
+
+  const handleCancelOrder = async () => {
+    if (!order) return
+    
+    if (!confirm('Вы уверены, что хотите отменить этот заказ?')) {
+      return
+    }
+
+    setCancelling(true)
+    setError('')
+
+    try {
+      await agentOrdersService.cancel(order.id)
+      await loadOrder()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка отмены заказа')
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -197,6 +218,16 @@ export default function OrderResponses() {
             <p className="mt-2 text-gray-600">Отклики на заказ</p>
           </div>
         </div>
+        {isOrderCreator() && order.status === 'active' && (
+          <button
+            onClick={handleCancelOrder}
+            disabled={cancelling}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            {cancelling ? 'Отмена...' : 'Отменить заказ'}
+          </button>
+        )}
       </div>
 
       {/* Информация о заказе */}
