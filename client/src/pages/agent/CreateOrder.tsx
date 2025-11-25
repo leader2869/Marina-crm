@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2 } from 'lucide-react'
+import { FilePlus, Ship, User, Calendar, DollarSign, MapPin, X, User as UserIcon, Image as ImageIcon } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
@@ -8,11 +9,11 @@ import { LoadingAnimation } from '../../components/LoadingAnimation'
 
 export default function CreateOrder() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [orders, setOrders] = useState<AgentOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showResponseModal, setShowResponseModal] = useState<number | null>(null)
-  const [showResponsesModal, setShowResponsesModal] = useState<number | null>(null)
   const [showVesselModal, setShowVesselModal] = useState<Vessel | null>(null)
   const [vesselDetails, setVesselDetails] = useState<Vessel | null>(null)
   const [loadingVesselDetails, setLoadingVesselDetails] = useState(false)
@@ -21,8 +22,6 @@ export default function CreateOrder() {
   const [creating, setCreating] = useState(false)
   const [responding, setResponding] = useState(false)
   const [error, setError] = useState('')
-  const [selectedResponses, setSelectedResponses] = useState<Set<number>>(new Set())
-  const [showShareModal, setShowShareModal] = useState<number | null>(null)
 
   const [createForm, setCreateForm] = useState({
     title: '',
@@ -136,15 +135,6 @@ export default function CreateOrder() {
     }
   }
 
-  const handleSelectVessel = async (orderId: number, responseId: number) => {
-    try {
-      await agentOrdersService.selectVessel(orderId, { responseId })
-      setShowResponsesModal(null)
-      await loadOrders()
-    } catch (err: any) {
-      setError(err.error || err.message || 'Ошибка выбора катера')
-    }
-  }
 
   const handleViewVessel = async (vessel: Vessel) => {
     setShowVesselModal(vessel)
@@ -164,81 +154,6 @@ export default function CreateOrder() {
     }
   }
 
-  const toggleResponseSelection = (responseId: number) => {
-    setSelectedResponses(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(responseId)) {
-        newSet.delete(responseId)
-      } else {
-        newSet.add(responseId)
-      }
-      return newSet
-    })
-  }
-
-  const handleShareProposals = (orderId: number) => {
-    setShowShareModal(orderId)
-  }
-
-  const generateProposalText = (order: AgentOrder, responses: AgentOrderResponse[]): string => {
-    let text = `🚢 Предложения по заказу: ${order.title}\n\n`
-    text += `📅 Даты: ${format(new Date(order.startDate), 'dd.MM.yyyy')} - ${format(new Date(order.endDate), 'dd.MM.yyyy')}\n`
-    text += `👥 Пассажиров: ${order.passengerCount}\n`
-    if (order.budget) {
-      text += `💰 Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽\n`
-    }
-    if (order.route) {
-      text += `📍 Маршрут: ${order.route}\n`
-    }
-    text += `\n📋 Предложенные катера:\n\n`
-
-    responses.forEach((response, index) => {
-      const vessel = response.vessel
-      text += `${index + 1}. ${vessel?.name || 'Катер'}\n`
-      text += `   👤 Владелец: ${response.vesselOwner?.firstName} ${response.vesselOwner?.lastName}\n`
-      text += `   👥 Пассажировместимость: ${vessel?.passengerCapacity || '-'} чел.\n`
-      if (response.proposedPrice) {
-        text += `   💰 Цена: ${response.proposedPrice.toLocaleString('ru-RU')} ₽\n`
-      }
-      if (response.message) {
-        text += `   💬 ${response.message}\n`
-      }
-      if (vessel?.technicalSpecs) {
-        const shortDesc = vessel.technicalSpecs.length > 100 
-          ? `${vessel.technicalSpecs.substring(0, 100)}...` 
-          : vessel.technicalSpecs
-        text += `   📝 ${shortDesc}\n`
-      }
-      text += `\n`
-    })
-
-    return text
-  }
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Текст скопирован в буфер обмена!')
-    }).catch(err => {
-      console.error('Ошибка копирования:', err)
-      alert('Не удалось скопировать текст')
-    })
-  }
-
-  const shareViaTelegram = (text: string) => {
-    const encodedText = encodeURIComponent(text)
-    window.open(`https://t.me/share/url?url=&text=${encodedText}`, '_blank')
-  }
-
-  const shareViaWhatsApp = (text: string) => {
-    const encodedText = encodeURIComponent(text)
-    window.open(`https://wa.me/?text=${encodedText}`, '_blank')
-  }
-
-  const shareViaEmail = (text: string, order: AgentOrder) => {
-    const subject = encodeURIComponent(`Предложения по заказу: ${order.title}`)
-    const body = encodeURIComponent(text)
-    window.location.href = `mailto:?subject=${subject}&body=${body}`
-  }
 
   const canRespond = () => {
     // Могут откликаться только владельцы катеров
