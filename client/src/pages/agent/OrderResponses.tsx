@@ -183,8 +183,8 @@ export default function OrderResponses() {
         header.style.paddingBottom = '20px'
         header.style.borderBottom = '2px solid #e5e7eb'
         header.innerHTML = `
-          <h1 style="font-size: 28px; font-weight: bold; color: #111827; margin: 0 0 20px 0;">Предложения по заказу</h1>
-          <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: #6b7280;">
+          <h1 style="font-size: 36px; font-weight: bold; color: #111827; margin: 0 0 24px 0;">Предложения по заказу</h1>
+          <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 18px; color: #6b7280;">
             <div>📅 Дата начала: ${format(new Date(order.startDate), 'dd.MM.yyyy')}</div>
             <div>🕐 Время начала: ${startTimeText}</div>
             <div>⏱️ Количество часов: ${hoursText}</div>
