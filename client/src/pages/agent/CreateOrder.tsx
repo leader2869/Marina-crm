@@ -141,7 +141,7 @@ export default function CreateOrder() {
     }
   }
 
-  const canRespond = (_order: AgentOrder) => {
+  const canRespond = () => {
     // Могут откликаться только владельцы катеров
     return user?.role === 'vessel_owner' && userVessels.length > 0
   }
@@ -243,7 +243,7 @@ export default function CreateOrder() {
                       Просмотреть отклики ({order.responses.length})
                     </button>
                   )}
-                  {canRespond(order) && !isOrderCreator(order) && (
+                  {canRespond() && !isOrderCreator(order) && (
                     <button
                       onClick={() => {
                         setSelectedOrderId(order.id)
