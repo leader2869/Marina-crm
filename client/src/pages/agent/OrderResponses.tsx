@@ -338,7 +338,25 @@ export default function OrderResponses() {
                   )}
                 </div>
 
-                <div className={`relative z-10 p-6 ${mainPhoto ? 'text-white' : 'text-gray-900'}`}>
+                {/* Цена сверху по центру */}
+                {response.proposedPrice && (
+                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-10">
+                    <div className={`px-4 py-2 rounded-lg shadow-lg ${
+                      mainPhoto 
+                        ? 'bg-white bg-opacity-95' 
+                        : 'bg-primary-600'
+                    }`}>
+                      <div className={`text-center ${mainPhoto ? 'text-primary-600' : 'text-white'}`}>
+                        <div className="text-xs font-medium mb-0.5">Цена</div>
+                        <div className={`text-xl font-bold ${mainPhoto ? 'text-primary-600' : 'text-white'}`}>
+                          {response.proposedPrice.toLocaleString('ru-RU')} ₽
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className={`relative z-10 p-6 ${mainPhoto ? 'text-white' : 'text-gray-900'} ${response.proposedPrice ? 'pt-16' : ''}`}>
                   <div className="flex items-center mb-3">
                     <Ship className={`h-6 w-6 mr-2 ${mainPhoto ? 'text-white' : 'text-primary-600'}`} />
                     <h3 className={`text-xl font-semibold ${mainPhoto ? 'text-white' : 'text-gray-900'}`}>
@@ -348,21 +366,9 @@ export default function OrderResponses() {
 
                   <div className={`space-y-2 text-sm ${mainPhoto ? 'text-white' : 'text-gray-600'}`}>
                     <div>
-                      <span className="font-medium">Владелец: </span>
-                      {response.vesselOwner?.firstName} {response.vesselOwner?.lastName}
-                    </div>
-                    <div>
                       <span className="font-medium">Пассажировместимость: </span>
                       {vessel?.passengerCapacity || '-'} чел.
                     </div>
-                    {response.proposedPrice && (
-                      <div className="mt-3 p-2 bg-white bg-opacity-20 rounded">
-                        <span className="font-medium">Цена: </span>
-                        <span className="font-bold text-lg">
-                          {response.proposedPrice.toLocaleString('ru-RU')} ₽
-                        </span>
-                      </div>
-                    )}
                   </div>
 
                   {vessel?.technicalSpecs && (
