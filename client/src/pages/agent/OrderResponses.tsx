@@ -182,6 +182,11 @@ export default function OrderResponses() {
         header.style.marginBottom = '20px'
         header.style.paddingBottom = '20px'
         header.style.borderBottom = '2px solid #e5e7eb'
+        const creatorName = order.createdBy 
+          ? `${order.createdBy.firstName || ''} ${order.createdBy.lastName || ''}`.trim() 
+          : 'Не указано'
+        const creatorPhone = order.createdBy?.phone || 'Не указано'
+
         header.innerHTML = `
           <h1 style="font-size: 36px; font-weight: bold; color: #111827; margin: 0 0 24px 0;">Предложения по заказу</h1>
           <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 18px; color: #6b7280;">
@@ -190,6 +195,11 @@ export default function OrderResponses() {
             <div>⏱️ Количество часов: ${hoursText}</div>
             <div>👥 Пассажиров: ${order.passengerCount}</div>
             ${order.route ? `<div>📍 Маршрут: ${order.route}</div>` : ''}
+          </div>
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 20px; flex-wrap: wrap; font-size: 18px; color: #374151;">
+            <div style="font-weight: 600;">👤 Создатель заказа:</div>
+            <div>${creatorName}</div>
+            <div>📞 ${creatorPhone}</div>
           </div>
         `
         headerContainer.appendChild(header)
