@@ -145,7 +145,6 @@ export default function OrderResponses() {
           <div>🕐 Время начала: ${startTimeText}</div>
           <div>⏱️ Количество часов: ${hoursText}</div>
           <div>👥 Пассажиров: ${order.passengerCount}</div>
-          ${order.budget ? `<div>💰 Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽</div>` : ''}
           ${order.route ? `<div>📍 Маршрут: ${order.route}</div>` : ''}
         </div>
       `
@@ -346,31 +345,6 @@ export default function OrderResponses() {
           card.appendChild(descriptionSection)
         }
 
-        // Сообщение от владельца
-        if (response.message) {
-          const messageSection = document.createElement('div')
-          messageSection.style.backgroundColor = '#f3f4f6'
-          messageSection.style.padding = '16px'
-          messageSection.style.borderRadius = '8px'
-          messageSection.style.borderLeft = '4px solid #2563eb'
-          
-          const messageLabel = document.createElement('div')
-          messageLabel.style.fontSize = '12px'
-          messageLabel.style.fontWeight = '600'
-          messageLabel.style.color = '#6b7280'
-          messageLabel.style.marginBottom = '8px'
-          messageLabel.textContent = 'Сообщение от владельца'
-          messageSection.appendChild(messageLabel)
-          
-          const messageText = document.createElement('div')
-          messageText.style.fontSize = '14px'
-          messageText.style.color = '#374151'
-          messageText.style.fontStyle = 'italic'
-          messageText.textContent = `"${response.message}"`
-          messageSection.appendChild(messageText)
-          
-          card.appendChild(messageSection)
-        }
 
         cardsContainer.appendChild(card)
       }
