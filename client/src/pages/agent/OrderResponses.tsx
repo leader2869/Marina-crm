@@ -8,7 +8,6 @@ import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as Use
 import { LoadingAnimation } from '../../components/LoadingAnimation'
 import BackButton from '../../components/BackButton'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
 
 export default function OrderResponses() {
   const { orderId } = useParams<{ orderId: string }>()
@@ -178,36 +177,38 @@ export default function OrderResponses() {
             let photoUrl = vessel.photos[mainPhotoIndex]
 
             // Если это base64, используем напрямую, иначе загружаем
-            let imageData = photoUrl
+            let imageData: string | null = photoUrl
             
             if (!photoUrl.startsWith('data:')) {
-              // Если не base64, пытаемся загрузить через canvas
-              const img = new Image()
-              img.crossOrigin = 'anonymous'
-              
-              await new Promise((resolve, reject) => {
-                img.onload = resolve
-                img.onerror = () => {
-                  console.warn('Не удалось загрузить изображение, пропускаем')
-                  resolve(null) // Продолжаем без изображения
-                }
-                img.src = photoUrl
-              })
+            // Если не base64, пытаемся загрузить через canvas
+            const img = new Image()
+            img.crossOrigin = 'anonymous'
+            
+            await new Promise<void>((resolve) => {
+              img.onload = () => resolve()
+              img.onerror = () => {
+                console.warn('Не удалось загрузить изображение, пропускаем')
+                resolve() // Продолжаем без изображения
+              }
+              img.src = photoUrl
+            })
 
-              if (img.complete && img.naturalWidth > 0) {
-                // Конвертируем в base64 через canvas
-                const canvas = document.createElement('canvas')
-                canvas.width = img.width
-                canvas.height = img.height
-                const ctx = canvas.getContext('2d')
-                if (ctx) {
-                  ctx.drawImage(img, 0, 0)
-                  imageData = canvas.toDataURL('image/jpeg', 0.8)
-                }
+            if (img.complete && img.naturalWidth > 0) {
+              // Конвертируем в base64 через canvas
+              const canvas = document.createElement('canvas')
+              canvas.width = img.width
+              canvas.height = img.height
+              const ctx = canvas.getContext('2d')
+              if (ctx) {
+                ctx.drawImage(img, 0, 0)
+                imageData = canvas.toDataURL('image/jpeg', 0.8)
               } else {
-                // Изображение не загрузилось, пропускаем
                 imageData = null
               }
+            } else {
+              // Изображение не загрузилось, пропускаем
+              imageData = null
+            }
             }
 
             if (imageData) {
