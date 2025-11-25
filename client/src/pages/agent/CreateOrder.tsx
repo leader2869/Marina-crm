@@ -170,25 +170,6 @@ export default function CreateOrder() {
   }
 
 
-  const handleViewVessel = async (vessel: Vessel) => {
-    setShowVesselModal(vessel)
-    setVesselDetails(null)
-    setLoadingVesselDetails(true)
-    
-    try {
-      // Загружаем полную информацию о катере
-      const fullVessel = await vesselsService.getById(vessel.id) as unknown as Vessel
-      setVesselDetails(fullVessel)
-    } catch (err: any) {
-      console.error('Ошибка загрузки деталей катера:', err)
-      // Если не удалось загрузить, используем данные из отклика
-      setVesselDetails(vessel)
-    } finally {
-      setLoadingVesselDetails(false)
-    }
-  }
-
-
   const canRespond = () => {
     // Могут откликаться только владельцы катеров
     return user?.role === 'vessel_owner' && userVessels.length > 0
