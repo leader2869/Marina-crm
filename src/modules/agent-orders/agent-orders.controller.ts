@@ -23,13 +23,21 @@ export class AgentOrdersController {
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.createdBy', 'createdBy')
         .leftJoinAndSelect('order.selectedVessel', 'selectedVessel')
+        .leftJoin('order.selectedVessel', 'selectedVesselJoin')
+        .leftJoin('selectedVesselJoin.owner', 'vesselOwner')
         .leftJoinAndSelect('order.responses', 'responses')
         .leftJoinAndSelect('responses.vessel', 'responseVessel')
         .leftJoinAndSelect('responses.vesselOwner', 'responseVesselOwner');
 
       // Фильтр по статусу
       if (status && Object.values(AgentOrderStatus).includes(status as AgentOrderStatus)) {
-        queryBuilder.where('order.status = :status', { status });
+        // Для завершенных заказов показываем только те, где пользователь создатель или владелец выбранного катера
+        if (status === AgentOrderStatus.COMPLETED || status === 'completed') {
+          queryBuilder.where('order.status = :status', { status: AgentOrderStatus.COMPLETED })
+            .andWhere('(order.createdById = :userId OR selectedVesselJoin.ownerId = :userId)', { userId: req.userId });
+        } else {
+          queryBuilder.where('order.status = :status', { status });
+        }
       }
 
       // Сортировка: сначала активные, потом по дате создания
@@ -334,9 +342,9 @@ export class AgentOrdersController {
         throw new AppError('Отклик не найден', 404);
       }
 
-      // Обновляем заказ: выбираем катер и меняем статус
+      // Обновляем заказ: выбираем катер и меняем статус на завершенный
       order.selectedVesselId = response.vesselId;
-      order.status = AgentOrderStatus.IN_PROGRESS;
+      order.status = AgentOrderStatus.COMPLETED;
       await orderRepository.save(order);
 
       // Обновляем статус выбранного отклика

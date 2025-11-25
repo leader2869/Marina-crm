@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
@@ -13,6 +13,7 @@ import jsPDF from 'jspdf'
 export default function OrderResponses() {
   const { orderId } = useParams<{ orderId: string }>()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [order, setOrder] = useState<AgentOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -58,7 +59,8 @@ export default function OrderResponses() {
     
     try {
       await agentOrdersService.selectVessel(order.id, { responseId })
-      await loadOrder()
+      // Перенаправляем на страницу завершенных заказов
+      navigate('/agent-orders?tab=completed')
     } catch (err: any) {
       setError(err.error || err.message || 'Ошибка выбора катера')
     }
