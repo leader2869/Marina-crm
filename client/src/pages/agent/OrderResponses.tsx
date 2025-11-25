@@ -30,6 +30,16 @@ export default function OrderResponses() {
     try {
       setLoading(true)
       const data = await agentOrdersService.getById(parseInt(orderId!)) as unknown as AgentOrder
+      console.log('[OrderResponses] Order loaded:', {
+        id: data.id,
+        createdById: data.createdById,
+        responsesCount: data.responses?.length || 0,
+        responses: data.responses?.map((r: AgentOrderResponse) => ({
+          id: r.id,
+          vesselId: r.vesselId,
+          vesselName: r.vessel?.name
+        }))
+      })
       setOrder(data)
     } catch (err: any) {
       console.error('Ошибка загрузки заказа:', err)
@@ -67,13 +77,17 @@ export default function OrderResponses() {
   }
 
   const toggleResponseSelection = (responseId: number) => {
+    console.log('[OrderResponses] toggleResponseSelection:', responseId)
     setSelectedResponses(prev => {
       const newSet = new Set(prev)
       if (newSet.has(responseId)) {
         newSet.delete(responseId)
+        console.log('[OrderResponses] Removed from selection:', responseId)
       } else {
         newSet.add(responseId)
+        console.log('[OrderResponses] Added to selection:', responseId)
       }
+      console.log('[OrderResponses] New selection:', Array.from(newSet))
       return newSet
     })
   }
@@ -142,7 +156,13 @@ export default function OrderResponses() {
   }
 
   const isOrderCreator = () => {
-    return order?.createdById === user?.id
+    const result = order?.createdById === user?.id
+    console.log('[OrderResponses] isOrderCreator check:', {
+      orderCreatedById: order?.createdById,
+      userId: user?.id,
+      result
+    })
+    return result
   }
 
   if (loading) {
@@ -274,16 +294,19 @@ export default function OrderResponses() {
 
                 {/* Чекбокс выбора */}
                 {isOrderCreator() && (
-                  <div className="absolute top-2 left-2 z-10">
+                  <div className="absolute top-2 left-2 z-20">
                     <button
+                      type="button"
                       onClick={(e) => {
+                        e.preventDefault()
                         e.stopPropagation()
+                        console.log('[OrderResponses] Checkbox clicked for response:', response.id)
                         toggleResponseSelection(response.id)
                       }}
-                      className={`p-2 rounded-full ${
+                      className={`p-2 rounded-full cursor-pointer ${
                         isSelected 
-                          ? 'bg-primary-600 text-white' 
-                          : 'bg-white text-gray-400 hover:bg-gray-100'
+                          ? 'bg-primary-600 text-white hover:bg-primary-700' 
+                          : 'bg-white text-gray-600 hover:bg-gray-100 border-2 border-gray-300'
                       } shadow-lg transition-colors`}
                       title={isSelected ? 'Снять выбор' : 'Выбрать катер'}
                     >
