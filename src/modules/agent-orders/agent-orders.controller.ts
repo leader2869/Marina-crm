@@ -241,6 +241,58 @@ export class AgentOrdersController {
     }
   }
 
+  async cancel(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const orderId = parseInt(id);
+
+      if (isNaN(orderId)) {
+        throw new AppError('Неверный ID заказа', 400);
+      }
+
+      const orderRepository = AppDataSource.getRepository(AgentOrder);
+      const order = await orderRepository.findOne({
+        where: { id: orderId },
+        relations: ['createdBy'],
+      });
+
+      if (!order) {
+        throw new AppError('Заказ не найден', 404);
+      }
+
+      // Проверяем права: только создатель заказа или суперадмин может отменить
+      if (order.createdById !== req.userId && req.userRole !== 'super_admin') {
+        throw new AppError('У вас нет прав для отмены этого заказа', 403);
+      }
+
+      // Проверяем, что заказ можно отменить (только активные или в процессе)
+      if (order.status === AgentOrderStatus.COMPLETED) {
+        throw new AppError('Нельзя отменить завершенный заказ', 400);
+      }
+
+      if (order.status === AgentOrderStatus.CANCELLED) {
+        throw new AppError('Заказ уже отменен', 400);
+      }
+
+      // Обновляем статус на отменен
+      order.status = AgentOrderStatus.CANCELLED;
+      await orderRepository.save(order);
+
+      // Загружаем заказ с отношениями для ответа
+      const orderWithRelations = await orderRepository.findOne({
+        where: { id: orderId },
+        relations: ['createdBy', 'selectedVessel', 'responses', 'responses.vessel', 'responses.vesselOwner'],
+      });
+
+      res.json({
+        message: 'Заказ успешно отменен',
+        order: orderWithRelations,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async selectVessel(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.userId) {

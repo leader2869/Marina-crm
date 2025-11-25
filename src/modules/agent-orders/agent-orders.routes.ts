@@ -15,6 +15,7 @@ router.get('/', authenticate, agentOrdersController.getAll.bind(agentOrdersContr
 router.post('/', authenticate, agentOrdersController.create.bind(agentOrdersController));
 router.post('/:orderId/respond', authenticate, agentOrdersController.respond.bind(agentOrdersController));
 router.post('/:orderId/select-vessel', authenticate, agentOrdersController.selectVessel.bind(agentOrdersController));
+router.post('/:id/cancel', authenticate, agentOrdersController.cancel.bind(agentOrdersController));
 router.get('/:id', authenticate, agentOrdersController.getById.bind(agentOrdersController));
 
 export default router;

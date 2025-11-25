@@ -256,6 +256,7 @@ export const agentOrdersService = {
   create: (data: any) => api.post('/agent-orders', data),
   respond: (orderId: number, data: any) => api.post(`/agent-orders/${orderId}/respond`, data),
   selectVessel: (orderId: number, data: { responseId: number }) => api.post(`/agent-orders/${orderId}/select-vessel`, data),
+  cancel: (orderId: number) => api.post(`/agent-orders/${orderId}/cancel`),
 }
 
 export default api

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FilePlus, User, Calendar, DollarSign, MapPin, X } from 'lucide-react'
+import { FilePlus, User, Calendar, DollarSign, MapPin, X, XCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -18,6 +18,7 @@ export default function CreateOrder() {
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
   const [creating, setCreating] = useState(false)
   const [responding, setResponding] = useState(false)
+  const [cancelling, setCancelling] = useState<number | null>(null)
   const [error, setError] = useState('')
 
   const [createForm, setCreateForm] = useState({
@@ -134,6 +135,24 @@ export default function CreateOrder() {
       setError(err.error || err.message || 'Ошибка создания заказа')
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleCancelOrder = async (orderId: number) => {
+    if (!confirm('Вы уверены, что хотите отменить этот заказ?')) {
+      return
+    }
+
+    setCancelling(orderId)
+    setError('')
+
+    try {
+      await agentOrdersService.cancel(orderId)
+      await loadOrders()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка отмены заказа')
+    } finally {
+      setCancelling(null)
     }
   }
 
@@ -267,6 +286,16 @@ export default function CreateOrder() {
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                     >
                       Просмотреть отклики ({order.responses.length})
+                    </button>
+                  )}
+                  {isOrderCreator(order) && order.status === 'active' && (
+                    <button
+                      onClick={() => handleCancelOrder(order.id)}
+                      disabled={cancelling === order.id}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      {cancelling === order.id ? 'Отмена...' : 'Отменить заказ'}
                     </button>
                   )}
                   {canRespond() && !isOrderCreator(order) && (
