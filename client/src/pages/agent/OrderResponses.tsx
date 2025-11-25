@@ -4,9 +4,11 @@ import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, AgentOrderResponse, Vessel } from '../../types'
 import { format } from 'date-fns'
-import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2, XCircle } from 'lucide-react'
+import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as UserIcon, Image as ImageIcon, Send, CheckSquare, Square, Share2, XCircle, Download } from 'lucide-react'
 import { LoadingAnimation } from '../../components/LoadingAnimation'
 import BackButton from '../../components/BackButton'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 export default function OrderResponses() {
   const { orderId } = useParams<{ orderId: string }>()
@@ -113,67 +115,161 @@ export default function OrderResponses() {
     })
   }
 
-  const generateProposalText = (responses: AgentOrderResponse[]): string => {
-    if (!order) return ''
-    
-    let text = `🚢 Предложения по заказу: ${order.title}\n\n`
-    text += `📅 Даты: ${format(new Date(order.startDate), 'dd.MM.yyyy')} - ${format(new Date(order.endDate), 'dd.MM.yyyy')}\n`
-    text += `👥 Пассажиров: ${order.passengerCount}\n`
-    if (order.budget) {
-      text += `💰 Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽\n`
-    }
-    if (order.route) {
-      text += `📍 Маршрут: ${order.route}\n`
-    }
-    text += `\n📋 Предложенные катера:\n\n`
-
-    responses.forEach((response, index) => {
-      const vessel = response.vessel
-      text += `${index + 1}. ${vessel?.name || 'Катер'}\n`
-      text += `   👤 Владелец: ${response.vesselOwner?.firstName} ${response.vesselOwner?.lastName}\n`
-      text += `   👥 Пассажировместимость: ${vessel?.passengerCapacity || '-'} чел.\n`
-      if (response.proposedPrice) {
-        text += `   💰 Цена: ${response.proposedPrice.toLocaleString('ru-RU')} ₽\n`
-      }
-      if (response.message) {
-        text += `   💬 ${response.message}\n`
-      }
-      if (vessel?.technicalSpecs) {
-        const shortDesc = vessel.technicalSpecs.length > 100 
-          ? `${vessel.technicalSpecs.substring(0, 100)}...` 
-          : vessel.technicalSpecs
-        text += `   📝 ${shortDesc}\n`
-      }
-      text += `\n`
-    })
-
-    return text
-  }
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Текст скопирован в буфер обмена!')
-    }).catch(err => {
-      console.error('Ошибка копирования:', err)
-      alert('Не удалось скопировать текст')
-    })
-  }
-
-  const shareViaTelegram = (text: string) => {
-    const encodedText = encodeURIComponent(text)
-    window.open(`https://t.me/share/url?url=&text=${encodedText}`, '_blank')
-  }
-
-  const shareViaWhatsApp = (text: string) => {
-    const encodedText = encodeURIComponent(text)
-    window.open(`https://wa.me/?text=${encodedText}`, '_blank')
-  }
-
-  const shareViaEmail = (text: string) => {
+  const generatePDF = async (responses: AgentOrderResponse[]) => {
     if (!order) return
-    const subject = encodeURIComponent(`Предложения по заказу: ${order.title}`)
-    const body = encodeURIComponent(text)
-    window.location.href = `mailto:?subject=${subject}&body=${body}`
+
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 15
+      const contentWidth = pageWidth - 2 * margin
+      let yPosition = margin
+
+      // Заголовок документа
+      pdf.setFontSize(18)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Предложения по заказу', margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(`Заказ: ${order.title}`, margin, yPosition)
+      yPosition += 7
+
+      pdf.setFontSize(10)
+      pdf.text(`Даты: ${format(new Date(order.startDate), 'dd.MM.yyyy')} - ${format(new Date(order.endDate), 'dd.MM.yyyy')}`, margin, yPosition)
+      yPosition += 5
+      pdf.text(`Пассажиров: ${order.passengerCount}`, margin, yPosition)
+      yPosition += 5
+      if (order.budget) {
+        pdf.text(`Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽`, margin, yPosition)
+        yPosition += 5
+      }
+      if (order.route) {
+        pdf.text(`Маршрут: ${order.route}`, margin, yPosition)
+        yPosition += 5
+      }
+      yPosition += 5
+
+      // Карточки катеров
+      for (let i = 0; i < responses.length; i++) {
+        const response = responses[i]
+        const vessel = response.vessel
+
+        // Проверяем, нужна ли новая страница
+        if (yPosition > pageHeight - 100) {
+          pdf.addPage()
+          yPosition = margin
+        }
+
+        // Заголовок карточки катера
+        pdf.setFontSize(14)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(`${i + 1}. ${vessel?.name || 'Катер'}`, margin, yPosition)
+        yPosition += 8
+
+        // Фотография катера (если есть)
+        if (vessel?.photos && vessel.photos.length > 0) {
+          try {
+            const mainPhotoIndex = vessel.mainPhotoIndex !== undefined && vessel.mainPhotoIndex !== null 
+              ? vessel.mainPhotoIndex 
+              : 0
+            const photoUrl = vessel.photos[mainPhotoIndex]
+
+            // Создаем временный элемент для загрузки изображения
+            const img = new Image()
+            img.crossOrigin = 'anonymous'
+            
+            await new Promise((resolve, reject) => {
+              img.onload = resolve
+              img.onerror = reject
+              img.src = photoUrl
+            })
+
+            // Вычисляем размеры изображения для PDF
+            const maxWidth = contentWidth
+            const maxHeight = 60
+            let imgWidth = img.width
+            let imgHeight = img.height
+            const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight)
+            imgWidth = imgWidth * ratio
+            imgHeight = imgHeight * ratio
+
+            // Проверяем, помещается ли изображение на странице
+            if (yPosition + imgHeight > pageHeight - margin) {
+              pdf.addPage()
+              yPosition = margin
+            }
+
+            pdf.addImage(photoUrl, 'JPEG', margin, yPosition, imgWidth, imgHeight)
+            yPosition += imgHeight + 5
+          } catch (err) {
+            console.error('Ошибка загрузки изображения:', err)
+          }
+        }
+
+        // Информация о катере
+        pdf.setFontSize(10)
+        pdf.setFont('helvetica', 'normal')
+        
+        if (response.proposedPrice) {
+          pdf.setFont('helvetica', 'bold')
+          pdf.text(`Цена: ${response.proposedPrice.toLocaleString('ru-RU')} ₽`, margin, yPosition)
+          yPosition += 6
+          pdf.setFont('helvetica', 'normal')
+        }
+
+        pdf.text(`Пассажировместимость: ${vessel?.passengerCapacity || '-'} чел.`, margin, yPosition)
+        yPosition += 5
+
+        if (vessel?.type) {
+          pdf.text(`Тип: ${vessel.type}`, margin, yPosition)
+          yPosition += 5
+        }
+
+        if (vessel?.length) {
+          pdf.text(`Длина: ${vessel.length} м`, margin, yPosition)
+          yPosition += 5
+        }
+
+        if (vessel?.width) {
+          pdf.text(`Ширина: ${vessel.width} м`, margin, yPosition)
+          yPosition += 5
+        }
+
+        if (response.message) {
+          pdf.setFont('helvetica', 'italic')
+          const messageLines = pdf.splitTextToSize(`Сообщение: "${response.message}"`, contentWidth)
+          pdf.text(messageLines, margin, yPosition)
+          yPosition += messageLines.length * 5
+          pdf.setFont('helvetica', 'normal')
+        }
+
+        if (vessel?.technicalSpecs) {
+          const specs = vessel.technicalSpecs.length > 200 
+            ? `${vessel.technicalSpecs.substring(0, 200)}...` 
+            : vessel.technicalSpecs
+          const specsLines = pdf.splitTextToSize(`Описание: ${specs}`, contentWidth)
+          pdf.text(specsLines, margin, yPosition)
+          yPosition += specsLines.length * 5
+        }
+
+        yPosition += 10
+
+        // Разделительная линия
+        pdf.setDrawColor(200, 200, 200)
+        pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+        yPosition += 10
+      }
+
+      // Сохраняем PDF
+      const fileName = `Предложения_${order.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+      pdf.save(fileName)
+    } catch (error) {
+      console.error('Ошибка генерации PDF:', error)
+      alert('Ошибка при создании PDF файла')
+    }
   }
 
   const isOrderCreator = () => {
@@ -470,46 +566,22 @@ export default function OrderResponses() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Текст предложения:
-                      </label>
-                      <textarea
-                        readOnly
-                        value={generateProposalText(selectedResponsesList)}
-                        rows={12}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm font-mono"
-                      />
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-gray-700 mb-2">
+                        Будет создан PDF файл с карточками всех выбранных катеров ({selectedResponsesList.length}).
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        В PDF будут включены: фотографии катеров, характеристики, предложенные цены и описания.
+                      </p>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={() => copyToClipboard(generateProposalText(selectedResponsesList))}
-                        className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium"
+                        onClick={() => generatePDF(selectedResponsesList)}
+                        className="flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-md"
                       >
-                        <Square className="h-4 w-4 mr-2" />
-                        Копировать текст
-                      </button>
-                      <button
-                        onClick={() => shareViaTelegram(generateProposalText(selectedResponsesList))}
-                        className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        Telegram
-                      </button>
-                      <button
-                        onClick={() => shareViaWhatsApp(generateProposalText(selectedResponsesList))}
-                        className="flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium"
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        WhatsApp
-                      </button>
-                      <button
-                        onClick={() => shareViaEmail(generateProposalText(selectedResponsesList))}
-                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        Email
+                        <Download className="h-5 w-5 mr-2" />
+                        Скачать PDF с карточками катеров
                       </button>
                     </div>
                   </div>
