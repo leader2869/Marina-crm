@@ -65,20 +65,21 @@ class NotificationService {
 
   /**
    * Получить список пользователей для уведомлений о новых заказах
-   * По умолчанию отправляем владельцам катеров
+   * По умолчанию отправляем всем активным пользователям
    */
   async getUsersForOrderNotifications(roles?: UserRole[]): Promise<User[]> {
     const userRepository = AppDataSource.getRepository(User);
     
-    const targetRoles = roles || [UserRole.VESSEL_OWNER];
+    const queryBuilder = userRepository.createQueryBuilder('user')
+      .where('user.isActive = :isActive', { isActive: true })
+      .select(['user.id', 'user.email', 'user.firstName', 'user.lastName', 'user.role']);
     
-    const users = await userRepository.find({
-      where: {
-        role: targetRoles as any,
-        isActive: true,
-      },
-      select: ['id', 'email', 'firstName', 'lastName', 'role'],
-    });
+    // Если указаны конкретные роли, фильтруем по ним
+    if (roles && roles.length > 0) {
+      queryBuilder.andWhere('user.role IN (:...roles)', { roles });
+    }
+    
+    const users = await queryBuilder.getMany();
 
     return users;
   }
