@@ -197,7 +197,7 @@ export default function OrderResponses() {
             ${order.route ? `<div>📍 Маршрут: ${order.route}</div>` : ''}
           </div>
           <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 20px; flex-wrap: wrap; font-size: 18px; color: #374151;">
-            <div style="font-weight: 600;">👤 Создатель заказа:</div>
+            <div style="font-weight: 600;">👤 Ваш персональный менеджер:</div>
             <div>${creatorName}</div>
             <div>📞 ${creatorPhone}</div>
           </div>
