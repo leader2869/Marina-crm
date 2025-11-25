@@ -8,6 +8,7 @@ import { Ship, User, Calendar, DollarSign, MapPin, MessageSquare, X, User as Use
 import { LoadingAnimation } from '../../components/LoadingAnimation'
 import BackButton from '../../components/BackButton'
 import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 export default function OrderResponses() {
   const { orderId } = useParams<{ orderId: string }>()
@@ -138,37 +139,9 @@ export default function OrderResponses() {
     if (!order) return
 
     try {
-      // Создаем временный контейнер для карточек
-      const container = document.createElement('div')
-      container.style.position = 'absolute'
-      container.style.left = '-9999px'
-      container.style.top = '0'
-      container.style.width = '1400px'
-      container.style.backgroundColor = '#f3f4f6'
-      container.style.padding = '40px'
-      container.style.fontFamily = 'system-ui, -apple-system, sans-serif'
-      document.body.appendChild(container)
-
       // Получаем время начала и количество часов из данных заказа
       const startTimeText = order.startTime || 'Не указано'
       const hoursText = order.hoursCount ? `${order.hoursCount} ч.` : 'Не указано'
-
-      // Заголовок документа
-      const header = document.createElement('div')
-      header.style.marginBottom = '30px'
-      header.style.paddingBottom = '20px'
-      header.style.borderBottom = '2px solid #e5e7eb'
-      header.innerHTML = `
-        <h1 style="font-size: 28px; font-weight: bold; color: #111827; margin: 0 0 20px 0;">Предложения по заказу</h1>
-        <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: #6b7280;">
-          <div>📅 Дата начала: ${format(new Date(order.startDate), 'dd.MM.yyyy')}</div>
-          <div>🕐 Время начала: ${startTimeText}</div>
-          <div>⏱️ Количество часов: ${hoursText}</div>
-          <div>👥 Пассажиров: ${order.passengerCount}</div>
-          ${order.route ? `<div>📍 Маршрут: ${order.route}</div>` : ''}
-        </div>
-      `
-      container.appendChild(header)
 
       // Загружаем полную информацию о каждом катере
       const vesselCards: Array<{ response: AgentOrderResponse; fullVessel: Vessel }> = []
@@ -184,20 +157,65 @@ export default function OrderResponses() {
         }
       }
 
-      // Создаем карточки катеров в формате модального окна
-      const cardsContainer = document.createElement('div')
-      cardsContainer.style.display = 'flex'
-      cardsContainer.style.flexDirection = 'column'
-      cardsContainer.style.gap = '40px'
-      container.appendChild(cardsContainer)
+      // Создаем PDF документ
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 15
+      const contentWidth = pageWidth - 2 * margin
 
-      // Ждем, пока все изображения загрузятся
-      const imagePromises: Promise<void>[] = []
+      // Функция для добавления шапки на страницу
+      const addHeader = (yPos: number): number => {
+        pdf.setFontSize(20)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('Предложения по заказу', margin, yPos)
+        yPos += 8
 
+        pdf.setFontSize(12)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(`Дата начала: ${format(new Date(order.startDate), 'dd.MM.yyyy')}`, margin, yPos)
+        yPos += 6
+        pdf.text(`Время начала: ${startTimeText}`, margin, yPos)
+        yPos += 6
+        pdf.text(`Количество часов: ${hoursText}`, margin, yPos)
+        yPos += 6
+        pdf.text(`Пассажиров: ${order.passengerCount}`, margin, yPos)
+        yPos += 6
+        if (order.route) {
+          pdf.text(`Маршрут: ${order.route}`, margin, yPos)
+          yPos += 6
+        }
+        yPos += 5
+
+        // Разделительная линия
+        pdf.setDrawColor(200, 200, 200)
+        pdf.line(margin, yPos, pageWidth - margin, yPos)
+        yPos += 8
+
+        return yPos
+      }
+
+      // Обрабатываем каждый катер отдельно
       for (let i = 0; i < vesselCards.length; i++) {
         const { response, fullVessel } = vesselCards[i]
-        
-        // Создаем карточку в стиле модального окна
+
+        // Если это не первая страница, добавляем новую
+        if (i > 0) {
+          pdf.addPage()
+        }
+
+        // Создаем временный контейнер для карточки катера
+        const container = document.createElement('div')
+        container.style.position = 'absolute'
+        container.style.left = '-9999px'
+        container.style.top = '0'
+        container.style.width = '1200px'
+        container.style.backgroundColor = '#ffffff'
+        container.style.padding = '30px'
+        container.style.fontFamily = 'system-ui, -apple-system, sans-serif'
+        document.body.appendChild(container)
+
+        // Создаем карточку катера
         const card = document.createElement('div')
         card.style.backgroundColor = '#ffffff'
         card.style.borderRadius = '12px'
@@ -288,15 +306,6 @@ export default function OrderResponses() {
             }
             
             photosGrid.appendChild(photoWrapper)
-
-            // Ждем загрузки изображения
-            const imgPromise = new Promise<void>((resolve) => {
-              const imgEl = new Image()
-              imgEl.onload = () => resolve()
-              imgEl.onerror = () => resolve()
-              imgEl.src = photo
-            })
-            imagePromises.push(imgPromise)
           })
           
           photosSection.appendChild(photosGrid)
@@ -367,36 +376,64 @@ export default function OrderResponses() {
           card.appendChild(descriptionSection)
         }
 
+        container.appendChild(card)
 
-        cardsContainer.appendChild(card)
+        // Ждем загрузки всех изображений
+        const imagePromises: Promise<void>[] = []
+        if (fullVessel?.photos && fullVessel.photos.length > 0) {
+          fullVessel.photos.forEach((photo) => {
+            const imgPromise = new Promise<void>((resolve) => {
+              const imgEl = new Image()
+              imgEl.onload = () => resolve()
+              imgEl.onerror = () => resolve()
+              imgEl.src = photo
+            })
+            imagePromises.push(imgPromise)
+          })
+        }
+        await Promise.all(imagePromises)
+
+        // Небольшая задержка для рендеринга
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        // Делаем скриншот карточки катера
+        const canvas = await html2canvas(container, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          logging: false,
+          useCORS: true,
+          allowTaint: true,
+        })
+
+        // Удаляем временный контейнер
+        document.body.removeChild(container)
+
+        // Получаем изображение в base64
+        const imgData = canvas.toDataURL('image/png')
+
+        // Добавляем шапку на страницу
+        let yPosition = margin
+        yPosition = addHeader(yPosition)
+
+        // Вычисляем размеры изображения для PDF
+        const imgWidth = canvas.width * 0.264583 // Конвертация пикселей в мм
+        const imgHeight = canvas.height * 0.264583
+        const maxWidth = contentWidth
+        const maxHeight = pageHeight - yPosition - margin // Оставляем место снизу
+        const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight)
+        const finalWidth = imgWidth * ratio
+        const finalHeight = imgHeight * ratio
+
+        // Добавляем изображение карточки катера в PDF
+        pdf.addImage(imgData, 'PNG', margin, yPosition, finalWidth, finalHeight)
       }
 
-      // Ждем загрузки всех изображений
-      await Promise.all(imagePromises)
-
-      // Небольшая задержка для рендеринга
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Делаем скриншот всего контейнера
-      const canvas = await html2canvas(container, {
-        backgroundColor: '#f3f4f6',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-      })
-
-      // Скачиваем изображение
-      const link = document.createElement('a')
-      link.download = `Предложения_${order.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
-
-      // Удаляем временный контейнер
-      document.body.removeChild(container)
+      // Сохраняем PDF
+      const fileName = `Предложения_${order.title.replace(/[^a-zа-яё0-9]/gi, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`
+      pdf.save(fileName)
     } catch (error) {
-      console.error('Ошибка генерации изображения:', error)
-      alert('Ошибка при создании изображения с карточками катеров')
+      console.error('Ошибка генерации PDF:', error)
+      alert('Ошибка при создании PDF файла с карточками катеров')
     }
   }
 
