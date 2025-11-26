@@ -105,7 +105,14 @@ export default function CreateOrder() {
         additionalRequirements: createForm.additionalRequirements || null,
       }
 
-      // Если указан бюджет, используем среднее значение или диапазон
+      // Сохраняем бюджет от и до
+      if (createForm.budgetFrom) {
+        orderData.budgetFrom = parseFloat(createForm.budgetFrom) || null
+      }
+      if (createForm.budgetTo) {
+        orderData.budgetTo = parseFloat(createForm.budgetTo) || null
+      }
+      // Для обратной совместимости сохраняем среднее значение в budget
       if (createForm.budgetFrom || createForm.budgetTo) {
         const from = parseFloat(createForm.budgetFrom) || 0
         const to = parseFloat(createForm.budgetTo) || 0
@@ -238,7 +245,7 @@ export default function CreateOrder() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div className="flex items-center text-sm text-gray-600">
                       <Calendar className="h-4 w-4 mr-2 text-primary-600" />
-                      <span>{format(new Date(order.startDate), 'dd.MM.yyyy')} - {format(new Date(order.endDate), 'dd.MM.yyyy')}</span>
+                      <span>{format(new Date(order.startDate), 'dd.MM.yyyy')}</span>
                     </div>
                     {order.startTime && (
                       <div className="flex items-center text-sm text-gray-600">
@@ -256,10 +263,18 @@ export default function CreateOrder() {
                       <User className="h-4 w-4 mr-2 text-primary-600" />
                       <span>{order.passengerCount} пассажиров</span>
                     </div>
-                    {order.budget && (
+                    {(order.budgetFrom || order.budgetTo) && (
                       <div className="flex items-center text-sm text-gray-600">
                         <DollarSign className="h-4 w-4 mr-2 text-primary-600" />
-                        <span>{order.budget.toLocaleString()} ₽</span>
+                        <span>
+                          {order.budgetFrom && order.budgetTo
+                            ? `от ${order.budgetFrom.toLocaleString()} до ${order.budgetTo.toLocaleString()} ₽`
+                            : order.budgetFrom
+                            ? `от ${order.budgetFrom.toLocaleString()} ₽`
+                            : order.budgetTo
+                            ? `до ${order.budgetTo.toLocaleString()} ₽`
+                            : ''}
+                        </span>
                       </div>
                     )}
                     {order.route && (

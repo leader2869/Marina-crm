@@ -389,7 +389,9 @@ export interface AgentOrder {
   hoursCount?: number | null
   endDate: string
   passengerCount: number
-  budget?: number
+  budget?: number // Устаревшее, для обратной совместимости
+  budgetFrom?: number | null
+  budgetTo?: number | null
   route?: string
   additionalRequirements?: string
   status: AgentOrderStatus

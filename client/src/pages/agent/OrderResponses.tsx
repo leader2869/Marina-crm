@@ -581,7 +581,7 @@ export default function OrderResponses() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="flex items-center text-sm text-gray-600">
             <Calendar className="h-4 w-4 mr-2 text-primary-600" />
-            <span>{format(new Date(order.startDate), 'dd.MM.yyyy')} - {format(new Date(order.endDate), 'dd.MM.yyyy')}</span>
+            <span>{format(new Date(order.startDate), 'dd.MM.yyyy')}</span>
           </div>
           <div className="flex items-center text-sm text-gray-600">
             <User className="h-4 w-4 mr-2 text-primary-600" />

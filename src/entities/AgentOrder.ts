@@ -46,7 +46,13 @@ export class AgentOrder {
   passengerCount: number; // Количество пассажиров
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  budget: number | null; // Бюджет заказа
+  budget: number | null; // Бюджет заказа (устаревшее, используется для обратной совместимости)
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  budgetFrom: number | null; // Бюджет от
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  budgetTo: number | null; // Бюджет до
 
   @Column({ type: 'text', nullable: true })
   route: string | null; // Маршрут

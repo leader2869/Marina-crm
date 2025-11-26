@@ -23,8 +23,9 @@ export class AgentOrdersController {
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.createdBy', 'createdBy')
         .leftJoinAndSelect('order.selectedVessel', 'selectedVessel')
+        .leftJoinAndSelect('selectedVessel.owner', 'vesselOwner')
         .leftJoin('order.selectedVessel', 'selectedVesselJoin')
-        .leftJoin('selectedVesselJoin.owner', 'vesselOwner')
+        .leftJoin('selectedVesselJoin.owner', 'vesselOwnerJoin')
         .leftJoinAndSelect('order.responses', 'responses')
         .leftJoinAndSelect('responses.vessel', 'responseVessel')
         .leftJoinAndSelect('responses.vesselOwner', 'responseVesselOwner');
@@ -81,7 +82,7 @@ export class AgentOrdersController {
 
       const order = await orderRepository.findOne({
         where: { id: parseInt(id) },
-        relations: ['createdBy', 'selectedVessel', 'responses', 'responses.vessel', 'responses.vesselOwner'],
+        relations: ['createdBy', 'selectedVessel', 'selectedVessel.owner', 'responses', 'responses.vessel', 'responses.vesselOwner'],
       });
 
       if (!order) {
@@ -125,6 +126,8 @@ export class AgentOrdersController {
         endDate,
         passengerCount,
         budget,
+        budgetFrom,
+        budgetTo,
         route,
         additionalRequirements,
       } = req.body;
@@ -143,7 +146,9 @@ export class AgentOrdersController {
         hoursCount: hoursCount ? parseFloat(hoursCount) : null,
         endDate: new Date(endDate),
         passengerCount: parseInt(passengerCount),
-        budget: budget ? parseFloat(budget) : null,
+        budget: budget ? parseFloat(budget) : null, // Для обратной совместимости
+        budgetFrom: budgetFrom ? parseFloat(budgetFrom) : null,
+        budgetTo: budgetTo ? parseFloat(budgetTo) : null,
         route: route || null,
         additionalRequirements: additionalRequirements || null,
         status: AgentOrderStatus.ACTIVE,
@@ -154,7 +159,7 @@ export class AgentOrdersController {
 
       const orderWithRelations = await orderRepository.findOne({
         where: { id: savedOrder.id },
-        relations: ['createdBy', 'selectedVessel', 'responses'],
+        relations: ['createdBy', 'selectedVessel', 'selectedVessel.owner', 'responses'],
       });
 
       // Отправляем уведомления всем пользователям о новом заказе
@@ -293,7 +298,7 @@ export class AgentOrdersController {
       // Загружаем заказ с отношениями для ответа
       const orderWithRelations = await orderRepository.findOne({
         where: { id: orderId },
-        relations: ['createdBy', 'selectedVessel', 'responses', 'responses.vessel', 'responses.vesselOwner'],
+        relations: ['createdBy', 'selectedVessel', 'selectedVessel.owner', 'responses', 'responses.vessel', 'responses.vesselOwner'],
       });
 
       res.json({
@@ -361,7 +366,7 @@ export class AgentOrdersController {
 
       const updatedOrder = await orderRepository.findOne({
         where: { id: parseInt(orderId) },
-        relations: ['createdBy', 'selectedVessel', 'responses', 'responses.vessel', 'responses.vesselOwner'],
+        relations: ['createdBy', 'selectedVessel', 'selectedVessel.owner', 'responses', 'responses.vessel', 'responses.vesselOwner'],
       });
 
       // Парсим JSON строки в массивы для фотографий катеров в откликах
