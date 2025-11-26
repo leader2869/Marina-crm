@@ -50,16 +50,23 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    const fullURL = error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url
+    // Логируем детали ошибки для отладки
+    const baseURL = error.config?.baseURL || API_URL
+    const url = error.config?.url || ''
+    const fullURL = baseURL ? `${baseURL}${url}` : url
+    
     console.error('API Error:', {
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
       message: error.message,
-      url: error.config?.url,
-      baseURL: error.config?.baseURL,
+      code: error.code,
+      url: url,
+      baseURL: baseURL,
       fullURL: fullURL,
-      method: error.config?.method
+      method: error.config?.method,
+      hasResponse: !!error.response,
+      hasRequest: !!error.request,
     })
     
     if (error.response?.status === 401) {
@@ -95,10 +102,29 @@ api.interceptors.response.use(
     
     // Если нет ответа от сервера (сетевая ошибка)
     if (!error.response) {
+      // Проверяем, что baseURL установлен
+      const baseURL = error.config?.baseURL || API_URL
+      const url = error.config?.url || ''
+      const fullURL = baseURL ? `${baseURL}${url}` : url
+      
+      console.error('[Network Error]', {
+        baseURL: baseURL,
+        url: url,
+        fullURL: fullURL,
+        errorMessage: error.message,
+        errorCode: error.code,
+        API_URL: API_URL,
+        env: {
+          VITE_API_URL: import.meta.env.VITE_API_URL,
+          PROD: import.meta.env.PROD,
+        },
+      })
+      
       return Promise.reject({
         error: 'Ошибка сети',
-        message: 'Не удалось подключиться к серверу. Проверьте подключение к интернету и настройки API URL.',
-        details: error.message
+        message: `Не удалось подключиться к серверу. URL: ${fullURL}. Проверьте подключение к интернету и настройки API URL.`,
+        details: error.message,
+        url: fullURL,
       })
     }
     
