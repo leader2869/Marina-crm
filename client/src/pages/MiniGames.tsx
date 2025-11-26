@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Gamepad2, Play, RotateCcw } from 'lucide-react'
+import { Gamepad2, Play, RotateCcw, Anchor, Ship } from 'lucide-react'
 import BackButton from '../components/BackButton'
 
 interface Position {
@@ -218,34 +218,50 @@ export default function MiniGames() {
               position: 'relative',
             }}
           >
-            {/* Еда */}
+            {/* Якорь (еда) */}
             <div
-              className="absolute bg-red-500 rounded-full"
+              className="absolute flex items-center justify-center"
               style={{
                 left: food.x * CELL_SIZE,
                 top: food.y * CELL_SIZE,
-                width: CELL_SIZE - 2,
-                height: CELL_SIZE - 2,
-                boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)',
+                width: CELL_SIZE,
+                height: CELL_SIZE,
               }}
-            />
+            >
+              <Anchor className="text-gray-800" size={CELL_SIZE - 4} />
+            </div>
 
-            {/* Змейка */}
+            {/* Катер */}
             {snake.map((segment, index) => (
               <div
                 key={index}
-                className={`absolute ${
-                  index === 0 ? 'bg-primary-600' : 'bg-primary-500'
-                } rounded-sm`}
+                className="absolute flex items-center justify-center"
                 style={{
                   left: segment.x * CELL_SIZE,
                   top: segment.y * CELL_SIZE,
-                  width: CELL_SIZE - 2,
-                  height: CELL_SIZE - 2,
+                  width: CELL_SIZE,
+                  height: CELL_SIZE,
                   zIndex: snake.length - index,
-                  boxShadow: index === 0 ? '0 0 8px rgba(37, 99, 235, 0.6)' : 'none',
                 }}
-              />
+              >
+                {index === 0 ? (
+                  <Ship 
+                    className="text-primary-600" 
+                    size={CELL_SIZE - 2}
+                    style={{
+                      filter: 'drop-shadow(0 0 4px rgba(37, 99, 235, 0.6))',
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="bg-primary-500 rounded-sm"
+                    style={{
+                      width: CELL_SIZE - 2,
+                      height: CELL_SIZE - 2,
+                    }}
+                  />
+                )}
+              </div>
             ))}
           </div>
 
@@ -259,7 +275,7 @@ export default function MiniGames() {
               <li>➡️ Стрелка вправо - движение вправо</li>
             </ul>
             <p className="text-sm text-gray-600 mt-3">
-              Соберите как можно больше очков, поедая красные яблоки. Избегайте столкновений со стенами и собой!
+              Соберите как можно больше очков, собирая якоря. Управляйте катером и избегайте столкновений со стенами и собой!
             </p>
           </div>
         </div>
