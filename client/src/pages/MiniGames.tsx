@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Gamepad2, Play, RotateCcw, Anchor, Ship } from 'lucide-react'
+import { Gamepad2, Play, RotateCcw, Ship } from 'lucide-react'
 import BackButton from '../components/BackButton'
 
 interface Position {
@@ -218,9 +218,9 @@ export default function MiniGames() {
               position: 'relative',
             }}
           >
-            {/* Якорь (еда) */}
+            {/* Русалка (еда) */}
             <div
-              className="absolute flex items-center justify-center"
+              className="absolute flex items-center justify-center text-2xl"
               style={{
                 left: food.x * CELL_SIZE,
                 top: food.y * CELL_SIZE,
@@ -228,7 +228,7 @@ export default function MiniGames() {
                 height: CELL_SIZE,
               }}
             >
-              <Anchor className="text-gray-800" size={CELL_SIZE - 4} />
+              🧜‍♀️
             </div>
 
             {/* Катер */}
@@ -275,7 +275,7 @@ export default function MiniGames() {
               <li>➡️ Стрелка вправо - движение вправо</li>
             </ul>
             <p className="text-sm text-gray-600 mt-3">
-              Соберите как можно больше очков, собирая якоря. Управляйте катером и избегайте столкновений со стенами и собой!
+              Соберите как можно больше очков, собирая русалок. Управляйте катером и избегайте столкновений со стенами и собой!
             </p>
           </div>
         </div>
