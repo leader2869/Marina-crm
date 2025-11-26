@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Gamepad2, Play, RotateCcw, Ship } from 'lucide-react'
+import { Gamepad2, Play, RotateCcw } from 'lucide-react'
 import BackButton from '../components/BackButton'
 
 interface Position {
@@ -245,19 +245,16 @@ export default function MiniGames() {
                 }}
               >
                 {index === 0 ? (
-                  <Ship 
-                    className="text-primary-600" 
-                    size={CELL_SIZE - 2}
-                    style={{
-                      filter: 'drop-shadow(0 0 4px rgba(37, 99, 235, 0.6))',
-                    }}
-                  />
+                  <div className="text-2xl" style={{ filter: 'drop-shadow(0 0 4px rgba(37, 99, 235, 0.8))' }}>
+                    ⛵
+                  </div>
                 ) : (
                   <div
                     className="bg-primary-500 rounded-sm"
                     style={{
                       width: CELL_SIZE - 2,
                       height: CELL_SIZE - 2,
+                      opacity: 0.7,
                     }}
                   />
                 )}
