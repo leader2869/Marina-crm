@@ -39,6 +39,7 @@ import VesselSelection from './pages/agent/VesselSelection'
 import BookBerth from './pages/agent/BookBerth'
 import AdditionalServices from './pages/agent/AdditionalServices'
 import AgentWidgets from './pages/agent/AgentWidgets'
+import MiniGames from './pages/MiniGames'
 import { UserRole } from './types'
 
 // Компонент для редиректа на начальную страницу в зависимости от роли
@@ -267,6 +268,10 @@ function App() {
                   <AgentWidgets />
                 </RoleProtectedRoute>
               } 
+            />
+            <Route 
+              path="mini-games" 
+              element={<MiniGames />} 
             />
             {/* Catch-all для несуществующих роутов */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

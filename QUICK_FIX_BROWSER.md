@@ -169,3 +169,4 @@ cd /Users/vitalymacbookair/Marina-crm
 После исправления DNS записей в REG.RU, корневой домен `1marina.ru` тоже будет работать правильно.
 
 
+
