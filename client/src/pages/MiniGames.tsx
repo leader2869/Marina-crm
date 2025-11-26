@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Gamepad2, Play, RotateCcw } from 'lucide-react'
+import { Gamepad2, Play, RotateCcw, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
 import BackButton from '../components/BackButton'
 
 interface Position {
@@ -21,6 +21,18 @@ export default function MiniGames() {
   const [isPlaying, setIsPlaying] = useState(false)
   const directionRef = useRef<Position>(INITIAL_DIRECTION)
   const gameLoopRef = useRef<number | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Определение мобильного устройства
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Генерация случайной позиции для еды
   const generateFood = useCallback((): Position => {
@@ -88,50 +100,108 @@ export default function MiniGames() {
     }
   }, [isPlaying, gameOver, food, checkCollision, generateFood])
 
+  // Изменение направления
+  const changeDirection = useCallback((newDirection: Position) => {
+    if (!isPlaying) return
+    
+    // Предотвращаем движение в противоположном направлении
+    if (
+      (directionRef.current.x === 1 && newDirection.x === -1) ||
+      (directionRef.current.x === -1 && newDirection.x === 1) ||
+      (directionRef.current.y === 1 && newDirection.y === -1) ||
+      (directionRef.current.y === -1 && newDirection.y === 1)
+    ) {
+      return
+    }
+
+    directionRef.current = newDirection
+  }, [isPlaying])
+
   // Обработка нажатий клавиш
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (!isPlaying) return
 
       const key = e.key
-      const newDirection = { ...directionRef.current }
+      let newDirection: Position | null = null
 
       switch (key) {
         case 'ArrowUp':
           if (directionRef.current.y === 0) {
-            newDirection.x = 0
-            newDirection.y = -1
+            newDirection = { x: 0, y: -1 }
           }
           break
         case 'ArrowDown':
           if (directionRef.current.y === 0) {
-            newDirection.x = 0
-            newDirection.y = 1
+            newDirection = { x: 0, y: 1 }
           }
           break
         case 'ArrowLeft':
           if (directionRef.current.x === 0) {
-            newDirection.x = -1
-            newDirection.y = 0
+            newDirection = { x: -1, y: 0 }
           }
           break
         case 'ArrowRight':
           if (directionRef.current.x === 0) {
-            newDirection.x = 1
-            newDirection.y = 0
+            newDirection = { x: 1, y: 0 }
           }
           break
         default:
           return
       }
 
-      directionRef.current = newDirection
-      e.preventDefault()
+      if (newDirection) {
+        changeDirection(newDirection)
+        e.preventDefault()
+      }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [isPlaying])
+  }, [isPlaying, changeDirection])
+
+  // Обработка touch событий для мобильных
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || !isPlaying) return
+
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStartRef.current.x
+    const deltaY = touch.clientY - touchStartRef.current.y
+    const minSwipeDistance = 30
+
+    if (Math.abs(deltaX) < minSwipeDistance && Math.abs(deltaY) < minSwipeDistance) {
+      return
+    }
+
+    let newDirection: Position | null = null
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Горизонтальный swipe
+      if (deltaX > 0 && directionRef.current.x === 0) {
+        newDirection = { x: 1, y: 0 } // Вправо
+      } else if (deltaX < 0 && directionRef.current.x === 0) {
+        newDirection = { x: -1, y: 0 } // Влево
+      }
+    } else {
+      // Вертикальный swipe
+      if (deltaY > 0 && directionRef.current.y === 0) {
+        newDirection = { x: 0, y: 1 } // Вниз
+      } else if (deltaY < 0 && directionRef.current.y === 0) {
+        newDirection = { x: 0, y: -1 } // Вверх
+      }
+    }
+
+    if (newDirection) {
+      changeDirection(newDirection)
+    }
+
+    touchStartRef.current = null
+  }
 
   // Начало игры
   const startGame = () => {
@@ -211,12 +281,14 @@ export default function MiniGames() {
         {/* Игровое поле */}
         <div className="flex flex-col items-center">
           <div
-            className="border-4 border-gray-800 rounded-lg bg-gray-100"
+            className="border-4 border-gray-800 rounded-lg bg-gray-100 touch-none"
             style={{
               width: GRID_SIZE * CELL_SIZE,
               height: GRID_SIZE * CELL_SIZE,
               position: 'relative',
             }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
             {/* Русалка (еда) */}
             <div
@@ -275,6 +347,57 @@ export default function MiniGames() {
               Соберите как можно больше очков, собирая русалок. Управляйте катером и избегайте столкновений со стенами и собой!
             </p>
           </div>
+
+          {/* Кнопки управления для мобильных */}
+          {isMobile && isPlaying && (
+            <div className="mt-6 w-full max-w-xs">
+              <div className="bg-gray-100 rounded-lg p-4">
+                <div className="flex flex-col items-center gap-2">
+                  {/* Верхняя кнопка */}
+                  <button
+                    onClick={() => changeDirection({ x: 0, y: -1 })}
+                    disabled={directionRef.current.y !== 0}
+                    className="w-16 h-16 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md"
+                  >
+                    <ArrowUp className="h-6 w-6" />
+                  </button>
+                  
+                  {/* Средний ряд */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => changeDirection({ x: -1, y: 0 })}
+                      disabled={directionRef.current.x !== 0}
+                      className="w-16 h-16 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md"
+                    >
+                      <ArrowLeft className="h-6 w-6" />
+                    </button>
+                    
+                    <div className="w-16 h-16"></div>
+                    
+                    <button
+                      onClick={() => changeDirection({ x: 1, y: 0 })}
+                      disabled={directionRef.current.x !== 0}
+                      className="w-16 h-16 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md"
+                    >
+                      <ArrowRight className="h-6 w-6" />
+                    </button>
+                  </div>
+                  
+                  {/* Нижняя кнопка */}
+                  <button
+                    onClick={() => changeDirection({ x: 0, y: 1 })}
+                    disabled={directionRef.current.y !== 0}
+                    className="w-16 h-16 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md"
+                  >
+                    <ArrowDown className="h-6 w-6" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 text-center mt-3">
+                  Или используйте свайпы на игровом поле
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
