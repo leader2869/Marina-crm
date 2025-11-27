@@ -7,6 +7,7 @@ import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { notificationService } from '../../services/notification.service';
+import { In } from 'typeorm';
 
 export class AgentOrdersController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -17,23 +18,44 @@ export class AgentOrdersController {
       );
 
       const { status } = req.query;
+      
+      // Проверяем аутентификацию для завершенных заказов
+      if ((status === AgentOrderStatus.COMPLETED || status === 'completed') && !req.userId) {
+        throw new AppError('Требуется аутентификация для просмотра завершенных заказов', 401);
+      }
       const orderRepository = AppDataSource.getRepository(AgentOrder);
 
       const queryBuilder = orderRepository
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.createdBy', 'createdBy')
-        .leftJoinAndSelect('order.selectedVessel', 'selectedVessel')
-        .leftJoinAndSelect('selectedVessel.owner', 'vesselOwner')
         .leftJoin('order.selectedVessel', 'selectedVesselJoin')
-        .leftJoin('selectedVesselJoin.owner', 'vesselOwnerJoin')
-        .leftJoinAndSelect('order.responses', 'responses')
-        .leftJoinAndSelect('responses.vessel', 'responseVessel')
-        .leftJoinAndSelect('responses.vesselOwner', 'responseVesselOwner');
+        .leftJoin('selectedVesselJoin.owner', 'vesselOwnerJoin');
+
+      // Для завершенных заказов загружаем выбранный катер с фотографиями
+      // Для активных заказов выбранный катер не нужен
+      if (status === AgentOrderStatus.COMPLETED || status === 'completed') {
+        queryBuilder
+          .leftJoinAndSelect('order.selectedVessel', 'selectedVessel')
+          .leftJoinAndSelect('selectedVessel.owner', 'vesselOwner');
+      }
+
+      // Для активных заказов загружаем только количество откликов, без самих откликов
+      // Это значительно уменьшает объем данных
+      if (status === AgentOrderStatus.ACTIVE || status === 'active') {
+        queryBuilder
+          .loadRelationCountAndMap('order.responsesCount', 'order.responses');
+      } else {
+        // Для завершенных заказов отклики не нужны вообще
+        // Для других статусов тоже не загружаем отклики в списке
+      }
 
       // Фильтр по статусу
       if (status && Object.values(AgentOrderStatus).includes(status as AgentOrderStatus)) {
         // Для завершенных заказов показываем только те, где пользователь создатель или владелец выбранного катера
         if (status === AgentOrderStatus.COMPLETED || status === 'completed') {
+          if (!req.userId) {
+            throw new AppError('Требуется аутентификация', 401);
+          }
           queryBuilder.where('order.status = :status', { status: AgentOrderStatus.COMPLETED })
             .andWhere('(order.createdById = :userId OR selectedVesselJoin.ownerId = :userId)', { userId: req.userId });
         } else {
@@ -50,22 +72,52 @@ export class AgentOrdersController {
         .take(limit)
         .getManyAndCount();
 
-      // Парсим JSON строки в массивы для фотографий катеров в откликах
-      const ordersWithParsedPhotos = orders.map((order: any) => {
-        if (order.responses && Array.isArray(order.responses)) {
-          order.responses = order.responses.map((response: any) => {
-            if (response.vessel && response.vessel.photos) {
-              try {
-                response.vessel.photos = JSON.parse(response.vessel.photos);
-              } catch (e) {
-                response.vessel.photos = [];
-              }
-            } else if (response.vessel) {
-              response.vessel.photos = [];
+      // Для завершенных заказов загружаем принятый отклик отдельно для получения цены
+      if ((status === AgentOrderStatus.COMPLETED || status === 'completed') && orders.length > 0) {
+        try {
+          const responseRepository = AppDataSource.getRepository(AgentOrderResponse);
+          const orderIds = orders.map(o => o.id);
+          
+          // Проверяем, что есть ID заказов
+          if (orderIds.length > 0) {
+            // Загружаем все принятые отклики одним запросом (без relations для ускорения)
+            const acceptedResponses = await responseRepository.find({
+              where: {
+                orderId: In(orderIds),
+                status: AgentOrderResponseStatus.ACCEPTED,
+              },
+              // Не загружаем relations, так как нужна только цена
+              select: ['id', 'orderId', 'proposedPrice', 'status'],
+            });
+            // Создаем мапу для быстрого поиска
+            const responsesMap = new Map(acceptedResponses.map(r => [r.orderId, r]));
+            // Присваиваем принятый отклик каждому заказу
+            for (const order of orders) {
+              (order as any).acceptedResponse = responsesMap.get(order.id) || null;
             }
-            return response;
-          });
+          }
+        } catch (error) {
+          console.error('Ошибка загрузки принятых откликов для завершенных заказов:', error);
+          // Продолжаем выполнение даже если не удалось загрузить отклики
+          for (const order of orders) {
+            (order as any).acceptedResponse = null;
+          }
         }
+      }
+
+      // Парсим JSON строки в массивы для фотографий только для выбранного катера в завершенных заказах
+      const ordersWithParsedPhotos = orders.map((order: any) => {
+        // Парсим фотографии только для выбранного катера в завершенных заказах
+        if (order.selectedVessel && order.selectedVessel.photos) {
+          try {
+            order.selectedVessel.photos = JSON.parse(order.selectedVessel.photos);
+          } catch (e) {
+            order.selectedVessel.photos = [];
+          }
+        } else if (order.selectedVessel) {
+          order.selectedVessel.photos = [];
+        }
+        
         return order;
       });
 

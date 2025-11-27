@@ -137,9 +137,10 @@ export default function CompletedOrders() {
                 )}
 
                 {order.selectedVessel && (() => {
-                  // Используем данные из responses.vessel если они есть (более полные), иначе из selectedVessel
-                  const acceptedResponse = order.responses?.find((r: any) => r.status === 'accepted') || order.responses?.[0];
-                  const vessel = acceptedResponse?.vessel || order.selectedVessel;
+                  // Используем выбранный катер напрямую
+                  const vessel = order.selectedVessel;
+                  // Получаем цену из принятого отклика
+                  const acceptedResponse = (order as any).acceptedResponse;
                   // Преобразуем price в число, если это строка (DECIMAL из БД может быть строкой)
                   let price: number | null = null;
                   if (acceptedResponse?.proposedPrice !== null && acceptedResponse?.proposedPrice !== undefined) {

@@ -297,19 +297,19 @@ export default function CreateOrder() {
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="flex items-center gap-2">
-                  {isOrderCreator(order) && order.responses && order.responses.length > 0 && (
+                  {isOrderCreator(order) && (order.responsesCount || 0) > 0 && (
                     <span className="text-sm text-gray-600">
-                      Откликов: {order.responses.length}
+                      Откликов: {order.responsesCount || 0}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {isOrderCreator(order) && order.responses && order.responses.length > 0 && (
+                  {isOrderCreator(order) && (order.responsesCount || 0) > 0 && (
                     <button
                       onClick={() => navigate(`/agent/orders/${order.id}/responses`)}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                     >
-                      Просмотреть отклики ({order.responses.length})
+                      Просмотреть отклики ({order.responsesCount || 0})
                     </button>
                   )}
                   {isOrderCreator(order) && order.status === 'active' && (
@@ -567,7 +567,7 @@ export default function CreateOrder() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Предложенная цена (₽)
+                      Цена за ЗАКАЗ (₽)
                     </label>
                     <input
                       type="number"
