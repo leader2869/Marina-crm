@@ -26,7 +26,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 секунд таймаут
+  timeout: 60000, // 60 секунд таймаут
 })
 
 // Добавляем токен к каждому запросу

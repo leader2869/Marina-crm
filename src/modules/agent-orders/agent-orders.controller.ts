@@ -36,7 +36,14 @@ export class AgentOrdersController {
       if (status === AgentOrderStatus.COMPLETED || status === 'completed') {
         queryBuilder
           .leftJoinAndSelect('order.selectedVessel', 'selectedVessel')
-          .leftJoinAndSelect('selectedVessel.owner', 'vesselOwner');
+          .leftJoin('selectedVessel.owner', 'vesselOwner')
+          .addSelect([
+            'vesselOwner.id',
+            'vesselOwner.firstName',
+            'vesselOwner.lastName',
+            'vesselOwner.email',
+            'vesselOwner.phone'
+          ]);
       }
 
       // Для активных заказов загружаем только количество откликов, без самих откликов
@@ -63,14 +70,39 @@ export class AgentOrdersController {
         }
       }
 
-      // Сортировка: сначала активные, потом по дате создания
-      queryBuilder.orderBy('order.status', 'ASC')
-        .addOrderBy('order.createdAt', 'DESC');
+      // Сортировка: для завершенных заказов только по дате создания (DESC)
+      // Для других статусов сначала активные, потом по дате создания
+      if (status === AgentOrderStatus.COMPLETED || status === 'completed') {
+        queryBuilder.orderBy('order.createdAt', 'DESC');
+      } else {
+        queryBuilder.orderBy('order.status', 'ASC')
+          .addOrderBy('order.createdAt', 'DESC');
+      }
 
-      const [orders, total] = await queryBuilder
+      // Для завершенных заказов используем более эффективный способ подсчета
+      // Сначала получаем заказы, затем считаем total отдельным запросом
+      const orders = await queryBuilder
         .skip((page - 1) * limit)
         .take(limit)
-        .getManyAndCount();
+        .getMany();
+
+      // Подсчитываем total отдельным запросом для оптимизации
+      let total = 0;
+      if (status === AgentOrderStatus.COMPLETED || status === 'completed') {
+        // Для завершенных заказов используем упрощенный запрос для подсчета
+        const countQueryBuilder = orderRepository
+          .createQueryBuilder('order')
+          .leftJoin('order.selectedVessel', 'selectedVesselJoin')
+          .where('order.status = :status', { status: AgentOrderStatus.COMPLETED })
+          .andWhere('(order.createdById = :userId OR selectedVesselJoin.ownerId = :userId)', { userId: req.userId });
+        total = await countQueryBuilder.getCount();
+      } else {
+        // Для других статусов используем обычный подсчет
+        const countQueryBuilder = orderRepository
+          .createQueryBuilder('order')
+          .where('order.status = :status', { status });
+        total = await countQueryBuilder.getCount();
+      }
 
       // Для завершенных заказов загружаем принятый отклик отдельно для получения цены
       if ((status === AgentOrderStatus.COMPLETED || status === 'completed') && orders.length > 0) {
@@ -106,11 +138,14 @@ export class AgentOrdersController {
       }
 
       // Парсим JSON строки в массивы для фотографий только для выбранного катера в завершенных заказах
+      // Ограничиваем количество фотографий для оптимизации (берем только первые 3 для списка)
       const ordersWithParsedPhotos = orders.map((order: any) => {
         // Парсим фотографии только для выбранного катера в завершенных заказах
         if (order.selectedVessel && order.selectedVessel.photos) {
           try {
-            order.selectedVessel.photos = JSON.parse(order.selectedVessel.photos);
+            const allPhotos = JSON.parse(order.selectedVessel.photos);
+            // Ограничиваем количество фотографий для списка (первые 3)
+            order.selectedVessel.photos = Array.isArray(allPhotos) ? allPhotos.slice(0, 3) : [];
           } catch (e) {
             order.selectedVessel.photos = [];
           }
