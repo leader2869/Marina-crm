@@ -176,10 +176,20 @@ export default function CompletedOrders() {
                         style={{
                           backgroundImage: (() => {
                             if (vessel.photos && Array.isArray(vessel.photos) && vessel.photos.length > 0) {
-                              const mainIndex = vessel.mainPhotoIndex !== undefined && vessel.mainPhotoIndex !== null 
-                                ? vessel.mainPhotoIndex 
-                                : 0
-                              return `url(${vessel.photos[mainIndex]})`
+                              // Определяем индекс главной фотографии
+                              // Если mainPhotoIndex указан и находится в пределах массива, используем его
+                              // Иначе используем первую фотографию (индекс 0)
+                              let mainIndex = 0;
+                              if (vessel.mainPhotoIndex !== undefined && vessel.mainPhotoIndex !== null) {
+                                // Проверяем, что индекс находится в пределах массива
+                                if (vessel.mainPhotoIndex >= 0 && vessel.mainPhotoIndex < vessel.photos.length) {
+                                  mainIndex = vessel.mainPhotoIndex;
+                                }
+                              }
+                              const photoUrl = vessel.photos[mainIndex];
+                              if (photoUrl) {
+                                return `url(${photoUrl})`
+                              }
                             }
                             return undefined
                           })(),

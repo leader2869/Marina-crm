@@ -139,18 +139,35 @@ export class AgentOrdersController {
 
       // Парсим JSON строки в массивы для фотографий только для выбранного катера в завершенных заказах
       // Ограничиваем количество фотографий для оптимизации (берем только первые 3 для списка)
+      // Но сохраняем первую фотографию как главную, даже если mainPhotoIndex указывает на другую
       const ordersWithParsedPhotos = orders.map((order: any) => {
         // Парсим фотографии только для выбранного катера в завершенных заказах
         if (order.selectedVessel && order.selectedVessel.photos) {
           try {
             const allPhotos = JSON.parse(order.selectedVessel.photos);
-            // Ограничиваем количество фотографий для списка (первые 3)
-            order.selectedVessel.photos = Array.isArray(allPhotos) ? allPhotos.slice(0, 3) : [];
+            if (Array.isArray(allPhotos) && allPhotos.length > 0) {
+              // Ограничиваем количество фотографий для списка (первые 3)
+              order.selectedVessel.photos = allPhotos.slice(0, 3);
+              // Убеждаемся, что mainPhotoIndex указывает на существующую фотографию
+              // Если mainPhotoIndex больше или равен длине ограниченного массива, используем 0
+              if (order.selectedVessel.mainPhotoIndex !== undefined && order.selectedVessel.mainPhotoIndex !== null) {
+                if (order.selectedVessel.mainPhotoIndex >= order.selectedVessel.photos.length) {
+                  order.selectedVessel.mainPhotoIndex = 0;
+                }
+              } else {
+                order.selectedVessel.mainPhotoIndex = 0;
+              }
+            } else {
+              order.selectedVessel.photos = [];
+              order.selectedVessel.mainPhotoIndex = null;
+            }
           } catch (e) {
             order.selectedVessel.photos = [];
+            order.selectedVessel.mainPhotoIndex = null;
           }
         } else if (order.selectedVessel) {
           order.selectedVessel.photos = [];
+          order.selectedVessel.mainPhotoIndex = null;
         }
         
         return order;

@@ -71,10 +71,36 @@ export default function VesselDetails() {
           registrationNumber: data.registrationNumber || '',
           technicalSpecs: data.technicalSpecs || '',
         })
-        const loadedPhotos = data.photos || []
+        // Убеждаемся, что главное фото всегда на первом месте
+        let loadedPhotos = data.photos || []
+        let loadedMainPhotoIndex = data.mainPhotoIndex !== undefined && data.mainPhotoIndex !== null ? data.mainPhotoIndex : 0
+        
+        // Если главное фото не на первом месте, перемещаем его
+        if (loadedMainPhotoIndex > 0 && loadedPhotos.length > loadedMainPhotoIndex) {
+          const mainPhoto = loadedPhotos[loadedMainPhotoIndex]
+          // Удаляем главное фото из текущей позиции
+          loadedPhotos = loadedPhotos.filter((_, index) => index !== loadedMainPhotoIndex)
+          // Вставляем на первое место
+          loadedPhotos.unshift(mainPhoto)
+          loadedMainPhotoIndex = 0
+          
+          // Обновляем на сервере, чтобы сохранить правильный порядок
+          if (data.id) {
+            try {
+              await vesselsService.update(data.id, {
+                photos: loadedPhotos,
+                mainPhotoIndex: 0
+              })
+            } catch (err) {
+              console.error('Ошибка обновления порядка фотографий:', err)
+              // Продолжаем работу даже если не удалось обновить
+            }
+          }
+        }
+        
         console.log('Установка фотографий:', loadedPhotos.length)
         setPhotos(loadedPhotos)
-        setMainPhotoIndex(data.mainPhotoIndex !== undefined ? data.mainPhotoIndex : null)
+        setMainPhotoIndex(loadedMainPhotoIndex)
         
         // Если пользователь не может редактировать, отключаем режим редактирования
         if (data && user) {
@@ -338,8 +364,19 @@ export default function VesselDetails() {
     setUploadingPhoto(true)
 
     try {
+      // Перемещаем выбранное фото на первое место в массиве
+      const newPhotos = [...photos]
+      const selectedPhoto = newPhotos[index]
+      
+      // Удаляем фото из текущей позиции
+      newPhotos.splice(index, 1)
+      // Вставляем на первое место
+      newPhotos.unshift(selectedPhoto)
+      
+      // Теперь главное фото всегда на позиции 0
       await vesselsService.update(vessel.id, { 
-        mainPhotoIndex: index
+        photos: newPhotos,
+        mainPhotoIndex: 0
       })
       await loadVessel()
     } catch (err: any) {
