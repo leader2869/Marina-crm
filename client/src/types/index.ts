@@ -400,6 +400,8 @@ export interface AgentOrder {
   createdBy?: User
   selectedVessel?: Vessel
   responses?: AgentOrderResponse[]
+  responsesCount?: number // Количество откликов (для активных заказов)
+  acceptedResponse?: AgentOrderResponse // Принятый отклик (для завершенных заказов)
   createdAt: string
   updatedAt: string
 }
