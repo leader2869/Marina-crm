@@ -4,7 +4,7 @@ import { vesselsService } from '../services/api'
 import { Vessel } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
-import { Ship, Edit2, X, Save, Upload, Image as ImageIcon } from 'lucide-react'
+import { Ship, Edit2, X, Save, Upload, Image as ImageIcon, ArrowUp, ArrowDown } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 
@@ -386,6 +386,42 @@ export default function VesselDetails() {
     }
   }
 
+  const handleMovePhoto = async (index: number, direction: 'up' | 'down') => {
+    if (!vessel || photos.length <= 1) return
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= photos.length) return
+
+    setError('')
+    setUploadingPhoto(true)
+
+    try {
+      const newPhotos: string[] = [...photos]
+      // Меняем местами фотографии
+      const temp = newPhotos[index]
+      newPhotos[index] = newPhotos[newIndex]
+      newPhotos[newIndex] = temp
+      
+      // Обновляем mainPhotoIndex, если перемещается главное фото
+      let newMainPhotoIndex = mainPhotoIndex
+      if (mainPhotoIndex === index) {
+        newMainPhotoIndex = newIndex
+      } else if (mainPhotoIndex === newIndex) {
+        newMainPhotoIndex = index
+      }
+      
+      await vesselsService.update(vessel.id, { 
+        photos: newPhotos,
+        mainPhotoIndex: newMainPhotoIndex
+      })
+      await loadVessel()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка перемещения фотографии')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
   if (loading) {
     return <LoadingAnimation message="Загрузка данных судна..." />
   }
@@ -678,6 +714,28 @@ export default function VesselDetails() {
                       )}
                       {canEdit() && (
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                          <div className="flex flex-col gap-1">
+                            {index > 0 && (
+                              <button
+                                onClick={() => handleMovePhoto(index, 'up')}
+                                disabled={uploadingPhoto}
+                                className="p-1.5 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm disabled:opacity-50"
+                                title="Переместить вверх"
+                              >
+                                <ArrowUp className="h-4 w-4" />
+                              </button>
+                            )}
+                            {index < photos.length - 1 && (
+                              <button
+                                onClick={() => handleMovePhoto(index, 'down')}
+                                disabled={uploadingPhoto}
+                                className="p-1.5 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm disabled:opacity-50"
+                                title="Переместить вниз"
+                              >
+                                <ArrowDown className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                           {mainPhotoIndex !== index && (
                             <button
                               onClick={() => handleSetMainPhoto(index)}
