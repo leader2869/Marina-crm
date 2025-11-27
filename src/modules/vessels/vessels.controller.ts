@@ -108,14 +108,8 @@ export class VesselsController {
         throw new AppError('Судно не найдено', 404);
       }
 
-      // Проверка прав доступа
-      if (
-        vessel.ownerId !== req.userId &&
-        req.userRole !== 'super_admin' &&
-        req.userRole !== 'admin'
-      ) {
-        throw new AppError('Недостаточно прав доступа', 403);
-      }
+      // Любой аутентифицированный пользователь может просматривать карточку катера
+      // Редактирование контролируется на фронтенде и в методе update
 
       // Преобразуем JSON строку в массив для фотографий
       if (vessel.photos) {

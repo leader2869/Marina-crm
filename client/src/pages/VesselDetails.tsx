@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { vesselsService, usersService } from '../services/api'
-import { Vessel, User } from '../types'
+import { vesselsService } from '../services/api'
+import { Vessel } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
-import { Ship, User as UserIcon, Calendar, Edit2, X, Save, RefreshCw, Upload, Image as ImageIcon } from 'lucide-react'
-import { format } from 'date-fns'
+import { Ship, Edit2, X, Save, Upload, Image as ImageIcon } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 
@@ -31,17 +30,25 @@ export default function VesselDetails() {
   const [photos, setPhotos] = useState<string[]>([])
   const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const [showChangeOwnerModal, setShowChangeOwnerModal] = useState(false)
-  const [users, setUsers] = useState<User[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
-  const [changingOwner, setChangingOwner] = useState(false)
-  const [selectedOwnerId, setSelectedOwnerId] = useState<number | null>(null)
 
   useEffect(() => {
     if (id) {
       loadVessel()
     }
   }, [id])
+
+  // Автоматически отключаем режим редактирования, если пользователь не может редактировать
+  useEffect(() => {
+    if (vessel && user && editing) {
+      const canEditVessel = 
+        user.role === UserRole.SUPER_ADMIN ||
+        user.role === UserRole.ADMIN ||
+        vessel.ownerId === user.id
+      if (!canEditVessel) {
+        setEditing(false)
+      }
+    }
+  }, [vessel, user, editing])
 
   const loadVessel = async () => {
     try {
@@ -68,6 +75,17 @@ export default function VesselDetails() {
         console.log('Установка фотографий:', loadedPhotos.length)
         setPhotos(loadedPhotos)
         setMainPhotoIndex(data.mainPhotoIndex !== undefined ? data.mainPhotoIndex : null)
+        
+        // Если пользователь не может редактировать, отключаем режим редактирования
+        if (data && user) {
+          const canEditVessel = 
+            user.role === UserRole.SUPER_ADMIN ||
+            user.role === UserRole.ADMIN ||
+            data.ownerId === user.id
+          if (!canEditVessel) {
+            setEditing(false)
+          }
+        }
       }
     } catch (error: any) {
       console.error('Ошибка загрузки судна:', error)
@@ -86,57 +104,7 @@ export default function VesselDetails() {
     )
   }
 
-  const isSuperAdmin = () => {
-    return user?.role === UserRole.SUPER_ADMIN
-  }
 
-  const loadUsers = async () => {
-    if (!isSuperAdmin()) return
-    
-    setLoadingUsers(true)
-    try {
-      const response = await usersService.getAll({ limit: 1000 })
-      setUsers(response.data || [])
-    } catch (err: any) {
-      console.error('Ошибка загрузки пользователей:', err)
-      setError(err.error || err.message || 'Ошибка загрузки пользователей')
-    } finally {
-      setLoadingUsers(false)
-    }
-  }
-
-  const handleOpenChangeOwnerModal = async () => {
-    setShowChangeOwnerModal(true)
-    setSelectedOwnerId(null)
-    setError('')
-    await loadUsers()
-  }
-
-  const handleCloseChangeOwnerModal = () => {
-    setShowChangeOwnerModal(false)
-    setSelectedOwnerId(null)
-    setError('')
-  }
-
-  const handleChangeOwner = async () => {
-    if (!vessel || !selectedOwnerId) {
-      setError('Выберите нового владельца')
-      return
-    }
-
-    setChangingOwner(true)
-    setError('')
-
-    try {
-      await vesselsService.update(vessel.id, { ownerId: selectedOwnerId })
-      await loadVessel()
-      handleCloseChangeOwnerModal()
-    } catch (err: any) {
-      setError(err.error || err.message || 'Ошибка изменения владельца')
-    } finally {
-      setChangingOwner(false)
-    }
-  }
 
   const handleSave = async () => {
     if (!vessel) return
@@ -420,7 +388,7 @@ export default function VesselDetails() {
             Редактировать
           </button>
         )}
-        {editing && (
+        {editing && canEdit() && (
           <div className="flex items-center space-x-2">
             <button
               onClick={() => {
@@ -457,7 +425,7 @@ export default function VesselDetails() {
             <Ship className="h-6 w-6 text-primary-600 mr-2" />
             Основная информация
           </h2>
-          {editing ? (
+          {editing && canEdit() ? (
             <div className="space-y-4">
               <div>
                 <label htmlFor="edit-name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -609,69 +577,6 @@ export default function VesselDetails() {
           )}
         </div>
 
-        {/* Информация о владельце */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-              <UserIcon className="h-6 w-6 text-primary-600 mr-2" />
-              Владелец
-            </h2>
-            {isSuperAdmin() && editing && (
-              <button
-                onClick={handleOpenChangeOwnerModal}
-                className="flex items-center px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-              >
-                <RefreshCw className="h-4 w-4 mr-1.5" />
-                Сменить владельца
-              </button>
-            )}
-          </div>
-          {vessel.owner ? (
-            <div className="space-y-4">
-              <div className="flex justify-between py-2 border-b border-gray-200">
-                <span className="text-gray-600">Имя:</span>
-                <span className="font-semibold text-gray-900">
-                  {vessel.owner.firstName} {vessel.owner.lastName}
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-200">
-                <span className="text-gray-600">Email:</span>
-                <span className="font-semibold text-gray-900">{vessel.owner.email}</span>
-              </div>
-              {vessel.owner.phone && (
-                <div className="flex justify-between py-2 border-b border-gray-200">
-                  <span className="text-gray-600">Телефон:</span>
-                  <span className="font-semibold text-gray-900">{vessel.owner.phone}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-gray-600">Информация о владельце не загружена</p>
-          )}
-        </div>
-
-        {/* Дополнительная информация */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <Calendar className="h-6 w-6 text-primary-600 mr-2" />
-            Дополнительная информация
-          </h2>
-          <div className="space-y-4">
-            <div className="flex justify-between py-2 border-b border-gray-200">
-              <span className="text-gray-600">Дата регистрации:</span>
-              <span className="font-semibold text-gray-900">
-                {format(new Date(vessel.createdAt), 'dd.MM.yyyy')}
-              </span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-200">
-              <span className="text-gray-600">Последнее обновление:</span>
-              <span className="font-semibold text-gray-900">
-                {format(new Date(vessel.updatedAt), 'dd.MM.yyyy HH:mm')}
-              </span>
-            </div>
-          </div>
-        </div>
-
         {/* Фотографии катера */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
@@ -777,87 +682,6 @@ export default function VesselDetails() {
         </div>
       </div>
 
-      {/* Модальное окно смены владельца */}
-      {showChangeOwnerModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={handleCloseChangeOwnerModal} />
-
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Сменить владельца судна</h3>
-                  <button
-                    onClick={handleCloseChangeOwnerModal}
-                    className="text-gray-400 hover:text-gray-500"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-
-                {error && (
-                  <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                    {error}
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="owner-select" className="block text-sm font-medium text-gray-700 mb-2">
-                      Выберите нового владельца *
-                    </label>
-                    {loadingUsers ? (
-                      <div className="text-center py-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-                        <p className="mt-2 text-gray-600">Загрузка пользователей...</p>
-                      </div>
-                    ) : (
-                      <select
-                        id="owner-select"
-                        value={selectedOwnerId || ''}
-                        onChange={(e) => setSelectedOwnerId(parseInt(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                      >
-                        <option value="">-- Выберите владельца --</option>
-                        {users
-                          .filter((u) => u.isActive !== false)
-                          .map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.firstName} {user.lastName} ({user.email}) - {user.role}
-                            </option>
-                          ))}
-                      </select>
-                    )}
-                  </div>
-
-                  {users.length === 0 && !loadingUsers && (
-                    <p className="text-gray-600 text-sm">Пользователи не найдены</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={handleChangeOwner}
-                  disabled={changingOwner || !selectedOwnerId || loadingUsers}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
-                >
-                  {changingOwner ? 'Сохранение...' : 'Сохранить'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseChangeOwnerModal}
-                  disabled={changingOwner}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
-                >
-                  Отмена
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
