@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, User, Calendar, DollarSign, MapPin, Clock, Ship, X, Image as ImageIcon, User as UserIcon } from 'lucide-react'
+import { CheckCircle, User, Calendar, DollarSign, MapPin, Clock, Ship, X, Image as ImageIcon } from 'lucide-react'
 import { agentOrdersService, vesselsService } from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { AgentOrder, Vessel } from '../../types'
@@ -14,18 +14,33 @@ export default function CompletedOrders() {
   const [showVesselModal, setShowVesselModal] = useState<Vessel | null>(null)
   const [vesselDetails, setVesselDetails] = useState<Vessel | null>(null)
   const [loadingVesselDetails, setLoadingVesselDetails] = useState(false)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const limit = 5
 
   useEffect(() => {
     loadOrders()
-  }, [user])
+  }, [user, page])
+
+  useEffect(() => {
+    // Прокручиваем страницу вверх при изменении страницы
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [page])
 
   const loadOrders = async () => {
     try {
       setLoading(true)
-      const response = await agentOrdersService.getAll({ status: 'completed', limit: 100 })
+      const response: any = await agentOrdersService.getAll({ status: 'completed', limit, page })
       // API возвращает объект с пагинацией: { data: [...], total: number, page: number, limit: number }
-      const ordersData = Array.isArray(response) ? response : (response.data || response || [])
-      setOrders(ordersData)
+      // axios interceptor уже возвращает response.data, поэтому обращаемся напрямую к полям
+      const ordersData = response?.data || response || []
+      const totalData = response?.total || 0
+      const totalPagesData = response?.totalPages || Math.ceil(totalData / limit)
+      
+      setOrders(Array.isArray(ordersData) ? ordersData : [])
+      setTotal(totalData)
+      setTotalPages(totalPagesData)
     } catch (err: any) {
       console.error('Ошибка загрузки завершенных заказов:', err)
       setError(err.error || err.message || 'Ошибка загрузки завершенных заказов')
@@ -244,6 +259,31 @@ export default function CompletedOrders() {
         ))}
       </div>
 
+      {/* Пагинация */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-lg shadow px-6 py-4 flex items-center justify-between border-t border-gray-200">
+          <div className="text-sm text-gray-700">
+            Страница {page} из {totalPages} (всего: {total})
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(prev => Math.max(1, prev - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Назад
+            </button>
+            <button
+              onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Вперед
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Модальное окно просмотра катера */}
       {showVesselModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -333,24 +373,6 @@ export default function CompletedOrders() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Описание катера</label>
                         <p className="text-sm text-gray-700 whitespace-pre-wrap">{vesselDetails.technicalSpecs}</p>
-                      </div>
-                    )}
-
-                    {showVesselModal.owner && (
-                      <div className="border-t pt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                          <UserIcon className="h-4 w-4 mr-2" />
-                          Владелец
-                        </h4>
-                        <p className="text-sm text-gray-900">
-                          {showVesselModal.owner.firstName} {showVesselModal.owner.lastName}
-                        </p>
-                        {showVesselModal.owner.email && (
-                          <p className="text-sm text-gray-600">{showVesselModal.owner.email}</p>
-                        )}
-                        {showVesselModal.owner.phone && (
-                          <p className="text-sm text-gray-600">{showVesselModal.owner.phone}</p>
-                        )}
                       </div>
                     )}
                   </div>
