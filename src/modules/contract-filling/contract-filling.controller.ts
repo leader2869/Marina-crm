@@ -109,14 +109,40 @@ export class ContractFillingController {
       }
 
       const files = fs.readdirSync(TEMPLATES_FOLDER);
+      console.log('[ContractFilling] Файлы в папке шаблонов:', files);
+      
       for (const file of files) {
         if (file.endsWith('.json')) {
           const metadataPath = path.join(TEMPLATES_FOLDER, file);
           const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-          templates.push(metadata);
+          
+          // Проверяем, что файл шаблона существует
+          const templateFilePath = path.join(TEMPLATES_FOLDER, metadata.filename);
+          if (fs.existsSync(templateFilePath)) {
+            templates.push(metadata);
+          } else {
+            console.warn(`[ContractFilling] Файл шаблона не найден: ${templateFilePath}`);
+          }
+        } else if (file.match(/\.(doc|docx)$/i)) {
+          // Если есть файл без метаданных, создаем метаданные на лету
+          const templateFilePath = path.join(TEMPLATES_FOLDER, file);
+          if (fs.existsSync(templateFilePath)) {
+            // Пытаемся извлечь якоря
+            try {
+              const anchors = await this.extractAnchorsFromDoc(templateFilePath);
+              templates.push({
+                filename: file,
+                anchors: anchors,
+                created_at: fs.statSync(templateFilePath).mtime.toISOString()
+              });
+            } catch (error: any) {
+              console.warn(`[ContractFilling] Не удалось извлечь якоря из ${file}:`, error.message);
+            }
+          }
         }
       }
 
+      console.log('[ContractFilling] Возвращаем шаблоны:', templates.map(t => t.filename));
       res.json({ templates });
     } catch (error: any) {
       next(new AppError(error.message || 'Ошибка при загрузке шаблонов', 500));
@@ -231,6 +257,7 @@ export class ContractFillingController {
 
       console.log('[ContractFilling] fillContract вызван:', {
         template_filename,
+        template_filename_type: typeof template_filename,
         dataKeys: data ? Object.keys(data) : [],
         templatesFolder: TEMPLATES_FOLDER,
         outputFolder: OUTPUT_FOLDER
@@ -240,11 +267,45 @@ export class ContractFillingController {
         throw new AppError('Имя шаблона не указано', 400);
       }
 
-      const templatePath = path.join(TEMPLATES_FOLDER, template_filename);
-      console.log('[ContractFilling] Проверка шаблона:', templatePath, 'существует:', fs.existsSync(templatePath));
+      // Декодируем имя файла, если оно пришло в неправильной кодировке
+      let decodedFilename = template_filename;
+      try {
+        // Пробуем декодировать как URI компонент
+        decodedFilename = decodeURIComponent(template_filename);
+      } catch (e) {
+        // Если не получилось, используем как есть
+        decodedFilename = template_filename;
+      }
+
+      // Пробуем найти файл с разными вариантами имени
+      let templatePath = path.join(TEMPLATES_FOLDER, decodedFilename);
+      console.log('[ContractFilling] Проверка шаблона (декодированное):', templatePath, 'существует:', fs.existsSync(templatePath));
       
       if (!fs.existsSync(templatePath)) {
-        throw new AppError(`Шаблон не найден: ${templatePath}`, 404);
+        // Пробуем оригинальное имя
+        templatePath = path.join(TEMPLATES_FOLDER, template_filename);
+        console.log('[ContractFilling] Проверка шаблона (оригинальное):', templatePath, 'существует:', fs.existsSync(templatePath));
+      }
+
+      if (!fs.existsSync(templatePath)) {
+        // Пробуем найти файл по списку файлов в папке
+        const files = fs.existsSync(TEMPLATES_FOLDER) ? fs.readdirSync(TEMPLATES_FOLDER) : [];
+        console.log('[ContractFilling] Файлы в папке шаблонов:', files);
+        
+        // Ищем файл, который может быть похожим (без учета кодировки)
+        const matchingFile = files.find(file => {
+          // Сравниваем без учета регистра и кодировки
+          const fileLower = file.toLowerCase();
+          const templateLower = template_filename.toLowerCase();
+          return fileLower.includes(templateLower) || templateLower.includes(fileLower);
+        });
+
+        if (matchingFile) {
+          templatePath = path.join(TEMPLATES_FOLDER, matchingFile);
+          console.log('[ContractFilling] Найден похожий файл:', templatePath);
+        } else {
+          throw new AppError(`Шаблон не найден: ${template_filename}. Доступные файлы: ${files.join(', ')}`, 404);
+        }
       }
 
       // Фильтруем пустые значения
