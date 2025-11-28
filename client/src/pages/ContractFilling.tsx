@@ -64,7 +64,6 @@ export default function ContractFilling() {
       return
     }
 
-    setFile(selectedFile)
     setLoading(true)
 
     const formData = new FormData()
