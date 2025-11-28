@@ -15,6 +15,7 @@ import VesselDetails from './pages/VesselDetails'
 import Bookings from './pages/Bookings'
 import Tariffs from './pages/Tariffs'
 import BookingRules from './pages/BookingRules'
+import ContractFilling from './pages/ContractFilling'
 import Finances from './pages/Finances'
 import Incomes from './pages/Incomes'
 import Expenses from './pages/Expenses'
@@ -116,6 +117,14 @@ function App() {
               element={
                 <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER]}>
                   <BookingRules />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="contract-filling" 
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER]}>
+                  <ContractFilling />
                 </RoleProtectedRoute>
               } 
             />
