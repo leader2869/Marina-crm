@@ -273,20 +273,34 @@ export class ContractFillingController {
   async download(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { filename } = req.params;
-      const filepath = path.join(OUTPUT_FOLDER, filename);
+      
+      // Декодируем имя файла из URL
+      const decodedFilename = decodeURIComponent(filename);
+      const filepath = path.join(OUTPUT_FOLDER, decodedFilename);
 
       if (!fs.existsSync(filepath)) {
         throw new AppError('Файл не найден', 404);
       }
 
-      const downloadResult = res.download(filepath, filename, (err) => {
-        if (err && !res.headersSent) {
-          next(new AppError('Ошибка при скачивании файла', 500));
-        }
-      });
+      // Определяем MIME тип
+      const ext = path.extname(decodedFilename).toLowerCase();
+      let contentType = 'application/octet-stream';
+      if (ext === '.doc') {
+        contentType = 'application/msword';
+      } else if (ext === '.docx') {
+        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      }
+
+      // Читаем файл
+      const fileBuffer = fs.readFileSync(filepath);
       
-      // Подавляем предупреждение TypeScript о возвращаемом значении
-      void downloadResult;
+      // Устанавливаем заголовки
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(decodedFilename)}"`);
+      res.setHeader('Content-Length', fileBuffer.length.toString());
+      
+      // Отправляем файл
+      res.send(fileBuffer);
     } catch (error: any) {
       next(new AppError(error.message || 'Ошибка при скачивании файла', 500));
     }
