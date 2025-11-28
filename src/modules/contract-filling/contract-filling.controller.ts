@@ -229,13 +229,22 @@ export class ContractFillingController {
     try {
       const { template_filename, data } = req.body;
 
+      console.log('[ContractFilling] fillContract вызван:', {
+        template_filename,
+        dataKeys: data ? Object.keys(data) : [],
+        templatesFolder: TEMPLATES_FOLDER,
+        outputFolder: OUTPUT_FOLDER
+      });
+
       if (!template_filename) {
         throw new AppError('Имя шаблона не указано', 400);
       }
 
       const templatePath = path.join(TEMPLATES_FOLDER, template_filename);
+      console.log('[ContractFilling] Проверка шаблона:', templatePath, 'существует:', fs.existsSync(templatePath));
+      
       if (!fs.existsSync(templatePath)) {
-        throw new AppError('Шаблон не найден', 404);
+        throw new AppError(`Шаблон не найден: ${templatePath}`, 404);
       }
 
       // Фильтруем пустые значения
@@ -250,13 +259,32 @@ export class ContractFillingController {
         throw new AppError('Нет данных для заполнения', 400);
       }
 
+      // Убеждаемся, что папка OUTPUT_FOLDER существует
+      if (!fs.existsSync(OUTPUT_FOLDER)) {
+        console.log('[ContractFilling] Создаем папку OUTPUT_FOLDER:', OUTPUT_FOLDER);
+        fs.mkdirSync(OUTPUT_FOLDER, { recursive: true });
+      }
+
       // Генерируем имя выходного файла
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
       const outputFilename = `filled_${timestamp}_${template_filename}`;
       const outputPath = path.join(OUTPUT_FOLDER, outputFilename);
 
+      console.log('[ContractFilling] Начинаем заполнение договора:', {
+        templatePath,
+        outputPath,
+        filteredDataKeys: Object.keys(filteredData)
+      });
+
       // Заполняем договор
       await this.replaceAnchorsInDoc(templatePath, filteredData, outputPath);
+
+      // Проверяем, что файл создан
+      if (!fs.existsSync(outputPath)) {
+        throw new AppError('Не удалось создать выходной файл', 500);
+      }
+
+      console.log('[ContractFilling] Договор успешно заполнен:', outputPath);
 
       res.json({
         success: true,
@@ -265,6 +293,11 @@ export class ContractFillingController {
         replaced_anchors: Object.keys(filteredData)
       });
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка в fillContract:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       next(new AppError(error.message || 'Ошибка при заполнении договора', 500));
     }
   }
@@ -600,8 +633,22 @@ export class ContractFillingController {
       }
 
       // Сохраняем измененный файл
+      console.log('[ContractFilling] Сохраняем файл:', outputPath);
       zip.writeZip(outputPath);
+      
+      // Проверяем, что файл создан
+      if (!fs.existsSync(outputPath)) {
+        throw new Error('Файл не был создан после записи');
+      }
+      
+      const stats = fs.statSync(outputPath);
+      console.log('[ContractFilling] Файл создан успешно, размер:', stats.size, 'байт');
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка в replaceAnchorsInDoc:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       throw new AppError(`Ошибка при заполнении договора: ${error.message}`, 500);
     }
   }
