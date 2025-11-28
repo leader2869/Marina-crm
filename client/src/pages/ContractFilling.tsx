@@ -367,9 +367,44 @@ export default function ContractFilling() {
     }
   }
 
-  const downloadFile = () => {
-    if (filledFilename) {
-      window.open(`${API_URL}/download/${filledFilename}`, '_blank')
+  const downloadFile = async () => {
+    if (!filledFilename) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/download/${encodeURIComponent(filledFilename)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Ошибка при скачивании файла' }))
+        showMessage('error', errorData.error || 'Ошибка при скачивании файла')
+        return
+      }
+
+      // Получаем blob из ответа
+      const blob = await response.blob()
+      
+      // Создаем ссылку для скачивания
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filledFilename
+      document.body.appendChild(a)
+      a.click()
+      
+      // Очищаем
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      showMessage('success', 'Файл успешно скачан')
+    } catch (error: any) {
+      showMessage('error', `Ошибка при скачивании: ${error.message}`)
     }
   }
 
