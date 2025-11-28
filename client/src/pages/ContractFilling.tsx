@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Upload, Download, Save } from 'lucide-react'
+import { FileText, Upload, Download, Save, X } from 'lucide-react'
 
 interface Template {
   filename: string
@@ -26,6 +26,8 @@ export default function ContractFilling() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [filledFilename, setFilledFilename] = useState('')
+  const [showSaveContragentModal, setShowSaveContragentModal] = useState(false)
+  const [contragentName, setContragentName] = useState('')
 
   // URL для API
   const API_URL = '/api/contract-filling'
@@ -35,9 +37,18 @@ export default function ContractFilling() {
     loadContragents()
   }, [])
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token')
+    return {
+      'Authorization': token ? `Bearer ${token}` : '',
+    }
+  }
+
   const loadTemplates = async () => {
     try {
-      const response = await fetch(`${API_URL}/templates`)
+      const response = await fetch(`${API_URL}/templates`, {
+        headers: getAuthHeaders()
+      })
       const data = await response.json()
       setTemplates(data.templates || [])
     } catch (error) {
@@ -47,7 +58,9 @@ export default function ContractFilling() {
 
   const loadContragents = async () => {
     try {
-      const response = await fetch(`${API_URL}/contragents`)
+      const response = await fetch(`${API_URL}/contragents`, {
+        headers: getAuthHeaders()
+      })
       const data = await response.json()
       setContragents(data.contragents || [])
     } catch (error) {
@@ -70,8 +83,12 @@ export default function ContractFilling() {
     formData.append('file', selectedFile)
 
     try {
+      const token = localStorage.getItem('token')
       const response = await fetch(`${API_URL}/upload`, {
         method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
         body: formData,
       })
 
@@ -101,10 +118,12 @@ export default function ContractFilling() {
     setLoading(true)
 
     try {
+      const token = localStorage.getItem('token')
       const response = await fetch(`${API_URL}/save-template`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify({
           filename: uploadedFilename,
@@ -140,10 +159,91 @@ export default function ContractFilling() {
     }
   }
 
-  const loadContragentData = (contragent: Contragent) => {
-    if (contragent.data) {
-      setFormData({ ...formData, ...contragent.data })
-      showMessage('success', `Данные контрагента "${contragent.name}" загружены`)
+  const loadContragentData = async (contragent: Contragent) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/contragent/${contragent.filename}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        }
+      })
+      const data = await response.json()
+      
+      if (data.data) {
+        setFormData({ ...formData, ...data.data })
+        showMessage('success', `Данные контрагента "${data.name}" загружены`)
+      }
+    } catch (error: any) {
+      showMessage('error', `Ошибка при загрузке данных: ${error.message}`)
+    }
+  }
+
+  const saveContragent = async (name: string) => {
+    if (!name || !name.trim()) {
+      showMessage('error', 'Введите имя контрагента')
+      return
+    }
+
+    if (!formData || Object.keys(formData).length === 0) {
+      showMessage('error', 'Нет данных для сохранения')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/save-contragent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          data: formData,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showMessage('success', data.message || 'Контрагент сохранен')
+        loadContragents()
+      } else {
+        showMessage('error', data.error || 'Ошибка при сохранении контрагента')
+      }
+    } catch (error: any) {
+      showMessage('error', `Ошибка: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const deleteContragent = async (filename: string, name: string) => {
+    if (!confirm(`Удалить контрагента "${name}"?`)) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/contragent/${filename}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        }
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showMessage('success', 'Контрагент удален')
+        loadContragents()
+      } else {
+        showMessage('error', data.error || 'Ошибка при удалении контрагента')
+      }
+    } catch (error: any) {
+      showMessage('error', `Ошибка: ${error.message}`)
     }
   }
 
@@ -156,10 +256,12 @@ export default function ContractFilling() {
     setLoading(true)
 
     try {
+      const token = localStorage.getItem('token')
       const response = await fetch(`${API_URL}/fill`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify({
           template_filename: selectedTemplate,
@@ -314,13 +416,22 @@ export default function ContractFilling() {
               {contragents.map((contragent) => (
                 <div
                   key={contragent.filename}
-                  className="bg-white border border-gray-200 rounded-lg p-3 cursor-pointer hover:border-primary-500 hover:shadow-md transition-all"
+                  className="bg-white border border-gray-200 rounded-lg p-3 cursor-pointer hover:border-primary-500 hover:shadow-md transition-all relative"
                   onClick={() => loadContragentData(contragent)}
                 >
                   <div className="font-semibold text-gray-800">{contragent.name}</div>
                   <div className="text-xs text-gray-500 mt-1">
                     {new Date(contragent.updated_at).toLocaleDateString('ru-RU')}
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteContragent(contragent.filename, contragent.name)
+                    }}
+                    className="absolute top-2 right-2 p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -366,18 +477,77 @@ export default function ContractFilling() {
               </button>
 
               {filledFilename && (
-                <button
-                  onClick={downloadFile}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Скачать договор
-                </button>
+                <>
+                  <button
+                    onClick={downloadFile}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Скачать договор
+                  </button>
+                  <button
+                    onClick={() => {
+                      setContragentName('')
+                      setShowSaveContragentModal(true)
+                    }}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    Сохранить как контрагента
+                  </button>
+                </>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {/* Модальное окно для сохранения контрагента */}
+      {showSaveContragentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Сохранить контрагента</h3>
+              <button
+                onClick={() => setShowSaveContragentModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Имя контрагента:
+              </label>
+              <input
+                type="text"
+                value={contragentName}
+                onChange={(e) => setContragentName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Например: ООО Рога и Копыта"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowSaveContragentModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={async () => {
+                  await saveContragent(contragentName)
+                  setShowSaveContragentModal(false)
+                }}
+                disabled={!contragentName.trim() || loading}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
