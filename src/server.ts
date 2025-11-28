@@ -22,6 +22,7 @@ import incomeCategoriesRoutes from './modules/incomes/income-categories.routes';
 import expenseCategoriesRoutes from './modules/incomes/expense-categories.routes';
 import incomesRoutes from './modules/incomes/incomes.routes';
 import agentOrdersRoutes from './modules/agent-orders/agent-orders.routes';
+import contractFillingRoutes from './modules/contract-filling/contract-filling.routes';
 
 const app: Express = express();
 
@@ -249,6 +250,7 @@ app.use('/api/agent-orders', (req, res, next) => {
   console.log(`[Server] Agent Orders Route: ${req.method} ${req.path}`, { originalUrl: req.originalUrl });
   next();
 }, autoActivityLogger, agentOrdersRoutes);
+app.use('/api/contract-filling', autoActivityLogger, contractFillingRoutes);
 
 // Error handler
 app.use(errorHandler);
