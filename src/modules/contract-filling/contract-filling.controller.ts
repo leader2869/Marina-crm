@@ -5,6 +5,10 @@ import { UserRole } from '../../types';
 import * as fs from 'fs';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
+import { parseString } from 'xml2js';
+import { promisify } from 'util';
+
+const parseStringAsync = promisify(parseString);
 
 // Папки для хранения файлов
 // На Vercel используем /tmp для временных файлов
@@ -292,6 +296,27 @@ export class ContractFillingController {
     }
   }
 
+  // Извлечение текста из XML узла (рекурсивно)
+  private extractTextFromXmlNode(node: any): string {
+    if (typeof node === 'string') {
+      return node;
+    }
+    if (Array.isArray(node)) {
+      return node.map(n => this.extractTextFromXmlNode(n)).join('');
+    }
+    if (node && typeof node === 'object') {
+      // В DOCX текст находится в элементах w:t
+      if (node['w:t']) {
+        return this.extractTextFromXmlNode(node['w:t']);
+      }
+      // Рекурсивно обрабатываем все дочерние элементы
+      return Object.values(node)
+        .map(val => this.extractTextFromXmlNode(val))
+        .join('');
+    }
+    return '';
+  }
+
   // Извлечение якорей из DOCX файла
   private async extractAnchorsFromDoc(docPath: string): Promise<string[]> {
     try {
@@ -304,17 +329,61 @@ export class ContractFillingController {
       for (const entry of zipEntries) {
         if (entry.entryName === 'word/document.xml') {
           const xmlContent = entry.getData().toString('utf-8');
-          const patterns = [
-            /\{\{([^}]+)\}\}/g,  // {{имя}}
-            /\{([^}]+)\}/g       // {имя}
-          ];
+          
+          try {
+            // Парсим XML
+            const parsed = await parseStringAsync(xmlContent);
+            
+            // Извлекаем весь текст из документа
+            const fullText = this.extractTextFromXmlNode(parsed);
+            
+            // Ищем якоря в тексте
+            const patterns = [
+              /\{\{([^}]+)\}\}/g,  // {{имя}}
+              /\{([^}]+)\}/g       // {имя}
+            ];
 
-          for (const pattern of patterns) {
-            let match;
-            while ((match = pattern.exec(xmlContent)) !== null) {
-              const anchor = match[1].trim().replace(/[^\w\-а-яА-ЯёЁ]/g, '');
-              if (anchor) {
-                anchors.add(anchor);
+            for (const pattern of patterns) {
+              let match;
+              while ((match = pattern.exec(fullText)) !== null) {
+                // Очищаем якорь от лишних символов, но сохраняем кириллицу и пробелы
+                const anchor = match[1]
+                  .trim()
+                  .replace(/[\r\n\t]/g, ' ') // Заменяем переносы на пробелы
+                  .replace(/\s+/g, ' ')      // Множественные пробелы в один
+                  .replace(/[^\w\s\-а-яА-ЯёЁ]/g, ''); // Удаляем спецсимволы, кроме букв, цифр, пробелов и дефисов
+                
+                if (anchor && anchor.length > 0) {
+                  anchors.add(anchor);
+                }
+              }
+            }
+          } catch (parseError: any) {
+            // Если не удалось распарсить XML, используем простой поиск по тексту
+            console.warn('[ContractFilling] Не удалось распарсить XML, используем простой поиск:', parseError.message);
+            
+            // Удаляем XML-теги для простого поиска
+            const textWithoutTags = xmlContent
+              .replace(/<[^>]+>/g, ' ') // Удаляем все теги
+              .replace(/\s+/g, ' ')    // Множественные пробелы в один
+              .trim();
+            
+            const patterns = [
+              /\{\{([^}]+)\}\}/g,  // {{имя}}
+              /\{([^}]+)\}/g       // {имя}
+            ];
+
+            for (const pattern of patterns) {
+              let match;
+              while ((match = pattern.exec(textWithoutTags)) !== null) {
+                const anchor = match[1]
+                  .trim()
+                  .replace(/\s+/g, ' ')
+                  .replace(/[^\w\s\-а-яА-ЯёЁ]/g, '');
+                
+                if (anchor && anchor.length > 0) {
+                  anchors.add(anchor);
+                }
               }
             }
           }
@@ -325,6 +394,16 @@ export class ContractFillingController {
     } catch (error: any) {
       throw new AppError(`Ошибка при извлечении якорей: ${error.message}`, 500);
     }
+  }
+
+  // Нормализация якоря для сравнения
+  private normalizeAnchor(anchor: string): string {
+    return anchor
+      .trim()
+      .replace(/[\r\n\t]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/[^\w\s\-а-яА-ЯёЁ]/g, '')
+      .toLowerCase();
   }
 
   // Замена якорей в DOCX файле
@@ -340,7 +419,7 @@ export class ContractFillingController {
       // Нормализуем ключи данных
       const normalizedData: Record<string, string> = {};
       for (const [key, value] of Object.entries(data)) {
-        const normalizedKey = key.replace(/[^\w\-а-яА-ЯёЁ]/g, '').toLowerCase();
+        const normalizedKey = this.normalizeAnchor(key);
         normalizedData[normalizedKey] = String(value);
       }
 
@@ -349,26 +428,102 @@ export class ContractFillingController {
         if (entry.entryName === 'word/document.xml') {
           let xmlContent = entry.getData().toString('utf-8');
 
-          // Заменяем все якоря
-          const patterns = [
-            { fullPattern: /\{\{([^}]+)\}\}/g },
-            { fullPattern: /\{([^}]+)\}/g }
-          ];
+          // Сначала пытаемся распарсить XML для более точной замены
+          try {
+            const parsed = await parseStringAsync(xmlContent);
+            
+            // Функция для рекурсивной замены якорей в XML структуре
+            const replaceInNode = (node: any): any => {
+              if (typeof node === 'string') {
+                // Заменяем якоря в текстовых узлах
+                let text = node;
+                const patterns = [
+                  { fullPattern: /\{\{([^}]+)\}\}/g },
+                  { fullPattern: /\{([^}]+)\}/g }
+                ];
 
-          for (const { fullPattern } of patterns) {
-            xmlContent = xmlContent.replace(fullPattern, (match: string, anchorName: string) => {
-              const normalizedAnchor = anchorName.trim().replace(/[^\w\-а-яА-ЯёЁ]/g, '').toLowerCase();
+                for (const { fullPattern } of patterns) {
+                  text = text.replace(fullPattern, (match: string, anchorName: string) => {
+                    const normalizedAnchor = this.normalizeAnchor(anchorName);
+                    
+                    // Ищем значение в нормализованных данных
+                    for (const [key, value] of Object.entries(normalizedData)) {
+                      if (key === normalizedAnchor) {
+                        return value;
+                      }
+                    }
+
+                    // Если не нашли, возвращаем оригинал
+                    return match;
+                  });
+                }
+                return text;
+              }
               
-              // Ищем значение в нормализованных данных
+              if (Array.isArray(node)) {
+                return node.map(n => replaceInNode(n));
+              }
+              
+              if (node && typeof node === 'object') {
+                const result: any = {};
+                for (const [key, value] of Object.entries(node)) {
+                  result[key] = replaceInNode(value);
+                }
+                return result;
+              }
+              
+              return node;
+            };
+
+            const replaced = replaceInNode(parsed);
+            
+            // Конвертируем обратно в XML (упрощенный способ)
+            // Для более точной конвертации можно использовать xml2js.Builder
+            // Но для простоты используем строковую замену
+            xmlContent = xmlContent.replace(/\{\{([^}]+)\}\}/g, (match: string, anchorName: string) => {
+              const normalizedAnchor = this.normalizeAnchor(anchorName);
               for (const [key, value] of Object.entries(normalizedData)) {
-                if (key.toLowerCase() === normalizedAnchor) {
+                if (key === normalizedAnchor) {
                   return value;
                 }
               }
-
-              // Если не нашли, возвращаем оригинал
               return match;
             });
+            
+            xmlContent = xmlContent.replace(/\{([^}]+)\}/g, (match: string, anchorName: string) => {
+              const normalizedAnchor = this.normalizeAnchor(anchorName);
+              for (const [key, value] of Object.entries(normalizedData)) {
+                if (key === normalizedAnchor) {
+                  return value;
+                }
+              }
+              return match;
+            });
+          } catch (parseError) {
+            // Если не удалось распарсить, используем простую строковую замену
+            console.warn('[ContractFilling] Не удалось распарсить XML для замены, используем простую замену');
+            
+            const patterns = [
+              { fullPattern: /\{\{([^}]+)\}\}/g },
+              { fullPattern: /\{([^}]+)\}/g }
+            ];
+
+            for (const { fullPattern } of patterns) {
+              xmlContent = xmlContent.replace(fullPattern, (match: string, anchorName: string) => {
+                const normalizedAnchor = this.normalizeAnchor(anchorName);
+                
+                // Ищем значение в нормализованных данных
+                for (const [key, value] of Object.entries(normalizedData)) {
+                  if (key === normalizedAnchor) {
+                    // Заменяем якорь на значение, сохраняя XML структуру вокруг
+                    return value;
+                  }
+                }
+
+                // Если не нашли, возвращаем оригинал
+                return match;
+              });
+            }
           }
 
           // Обновляем содержимое в ZIP
