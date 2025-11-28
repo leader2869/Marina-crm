@@ -5,7 +5,7 @@ import { UserRole } from '../../types';
 import * as fs from 'fs';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
-import { parseString } from 'xml2js';
+import { parseString, Builder } from 'xml2js';
 import { promisify } from 'util';
 
 const parseStringAsync = promisify(parseString);
@@ -548,102 +548,35 @@ export class ContractFillingController {
         if (entry.entryName === 'word/document.xml') {
           let xmlContent = entry.getData().toString('utf-8');
 
-          // Сначала пытаемся распарсить XML для более точной замены
-          try {
-            const parsed = await parseStringAsync(xmlContent);
-            
-            // Функция для рекурсивной замены якорей в XML структуре
-            const replaceInNode = (node: any): any => {
-              if (typeof node === 'string') {
-                // Заменяем якоря в текстовых узлах
-                let text = node;
-                const patterns = [
-                  { fullPattern: /\{\{([^}]+)\}\}/g },
-                  { fullPattern: /\{([^}]+)\}/g }
-                ];
+          // Используем простую строковую замену, которая работает надежнее
+          // Якоря могут быть разбиты на несколько XML элементов, поэтому ищем их в полном тексте
+          const patterns = [
+            { fullPattern: /\{\{([^}]+)\}\}/g },
+            { fullPattern: /\{([^}]+)\}/g }
+          ];
 
-                for (const { fullPattern } of patterns) {
-                  text = text.replace(fullPattern, (match: string, anchorName: string) => {
-                    const normalizedAnchor = this.normalizeAnchor(anchorName);
-                    
-                    // Ищем значение в нормализованных данных
-                    for (const [key, value] of Object.entries(normalizedData)) {
-                      if (key === normalizedAnchor) {
-                        return value;
-                      }
-                    }
-
-                    // Если не нашли, возвращаем оригинал
-                    return match;
-                  });
-                }
-                return text;
-              }
-              
-              if (Array.isArray(node)) {
-                return node.map(n => replaceInNode(n));
-              }
-              
-              if (node && typeof node === 'object') {
-                const result: any = {};
-                for (const [key, value] of Object.entries(node)) {
-                  result[key] = replaceInNode(value);
-                }
-                return result;
-              }
-              
-              return node;
-            };
-
-            const replaced = replaceInNode(parsed);
-            
-            // Конвертируем обратно в XML (упрощенный способ)
-            // Для более точной конвертации можно использовать xml2js.Builder
-            // Но для простоты используем строковую замену
-            xmlContent = xmlContent.replace(/\{\{([^}]+)\}\}/g, (match: string, anchorName: string) => {
+          for (const { fullPattern } of patterns) {
+            xmlContent = xmlContent.replace(fullPattern, (match: string, anchorName: string) => {
               const normalizedAnchor = this.normalizeAnchor(anchorName);
+              
+              // Ищем значение в нормализованных данных
               for (const [key, value] of Object.entries(normalizedData)) {
                 if (key === normalizedAnchor) {
-                  return value;
+                  // Экранируем специальные XML символы в значении
+                  const escapedValue = String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&apos;');
+                  
+                  return escapedValue;
                 }
               }
+
+              // Если не нашли, возвращаем оригинал
               return match;
             });
-            
-            xmlContent = xmlContent.replace(/\{([^}]+)\}/g, (match: string, anchorName: string) => {
-              const normalizedAnchor = this.normalizeAnchor(anchorName);
-              for (const [key, value] of Object.entries(normalizedData)) {
-                if (key === normalizedAnchor) {
-                  return value;
-                }
-              }
-              return match;
-            });
-          } catch (parseError) {
-            // Если не удалось распарсить, используем простую строковую замену
-            console.warn('[ContractFilling] Не удалось распарсить XML для замены, используем простую замену');
-            
-            const patterns = [
-              { fullPattern: /\{\{([^}]+)\}\}/g },
-              { fullPattern: /\{([^}]+)\}/g }
-            ];
-
-            for (const { fullPattern } of patterns) {
-              xmlContent = xmlContent.replace(fullPattern, (match: string, anchorName: string) => {
-                const normalizedAnchor = this.normalizeAnchor(anchorName);
-                
-                // Ищем значение в нормализованных данных
-                for (const [key, value] of Object.entries(normalizedData)) {
-                  if (key === normalizedAnchor) {
-                    // Заменяем якорь на значение, сохраняя XML структуру вокруг
-                    return value;
-                  }
-                }
-
-                // Если не нашли, возвращаем оригинал
-                return match;
-              });
-            }
           }
 
           // Обновляем содержимое в ZIP
