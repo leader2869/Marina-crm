@@ -145,6 +145,12 @@ export class AuthController {
         throw new AppError('Email/телефон и пароль обязательны', 400);
       }
 
+      // Проверяем инициализацию базы данных
+      if (!AppDataSource.isInitialized) {
+        console.error('[Auth Login] База данных не инициализирована');
+        throw new AppError('База данных не подключена', 503);
+      }
+
       const userRepository = AppDataSource.getRepository(User);
       
       // Определяем, что введено: email или телефон
@@ -341,6 +347,12 @@ export class AuthController {
     try {
       if (!req.userId) {
         throw new AppError('Требуется аутентификация', 401);
+      }
+
+      // Проверяем инициализацию базы данных
+      if (!AppDataSource.isInitialized) {
+        console.error('[Auth] База данных не инициализирована');
+        throw new AppError('База данных не подключена', 503);
       }
 
       const userRepository = AppDataSource.getRepository(User);

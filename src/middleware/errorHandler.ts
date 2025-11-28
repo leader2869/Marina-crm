@@ -18,13 +18,32 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
+  // Логируем ошибку для отладки
+  console.error('[ErrorHandler]', {
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    isAppError: err instanceof AppError,
+  });
+
   const statusCode = err instanceof AppError ? err.statusCode : 500;
   const message = err.message || 'Внутренняя ошибка сервера';
 
-  res.status(statusCode).json({
-    error: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-  });
+  // Для Vercel возвращаем стандартный формат ошибки
+  if (process.env.VERCEL) {
+    res.status(statusCode).json({
+      error: {
+        code: statusCode.toString(),
+        message: message,
+      },
+    });
+  } else {
+    res.status(statusCode).json({
+      error: message,
+      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    });
+  }
 };
 
 

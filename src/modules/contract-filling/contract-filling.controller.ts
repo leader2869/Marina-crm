@@ -7,17 +7,26 @@ import * as path from 'path';
 import AdmZip from 'adm-zip';
 
 // Папки для хранения файлов
-const UPLOAD_FOLDER = path.join(process.cwd(), 'contract-uploads');
-const TEMPLATES_FOLDER = path.join(process.cwd(), 'contract-templates');
-const OUTPUT_FOLDER = path.join(process.cwd(), 'contract-output');
-const CONTRAGENTS_FOLDER = path.join(process.cwd(), 'contract-contragents');
+// На Vercel используем /tmp для временных файлов
+const isVercel = !!process.env.VERCEL;
+const baseFolder = isVercel ? '/tmp' : process.cwd();
 
-// Создаем папки если их нет
-[UPLOAD_FOLDER, TEMPLATES_FOLDER, OUTPUT_FOLDER, CONTRAGENTS_FOLDER].forEach(folder => {
-  if (!fs.existsSync(folder)) {
-    fs.mkdirSync(folder, { recursive: true });
-  }
-});
+const UPLOAD_FOLDER = path.join(baseFolder, 'contract-uploads');
+const TEMPLATES_FOLDER = path.join(baseFolder, 'contract-templates');
+const OUTPUT_FOLDER = path.join(baseFolder, 'contract-output');
+const CONTRAGENTS_FOLDER = path.join(baseFolder, 'contract-contragents');
+
+// Создаем папки если их нет (с обработкой ошибок)
+try {
+  [UPLOAD_FOLDER, TEMPLATES_FOLDER, OUTPUT_FOLDER, CONTRAGENTS_FOLDER].forEach(folder => {
+    if (!fs.existsSync(folder)) {
+      fs.mkdirSync(folder, { recursive: true });
+    }
+  });
+} catch (error: any) {
+  console.error('[ContractFilling] Ошибка при создании папок:', error.message);
+  // Не блокируем запуск, но логируем ошибку
+}
 
 export class ContractFillingController {
   // Загрузка документа и извлечение якорей
