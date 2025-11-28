@@ -5,7 +5,7 @@ import { UserRole } from '../../types';
 import * as fs from 'fs';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
-import { parseString, Builder } from 'xml2js';
+import { parseString } from 'xml2js';
 import { promisify } from 'util';
 
 const parseStringAsync = promisify(parseString);
