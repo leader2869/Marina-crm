@@ -352,16 +352,29 @@ export default function ContractFilling() {
         }),
       })
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Ошибка при заполнении договора' }))
+        const errorMessage = typeof errorData.error === 'object' 
+          ? errorData.error?.message || errorData.error?.code || 'Ошибка при заполнении договора'
+          : errorData.error || 'Ошибка при заполнении договора'
+        showMessage('error', errorMessage)
+        return
+      }
+
       const data = await response.json()
 
       if (data.success) {
         setFilledFilename(data.filename)
         showMessage('success', data.message || 'Договор успешно заполнен')
       } else {
-        showMessage('error', data.error || 'Ошибка при заполнении договора')
+        const errorMessage = typeof data.error === 'object'
+          ? data.error?.message || data.error?.code || 'Ошибка при заполнении договора'
+          : data.error || 'Ошибка при заполнении договора'
+        showMessage('error', errorMessage)
       }
     } catch (error: any) {
-      showMessage('error', `Ошибка: ${error.message}`)
+      const errorMessage = error?.message || error?.toString() || 'Неизвестная ошибка'
+      showMessage('error', `Ошибка: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
