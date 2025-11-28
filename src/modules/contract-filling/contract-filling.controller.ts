@@ -103,6 +103,10 @@ export class ContractFillingController {
     try {
       const templates: any[] = [];
 
+      if (!fs.existsSync(TEMPLATES_FOLDER)) {
+        return res.json({ templates: [] });
+      }
+
       const files = fs.readdirSync(TEMPLATES_FOLDER);
       for (const file of files) {
         if (file.endsWith('.json')) {
@@ -115,6 +119,107 @@ export class ContractFillingController {
       res.json({ templates });
     } catch (error: any) {
       next(new AppError(error.message || 'Ошибка при загрузке шаблонов', 500));
+    }
+  }
+
+  // Удаление шаблона
+  async deleteTemplate(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { filename } = req.params;
+
+      if (!filename) {
+        throw new AppError('Имя файла не указано', 400);
+      }
+
+      const templatePath = path.join(TEMPLATES_FOLDER, filename);
+      const metadataPath = path.join(TEMPLATES_FOLDER, filename + '.json');
+
+      if (!fs.existsSync(templatePath) && !fs.existsSync(metadataPath)) {
+        throw new AppError('Шаблон не найден', 404);
+      }
+
+      // Удаляем файл шаблона
+      if (fs.existsSync(templatePath)) {
+        fs.unlinkSync(templatePath);
+      }
+
+      // Удаляем метаданные
+      if (fs.existsSync(metadataPath)) {
+        fs.unlinkSync(metadataPath);
+      }
+
+      res.json({
+        success: true,
+        message: 'Шаблон удален'
+      });
+    } catch (error: any) {
+      next(new AppError(error.message || 'Ошибка при удалении шаблона', 500));
+    }
+  }
+
+  // Переименование шаблона
+  async renameTemplate(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { filename } = req.params;
+      const { newFilename } = req.body;
+
+      if (!filename) {
+        throw new AppError('Имя файла не указано', 400);
+      }
+
+      if (!newFilename || !newFilename.trim()) {
+        throw new AppError('Новое имя файла не указано', 400);
+      }
+
+      // Проверяем расширение
+      const sanitizedNewFilename = newFilename.trim();
+      if (!sanitizedNewFilename.match(/\.(doc|docx)$/i)) {
+        throw new AppError('Новое имя должно иметь расширение .doc или .docx', 400);
+      }
+
+      const oldTemplatePath = path.join(TEMPLATES_FOLDER, filename);
+      const oldMetadataPath = path.join(TEMPLATES_FOLDER, filename + '.json');
+      const newTemplatePath = path.join(TEMPLATES_FOLDER, sanitizedNewFilename);
+      const newMetadataPath = path.join(TEMPLATES_FOLDER, sanitizedNewFilename + '.json');
+
+      if (!fs.existsSync(oldTemplatePath) && !fs.existsSync(oldMetadataPath)) {
+        throw new AppError('Шаблон не найден', 404);
+      }
+
+      if (fs.existsSync(newTemplatePath) || fs.existsSync(newMetadataPath)) {
+        throw new AppError('Шаблон с таким именем уже существует', 400);
+      }
+
+      // Переименовываем файл шаблона
+      if (fs.existsSync(oldTemplatePath)) {
+        fs.renameSync(oldTemplatePath, newTemplatePath);
+      }
+
+      // Переименовываем метаданные
+      if (fs.existsSync(oldMetadataPath)) {
+        const metadata = JSON.parse(fs.readFileSync(oldMetadataPath, 'utf-8'));
+        metadata.filename = sanitizedNewFilename;
+        metadata.updated_at = new Date().toISOString();
+        fs.writeFileSync(newMetadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
+        fs.unlinkSync(oldMetadataPath);
+      } else {
+        // Если метаданных нет, создаем новые
+        const metadata = {
+          filename: sanitizedNewFilename,
+          anchors: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        fs.writeFileSync(newMetadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
+      }
+
+      res.json({
+        success: true,
+        message: 'Шаблон переименован',
+        filename: sanitizedNewFilename
+      });
+    } catch (error: any) {
+      next(new AppError(error.message || 'Ошибка при переименовании шаблона', 500));
     }
   }
 

@@ -39,6 +39,12 @@ router.post('/save-template', controller.saveTemplate.bind(controller));
 // Список шаблонов
 router.get('/templates', controller.getTemplates.bind(controller));
 
+// Удаление шаблона
+router.delete('/template/:filename', controller.deleteTemplate.bind(controller));
+
+// Переименование шаблона
+router.put('/template/:filename/rename', controller.renameTemplate.bind(controller));
+
 // Заполнение договора
 router.post('/fill', controller.fillContract.bind(controller));
 

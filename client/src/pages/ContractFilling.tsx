@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Upload, Download, Save, X } from 'lucide-react'
+import { FileText, Upload, Download, Save, X, Trash2, Edit2 } from 'lucide-react'
 
 interface Template {
   filename: string
@@ -28,6 +28,9 @@ export default function ContractFilling() {
   const [filledFilename, setFilledFilename] = useState('')
   const [showSaveContragentModal, setShowSaveContragentModal] = useState(false)
   const [contragentName, setContragentName] = useState('')
+  const [showRenameTemplateModal, setShowRenameTemplateModal] = useState(false)
+  const [templateToRename, setTemplateToRename] = useState('')
+  const [newTemplateName, setNewTemplateName] = useState('')
 
   // URL для API
   const API_URL = '/api/contract-filling'
@@ -247,6 +250,86 @@ export default function ContractFilling() {
     }
   }
 
+  const deleteTemplate = async (filename: string) => {
+    if (!confirm(`Удалить шаблон "${filename}"?`)) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/template/${encodeURIComponent(filename)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        }
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showMessage('success', 'Шаблон удален')
+        loadTemplates()
+        // Если удаленный шаблон был выбран, сбрасываем выбор
+        if (selectedTemplate === filename) {
+          setSelectedTemplate('')
+          setFormData({})
+          setStep('upload')
+        }
+      } else {
+        showMessage('error', data.error || 'Ошибка при удалении шаблона')
+      }
+    } catch (error: any) {
+      showMessage('error', `Ошибка: ${error.message}`)
+    }
+  }
+
+  const openRenameTemplateModal = (filename: string) => {
+    setTemplateToRename(filename)
+    setNewTemplateName(filename)
+    setShowRenameTemplateModal(true)
+  }
+
+  const renameTemplate = async () => {
+    if (!newTemplateName.trim() || !newTemplateName.match(/\.(doc|docx)$/i)) {
+      showMessage('error', 'Введите корректное имя файла с расширением .doc или .docx')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_URL}/template/${encodeURIComponent(templateToRename)}/rename`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          newFilename: newTemplateName.trim()
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showMessage('success', 'Шаблон переименован')
+        loadTemplates()
+        setShowRenameTemplateModal(false)
+        // Если переименованный шаблон был выбран, обновляем выбор
+        if (selectedTemplate === templateToRename) {
+          setSelectedTemplate(data.filename)
+        }
+      } else {
+        showMessage('error', data.error || 'Ошибка при переименовании шаблона')
+      }
+    } catch (error: any) {
+      showMessage('error', `Ошибка: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const fillContract = async () => {
     if (!selectedTemplate) {
       showMessage('error', 'Выберите шаблон')
@@ -388,18 +471,61 @@ export default function ContractFilling() {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Выберите шаблон:
           </label>
-          <select
-            value={selectedTemplate}
-            onChange={(e) => handleTemplateSelect(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-            <option value="">-- Выберите шаблон --</option>
-            {templates.map((template) => (
-              <option key={template.filename} value={template.filename}>
-                {template.filename} ({template.anchors.length} якорей)
-              </option>
-            ))}
-          </select>
+          {templates.length > 0 ? (
+            <div className="space-y-2">
+              {templates.map((template) => (
+                <div
+                  key={template.filename}
+                  className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <input
+                    type="radio"
+                    id={`template-${template.filename}`}
+                    name="template"
+                    value={template.filename}
+                    checked={selectedTemplate === template.filename}
+                    onChange={(e) => handleTemplateSelect(e.target.value)}
+                    className="w-4 h-4 text-primary-600"
+                  />
+                  <label
+                    htmlFor={`template-${template.filename}`}
+                    className="flex-1 cursor-pointer"
+                  >
+                    <div className="font-medium text-gray-800">{template.filename}</div>
+                    <div className="text-sm text-gray-500">
+                      {template.anchors.length} якорей
+                    </div>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openRenameTemplateModal(template.filename)
+                      }}
+                      className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                      title="Переименовать"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteTemplate(template.filename)
+                      }}
+                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                      title="Удалить"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500">
+              Нет сохраненных шаблонов. Загрузите и сохраните шаблон на шаге 1.
+            </div>
+          )}
           <button
             onClick={loadTemplates}
             className="mt-2 px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
@@ -543,6 +669,53 @@ export default function ContractFilling() {
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно для переименования шаблона */}
+      {showRenameTemplateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Переименовать шаблон</h3>
+              <button
+                onClick={() => setShowRenameTemplateModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Новое имя файла:
+              </label>
+              <input
+                type="text"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="например: договор.docx"
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                Имя должно заканчиваться на .doc или .docx
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowRenameTemplateModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={renameTemplate}
+                disabled={!newTemplateName.trim() || loading}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+              >
+                Переименовать
               </button>
             </div>
           </div>
