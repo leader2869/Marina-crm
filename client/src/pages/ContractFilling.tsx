@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Upload, Download, Save, X } from 'lucide-react'
-import api from '../services/api'
+import { FileText, Upload, Download, Save } from 'lucide-react'
 
 interface Template {
   filename: string
@@ -18,7 +17,6 @@ interface Contragent {
 
 export default function ContractFilling() {
   const [step, setStep] = useState<'upload' | 'fill'>('upload')
-  const [file, setFile] = useState<File | null>(null)
   const [uploadedFilename, setUploadedFilename] = useState('')
   const [anchors, setAnchors] = useState<string[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
@@ -29,8 +27,8 @@ export default function ContractFilling() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [filledFilename, setFilledFilename] = useState('')
 
-  // URL для Flask приложения (будет настроен позже)
-  const FLASK_URL = process.env.VITE_FLASK_URL || 'http://localhost:5001'
+  // URL для API (будет настроен позже)
+  const API_URL = import.meta.env.VITE_CONTRACT_API_URL || '/api/contract-filling'
 
   useEffect(() => {
     loadTemplates()
@@ -39,7 +37,7 @@ export default function ContractFilling() {
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch(`${FLASK_URL}/templates`)
+      const response = await fetch(`${API_URL}/templates`)
       const data = await response.json()
       setTemplates(data.templates || [])
     } catch (error) {
@@ -49,7 +47,7 @@ export default function ContractFilling() {
 
   const loadContragents = async () => {
     try {
-      const response = await fetch(`${FLASK_URL}/contragents`)
+      const response = await fetch(`${API_URL}/contragents`)
       const data = await response.json()
       setContragents(data.contragents || [])
     } catch (error) {
@@ -73,7 +71,7 @@ export default function ContractFilling() {
     formData.append('file', selectedFile)
 
     try {
-      const response = await fetch(`${FLASK_URL}/upload`, {
+      const response = await fetch(`${API_URL}/upload`, {
         method: 'POST',
         body: formData,
       })
@@ -104,7 +102,7 @@ export default function ContractFilling() {
     setLoading(true)
 
     try {
-      const response = await fetch(`${FLASK_URL}/save_template`, {
+      const response = await fetch(`${API_URL}/save-template`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -159,7 +157,7 @@ export default function ContractFilling() {
     setLoading(true)
 
     try {
-      const response = await fetch(`${FLASK_URL}/fill_contract`, {
+      const response = await fetch(`${API_URL}/fill`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,7 +185,7 @@ export default function ContractFilling() {
 
   const downloadFile = () => {
     if (filledFilename) {
-      window.open(`${FLASK_URL}/download/${filledFilename}`, '_blank')
+      window.open(`${API_URL}/download/${filledFilename}`, '_blank')
     }
   }
 
@@ -382,11 +380,11 @@ export default function ContractFilling() {
         )}
       </div>
 
-      {/* Информация о Flask приложении */}
-      <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-sm text-yellow-800">
-          <strong>Примечание:</strong> Для работы этой функции необходимо запустить Flask приложение
-          из папки "заполнение договоров" на порту 5001.
+      {/* Информация о функционале */}
+      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-800">
+          <strong>Информация:</strong> Модуль заполнения договоров интегрирован в систему.
+          Загрузите шаблон договора с якорями в формате <code>{'{{имя_якоря}}'}</code> или <code>{'{имя_якоря}'}</code>.
         </p>
       </div>
     </div>
