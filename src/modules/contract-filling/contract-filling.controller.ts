@@ -533,6 +533,13 @@ export class ContractFillingController {
     outputPath: string
   ): Promise<void> {
     try {
+      console.log('[ContractFilling] Начинаем замену якорей:', {
+        templatePath,
+        outputPath,
+        dataKeys: Object.keys(data),
+        dataValues: Object.values(data).slice(0, 3) // Первые 3 значения для лога
+      });
+
       const zip = new AdmZip(templatePath);
       const zipEntries = zip.getEntries();
 
@@ -541,6 +548,7 @@ export class ContractFillingController {
       for (const [key, value] of Object.entries(data)) {
         const normalizedKey = this.normalizeAnchor(key);
         normalizedData[normalizedKey] = String(value);
+        console.log(`[ContractFilling] Нормализация: "${key}" -> "${normalizedKey}" = "${value}"`);
       }
 
       // Заменяем якоря в document.xml
@@ -551,13 +559,15 @@ export class ContractFillingController {
           // Используем простую строковую замену, которая работает надежнее
           // Якоря могут быть разбиты на несколько XML элементов, поэтому ищем их в полном тексте
           const patterns = [
-            { fullPattern: /\{\{([^}]+)\}\}/g },
-            { fullPattern: /\{([^}]+)\}/g }
+            { fullPattern: /\{\{([^}]+)\}\}/g, name: 'double_braces' },
+            { fullPattern: /\{([^}]+)\}/g, name: 'single_braces' }
           ];
 
-          for (const { fullPattern } of patterns) {
+          let replacementCount = 0;
+          for (const { fullPattern, name } of patterns) {
             xmlContent = xmlContent.replace(fullPattern, (match: string, anchorName: string) => {
               const normalizedAnchor = this.normalizeAnchor(anchorName);
+              console.log(`[ContractFilling] Найден якорь "${match}" (${name}), нормализован: "${normalizedAnchor}"`);
               
               // Ищем значение в нормализованных данных
               for (const [key, value] of Object.entries(normalizedData)) {
@@ -570,14 +580,19 @@ export class ContractFillingController {
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&apos;');
                   
+                  console.log(`[ContractFilling] Замена: "${match}" -> "${value}" (экранировано: "${escapedValue}")`);
+                  replacementCount++;
                   return escapedValue;
                 }
               }
 
+              console.log(`[ContractFilling] Якорь "${normalizedAnchor}" не найден в данных`);
               // Если не нашли, возвращаем оригинал
               return match;
             });
           }
+
+          console.log(`[ContractFilling] Всего заменено якорей: ${replacementCount}`);
 
           // Обновляем содержимое в ZIP
           zip.updateFile(entry.entryName, Buffer.from(xmlContent, 'utf-8'));
