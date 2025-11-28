@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import multer from 'multer';
+import multer, { FileFilterCallback } from 'multer';
 import { ContractFillingController } from './contract-filling.controller';
 import { authenticate, authorize } from '../../middleware/auth';
 import { UserRole } from '../../types';
@@ -14,7 +14,7 @@ const upload = multer({
   limits: {
     fileSize: 16 * 1024 * 1024, // 16MB
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (req: Express.Request, file: Express.Multer.File, cb: FileFilterCallback) => {
     // Разрешаем только DOC и DOCX файлы
     if (file.mimetype === 'application/msword' || 
         file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||

@@ -104,7 +104,8 @@ export class ContractFillingController {
       const templates: any[] = [];
 
       if (!fs.existsSync(TEMPLATES_FOLDER)) {
-        return res.json({ templates: [] });
+        res.json({ templates: [] });
+        return;
       }
 
       const files = fs.readdirSync(TEMPLATES_FOLDER);

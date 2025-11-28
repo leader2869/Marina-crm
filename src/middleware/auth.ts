@@ -3,6 +3,7 @@ import { verifyToken } from '../utils/jwt';
 import { UserRole } from '../types';
 import { AppDataSource } from '../config/database';
 import { User } from '../entities/User';
+import { Multer } from 'multer';
 
 // Расширяем Request из Express, сохраняя все его свойства (body, params, query, headers и т.д.)
 // Используем declaration merging для правильной работы типов
@@ -12,6 +13,7 @@ declare global {
       user?: User;
       userId?: number;
       userRole?: UserRole;
+      file?: Express.Multer.File;
     }
   }
 }
@@ -21,6 +23,7 @@ export interface AuthRequest extends Request {
   user?: User;
   userId?: number;
   userRole?: UserRole;
+  file?: Express.Multer.File;
 }
 
 export const authenticate = async (
