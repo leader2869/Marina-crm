@@ -27,8 +27,8 @@ export default function ContractFilling() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [filledFilename, setFilledFilename] = useState('')
 
-  // URL для API (будет настроен позже)
-  const API_URL = import.meta.env.VITE_CONTRACT_API_URL || '/api/contract-filling'
+  // URL для API
+  const API_URL = '/api/contract-filling'
 
   useEffect(() => {
     loadTemplates()
@@ -379,13 +379,6 @@ export default function ContractFilling() {
         )}
       </div>
 
-      {/* Информация о функционале */}
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-sm text-blue-800">
-          <strong>Информация:</strong> Модуль заполнения договоров интегрирован в систему.
-          Загрузите шаблон договора с якорями в формате <code>{'{{имя_якоря}}'}</code> или <code>{'{имя_якоря}'}</code>.
-        </p>
-      </div>
     </div>
   )
 }
