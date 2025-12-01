@@ -316,52 +316,67 @@ export class ContractFillingController {
         template_filename,
         template_filename_type: typeof template_filename,
         dataKeys: data ? Object.keys(data) : [],
+        uploadFolder: UPLOAD_FOLDER,
         templatesFolder: TEMPLATES_FOLDER,
         outputFolder: OUTPUT_FOLDER
       });
 
       if (!template_filename) {
-        throw new AppError('Имя шаблона не указано', 400);
+        throw new AppError('Имя файла не указано', 400);
       }
 
       // Декодируем имя файла, если оно пришло в неправильной кодировке
       let decodedFilename = template_filename;
       try {
-        // Пробуем декодировать как URI компонент
         decodedFilename = decodeURIComponent(template_filename);
       } catch (e) {
-        // Если не получилось, используем как есть
         decodedFilename = template_filename;
       }
 
-      // Пробуем найти файл с разными вариантами имени
-      let templatePath = path.join(TEMPLATES_FOLDER, decodedFilename);
-      console.log('[ContractFilling] Проверка шаблона (декодированное):', templatePath, 'существует:', fs.existsSync(templatePath));
+      // Сначала ищем файл в папке загрузок (UPLOAD_FOLDER)
+      let templatePath = path.join(UPLOAD_FOLDER, decodedFilename);
+      console.log('[ContractFilling] Проверка файла в папке загрузок:', templatePath, 'существует:', fs.existsSync(templatePath));
       
       if (!fs.existsSync(templatePath)) {
         // Пробуем оригинальное имя
-        templatePath = path.join(TEMPLATES_FOLDER, template_filename);
-        console.log('[ContractFilling] Проверка шаблона (оригинальное):', templatePath, 'существует:', fs.existsSync(templatePath));
+        templatePath = path.join(UPLOAD_FOLDER, template_filename);
+        console.log('[ContractFilling] Проверка файла (оригинальное имя):', templatePath, 'существует:', fs.existsSync(templatePath));
+      }
+
+      // Если не нашли в папке загрузок, ищем в папке шаблонов
+      if (!fs.existsSync(templatePath)) {
+        templatePath = path.join(TEMPLATES_FOLDER, decodedFilename);
+        console.log('[ContractFilling] Проверка файла в папке шаблонов:', templatePath, 'существует:', fs.existsSync(templatePath));
       }
 
       if (!fs.existsSync(templatePath)) {
-        // Пробуем найти файл по списку файлов в папке
-        const files = fs.existsSync(TEMPLATES_FOLDER) ? fs.readdirSync(TEMPLATES_FOLDER) : [];
-        console.log('[ContractFilling] Файлы в папке шаблонов:', files);
+        templatePath = path.join(TEMPLATES_FOLDER, template_filename);
+        console.log('[ContractFilling] Проверка файла в папке шаблонов (оригинальное):', templatePath, 'существует:', fs.existsSync(templatePath));
+      }
+
+      if (!fs.existsSync(templatePath)) {
+        // Пробуем найти файл по списку файлов в папке загрузок
+        const uploadFiles = fs.existsSync(UPLOAD_FOLDER) ? fs.readdirSync(UPLOAD_FOLDER) : [];
+        const templateFiles = fs.existsSync(TEMPLATES_FOLDER) ? fs.readdirSync(TEMPLATES_FOLDER) : [];
+        const allFiles = [...uploadFiles, ...templateFiles];
+        console.log('[ContractFilling] Файлы в папках:', { uploadFiles, templateFiles });
         
-        // Ищем файл, который может быть похожим (без учета кодировки)
-        const matchingFile = files.find(file => {
-          // Сравниваем без учета регистра и кодировки
+        // Ищем файл, который может быть похожим
+        const matchingFile = allFiles.find(file => {
+          if (!file.match(/\.(doc|docx)$/i)) return false;
           const fileLower = file.toLowerCase();
           const templateLower = template_filename.toLowerCase();
           return fileLower.includes(templateLower) || templateLower.includes(fileLower);
         });
 
         if (matchingFile) {
-          templatePath = path.join(TEMPLATES_FOLDER, matchingFile);
+          // Проверяем в какой папке находится файл
+          const uploadPath = path.join(UPLOAD_FOLDER, matchingFile);
+          const templatePathCheck = path.join(TEMPLATES_FOLDER, matchingFile);
+          templatePath = fs.existsSync(uploadPath) ? uploadPath : templatePathCheck;
           console.log('[ContractFilling] Найден похожий файл:', templatePath);
         } else {
-          throw new AppError(`Шаблон не найден: ${template_filename}. Доступные файлы: ${files.join(', ')}`, 404);
+          throw new AppError(`Файл не найден: ${template_filename}. Доступные файлы в загрузках: ${uploadFiles.join(', ')}, в шаблонах: ${templateFiles.join(', ')}`, 404);
         }
       }
 
