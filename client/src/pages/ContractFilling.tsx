@@ -5,6 +5,7 @@ interface Template {
   filename: string
   anchors: string[]
   created_at: string
+  id?: string // Уникальный идентификатор для React key
 }
 
 interface Contragent {
@@ -53,7 +54,12 @@ export default function ContractFilling() {
         headers: getAuthHeaders()
       })
       const data = await response.json()
-      setTemplates(data.templates || [])
+      // Добавляем уникальный ID для каждого шаблона
+      const templatesWithId = (data.templates || []).map((template: Template, index: number) => ({
+        ...template,
+        id: template.filename + '_' + index + '_' + (template.created_at || Date.now())
+      }))
+      setTemplates(templatesWithId)
     } catch (error) {
       console.error('Ошибка загрузки шаблонов:', error)
     }
@@ -523,7 +529,7 @@ export default function ContractFilling() {
             <div className="space-y-2">
               {templates.map((template) => (
                 <div
-                  key={template.filename}
+                  key={template.id || template.filename || `template-${templates.indexOf(template)}`}
                   className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <input
