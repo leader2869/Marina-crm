@@ -587,18 +587,18 @@ export class ContractFillingController {
           } else if (fs.existsSync(directDecodedTemplatePath)) {
             templatePath = directDecodedTemplatePath;
             console.log('[ContractFilling] Файл найден по прямому пути (template, декодированное имя):', templatePath);
-          } else {
-            console.error('[ContractFilling] Файл не найден:', {
-              template_filename,
-              decodedFilename,
-              uploadFiles,
-              templateFiles,
-              uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
+        } else {
+          console.error('[ContractFilling] Файл не найден:', {
+            template_filename,
+            decodedFilename,
+            uploadFiles,
+            templateFiles,
+            uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
               templatesFolderExists: fs.existsSync(TEMPLATES_FOLDER),
               uploadFolderAbsolute: path.resolve(UPLOAD_FOLDER),
               templatesFolderAbsolute: path.resolve(TEMPLATES_FOLDER)
-            });
-            throw new AppError(`Файл не найден: ${template_filename}. Доступные файлы в загрузках: ${uploadFiles.length > 0 ? uploadFiles.join(', ') : '(папка пуста или не существует)'}, в шаблонах: ${templateFiles.length > 0 ? templateFiles.join(', ') : '(папка пуста или не существует)'}`, 404);
+          });
+          throw new AppError(`Файл не найден: ${template_filename}. Доступные файлы в загрузках: ${uploadFiles.length > 0 ? uploadFiles.join(', ') : '(папка пуста или не существует)'}, в шаблонах: ${templateFiles.length > 0 ? templateFiles.join(', ') : '(папка пуста или не существует)'}`, 404);
           }
         }
       }
@@ -761,20 +761,41 @@ export class ContractFillingController {
   // Список контрагентов
   async getContragents(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      console.log('[ContractFilling] Запрос на получение контрагентов');
       const contragents: any[] = [];
 
-      if (!fs.existsSync(CONTRAGENTS_FOLDER)) {
+      const folderExists = fs.existsSync(CONTRAGENTS_FOLDER);
+      console.log('[ContractFilling] Проверка папки контрагентов:', {
+        folder: CONTRAGENTS_FOLDER,
+        folderAbsolute: path.resolve(CONTRAGENTS_FOLDER),
+        exists: folderExists
+      });
+
+      if (!folderExists) {
+        console.log('[ContractFilling] Папка контрагентов не существует, возвращаем пустой список');
         res.json({ contragents: [] });
         return;
       }
 
       const files = fs.readdirSync(CONTRAGENTS_FOLDER);
+      console.log('[ContractFilling] Файлы в папке контрагентов:', files);
+
       for (const file of files) {
         if (file.endsWith('.json')) {
+          try {
           const filepath = path.join(CONTRAGENTS_FOLDER, file);
           const contragent = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
           contragent.filename = file;
           contragents.push(contragent);
+            console.log('[ContractFilling] Загружен контрагент:', {
+              filename: file,
+              name: contragent.name,
+              hasData: !!contragent.data,
+              dataKeys: contragent.data ? Object.keys(contragent.data).length : 0
+            });
+          } catch (fileError: any) {
+            console.error(`[ContractFilling] Ошибка при чтении файла ${file}:`, fileError.message);
+          }
         }
       }
 
@@ -785,8 +806,13 @@ export class ContractFillingController {
         return dateB - dateA;
       });
 
+      console.log('[ContractFilling] Всего загружено контрагентов:', contragents.length);
       res.json({ contragents });
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка при загрузке контрагентов:', {
+        message: error.message,
+        stack: error.stack
+      });
       next(new AppError(error.message || 'Ошибка при загрузке контрагентов', 500));
     }
   }
@@ -1246,7 +1272,7 @@ export class ContractFillingController {
                     if (matchedText === match.original && !replacedAnchors.has(match.original)) {
                       foundBroken = true;
                       replacedAnchors.add(match.original);
-                      replacementCount++;
+              replacementCount++;
                       console.log(`[ContractFilling] Замена разбитого якоря: "${match.original}" -> "${match.value}"`);
                       // Заменяем на значение, вставляя его в первый элемент w:t
                       return match.escapedValue;

@@ -37,13 +37,28 @@ export default function ContractFilling() {
 
   const loadContragents = async () => {
     try {
+      console.log('[ContractFilling] Загрузка контрагентов...')
       const response = await fetch(`${API_URL}/contragents`, {
         headers: getAuthHeaders()
       })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       const data = await response.json()
-      setContragents(data.contragents || [])
+      console.log('[ContractFilling] Получены контрагенты:', data)
+      console.log('[ContractFilling] Количество контрагентов:', data.contragents?.length || 0)
+      
+      const loadedContragents = data.contragents || []
+      setContragents(loadedContragents)
+      
+      if (loadedContragents.length === 0) {
+        console.log('[ContractFilling] Контрагенты не найдены')
+      }
     } catch (error) {
       console.error('Ошибка загрузки контрагентов:', error)
+      showMessage('error', `Ошибка загрузки контрагентов: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
     }
   }
 
@@ -108,26 +123,47 @@ export default function ContractFilling() {
 
   const loadContragentData = async (contragent: Contragent) => {
     try {
+      console.log('[ContractFilling] Загрузка данных контрагента:', contragent)
       const token = localStorage.getItem('token')
       const response = await fetch(`${API_URL}/contragent/${contragent.filename}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
         }
       })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       const data = await response.json()
+      console.log('[ContractFilling] Получены данные контрагента:', data)
       
       if (data.data) {
-        // Обновляем только те поля, которые есть в текущей форме
-        const updatedData = { ...formData }
-        Object.keys(data.data).forEach(key => {
-          if (updatedData.hasOwnProperty(key)) {
-            updatedData[key] = data.data[key]
-          }
-        })
-        setFormData(updatedData)
-        showMessage('success', `Данные контрагента "${data.name}" загружены`)
+        // Если форма еще не инициализирована (нет якорей), инициализируем её
+        if (anchors.length === 0 && Object.keys(formData).length === 0) {
+          console.log('[ContractFilling] Форма не инициализирована, инициализируем с данными контрагента')
+          const initialData: Record<string, string> = {}
+          Object.keys(data.data).forEach(key => {
+            initialData[key] = data.data[key] || ''
+          })
+          setFormData(initialData)
+        } else {
+          // Обновляем данные, добавляя новые поля если их нет
+          const updatedData = { ...formData }
+          Object.keys(data.data).forEach(key => {
+            updatedData[key] = data.data[key] || ''
+          })
+          setFormData(updatedData)
+        }
+        
+        console.log('[ContractFilling] Данные контрагента загружены в форму')
+        showMessage('success', `Данные контрагента "${data.name || contragent.name}" загружены`)
+      } else {
+        console.warn('[ContractFilling] Данные контрагента не содержат поле data')
+        showMessage('error', 'Данные контрагента не найдены')
       }
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка при загрузке данных контрагента:', error)
       showMessage('error', `Ошибка при загрузке данных: ${error.message}`)
     }
   }
@@ -404,9 +440,18 @@ export default function ContractFilling() {
           )}
 
           {/* Сохраненные контрагенты */}
-          {contragents.length > 0 && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3">Сохраненные контрагенты:</h3>
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-semibold">Сохраненные контрагенты:</h3>
+              <button
+                onClick={loadContragents}
+                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              >
+                Обновить список
+              </button>
+            </div>
+            
+            {contragents.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {contragents.map((contragent) => (
                   <div
@@ -414,14 +459,20 @@ export default function ContractFilling() {
                     className="bg-white border border-gray-200 rounded-lg p-3 cursor-pointer hover:border-primary-500 hover:shadow-md transition-all relative"
                     onClick={() => loadContragentData(contragent)}
                   >
-                    <div className="font-semibold text-gray-800">{contragent.name}</div>
+                    <div className="font-semibold text-gray-800">
+                      {contragent.name || contragent.filename || 'Без имени'}
+                    </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {new Date(contragent.updated_at).toLocaleDateString('ru-RU')}
+                      {contragent.updated_at 
+                        ? new Date(contragent.updated_at).toLocaleDateString('ru-RU')
+                        : contragent.created_at 
+                        ? new Date(contragent.created_at).toLocaleDateString('ru-RU')
+                        : 'Дата неизвестна'}
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        deleteContragent(contragent.filename, contragent.name)
+                        deleteContragent(contragent.filename, contragent.name || contragent.filename)
                       }}
                       className="absolute top-2 right-2 p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
                     >
@@ -430,14 +481,13 @@ export default function ContractFilling() {
                   </div>
                 ))}
               </div>
-              <button
-                onClick={loadContragents}
-                className="mt-3 px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-              >
-                Обновить список
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <p>Нет сохраненных контрагентов</p>
+                <p className="text-sm mt-2">Заполните форму и сохраните данные контрагента</p>
+              </div>
+            )}
+          </div>
 
           {/* Форма заполнения */}
           <div>
