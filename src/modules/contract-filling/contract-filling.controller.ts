@@ -703,7 +703,7 @@ export class ContractFillingController {
         templatePath,
         outputPath,
         dataKeys: Object.keys(data),
-        dataValues: Object.values(data).slice(0, 3) // Первые 3 значения для лога
+        dataValues: Object.values(data).slice(0, 3)
       });
 
       const zip = new AdmZip(templatePath);
@@ -721,24 +721,160 @@ export class ContractFillingController {
       for (const entry of zipEntries) {
         if (entry.entryName === 'word/document.xml') {
           let xmlContent = entry.getData().toString('utf-8');
+          
+          console.log('[ContractFilling] Исходный XML (первые 500 символов):', xmlContent.substring(0, 500));
 
-          // Используем простую строковую замену, которая работает надежнее
-          // Якоря могут быть разбиты на несколько XML элементов, поэтому ищем их в полном тексте
-          const patterns = [
-            { fullPattern: /\{\{([^}]+)\}\}/g, name: 'double_braces' },
-            { fullPattern: /\{([^}]+)\}/g, name: 'single_braces' }
-          ];
-
-          let replacementCount = 0;
-          for (const { fullPattern, name } of patterns) {
-            xmlContent = xmlContent.replace(fullPattern, (match: string, anchorName: string) => {
-              const normalizedAnchor = this.normalizeAnchor(anchorName);
-              console.log(`[ContractFilling] Найден якорь "${match}" (${name}), нормализован: "${normalizedAnchor}"`);
+          // Парсим XML для правильной обработки разбитых якорей
+          try {
+            const parsed = await parseStringAsync(xmlContent);
+            
+            // Функция для рекурсивного обхода и замены якорей в XML структуре
+            const replaceInNode = (node: any): any => {
+              if (typeof node === 'string') {
+                return node;
+              }
               
-              // Ищем значение в нормализованных данных
-              for (const [key, value] of Object.entries(normalizedData)) {
-                if (key === normalizedAnchor) {
-                  // Экранируем специальные XML символы в значении
+              if (Array.isArray(node)) {
+                return node.map(n => replaceInNode(n));
+              }
+              
+              if (node && typeof node === 'object') {
+                const result: any = {};
+                
+                // Обрабатываем текстовые элементы w:t
+                if (node['w:t']) {
+                  const textContent = Array.isArray(node['w:t']) 
+                    ? node['w:t'].map((t: any) => typeof t === 'string' ? t : (t._ || t)).join('')
+                    : (typeof node['w:t'] === 'string' ? node['w:t'] : (node['w:t']._ || ''));
+                  
+                  // Ищем якоря в тексте
+                  let modifiedText = textContent;
+                  const patterns = [
+                    { fullPattern: /\{\{([^}]+)\}\}/g, name: 'double_braces' },
+                    { fullPattern: /\{([^}]+)\}/g, name: 'single_braces' }
+                  ];
+                  
+                  for (const { fullPattern, name } of patterns) {
+                    modifiedText = modifiedText.replace(fullPattern, (match: string, anchorName: string) => {
+                      const normalizedAnchor = this.normalizeAnchor(anchorName);
+                      console.log(`[ContractFilling] Найден якорь "${match}" (${name}), нормализован: "${normalizedAnchor}"`);
+                      
+                      if (normalizedData.hasOwnProperty(normalizedAnchor)) {
+                        const value = normalizedData[normalizedAnchor];
+                        console.log(`[ContractFilling] Замена: "${match}" -> "${value}"`);
+                        return value;
+                      }
+                      
+                      console.log(`[ContractFilling] Якорь "${normalizedAnchor}" не найден в данных`);
+                      return match;
+                    });
+                  }
+                  
+                  // Если текст изменился, обновляем узел
+                  if (modifiedText !== textContent) {
+                    result['w:t'] = modifiedText;
+                    // Копируем остальные свойства узла
+                    for (const key in node) {
+                      if (key !== 'w:t') {
+                        result[key] = replaceInNode(node[key]);
+                      }
+                    }
+                    return result;
+                  }
+                }
+                
+                // Рекурсивно обрабатываем все дочерние элементы
+                for (const key in node) {
+                  result[key] = replaceInNode(node[key]);
+                }
+                
+                return result;
+              }
+              
+              return node;
+            };
+            
+            const modifiedParsed = replaceInNode(parsed);
+            
+            // Конвертируем обратно в XML строку
+            // Используем простой подход - заменяем в исходном XML
+            // Но сначала соберем весь текст документа для поиска якорей
+            const fullText = this.extractTextFromXmlNode(parsed);
+            console.log('[ContractFilling] Извлеченный текст (первые 500 символов):', fullText.substring(0, 500));
+            
+            // Ищем все якоря в тексте
+            const anchorMatches: Array<{ original: string; normalized: string; value: string }> = [];
+            const patterns = [
+              { fullPattern: /\{\{([^}]+)\}\}/g, name: 'double_braces' },
+              { fullPattern: /\{([^}]+)\}/g, name: 'single_braces' }
+            ];
+            
+            for (const { fullPattern } of patterns) {
+              let match;
+              while ((match = fullPattern.exec(fullText)) !== null) {
+                const normalizedAnchor = this.normalizeAnchor(match[1]);
+                if (normalizedData.hasOwnProperty(normalizedAnchor)) {
+                  anchorMatches.push({
+                    original: match[0],
+                    normalized: normalizedAnchor,
+                    value: normalizedData[normalizedAnchor]
+                  });
+                }
+              }
+            }
+            
+            console.log('[ContractFilling] Найдено якорей для замены:', anchorMatches.length);
+            
+            // Заменяем якоря в XML, используя более агрессивный подход
+            // Удаляем XML теги временно, заменяем, затем восстанавливаем структуру
+            let replacementCount = 0;
+            
+            // Создаем карту замен: оригинальный якорь -> значение
+            const replacementMap: Record<string, string> = {};
+            for (const match of anchorMatches) {
+              // Экранируем значение для XML
+              const escapedValue = String(match.value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+              replacementMap[match.original] = escapedValue;
+            }
+            
+            // Заменяем все якоря в XML
+            for (const [originalAnchor, escapedValue] of Object.entries(replacementMap)) {
+              // Заменяем якорь, даже если он разбит на несколько элементов
+              // Ищем паттерн якоря в XML и заменяем его
+              const anchorPattern = originalAnchor.replace(/[{}]/g, '\\$&');
+              const regex = new RegExp(anchorPattern.replace(/\{\{/g, '\\{\\{').replace(/\}\}/g, '\\}\\}'), 'g');
+              
+              // Более простой подход: заменяем якорь в тексте между тегами
+              xmlContent = xmlContent.replace(
+                new RegExp(originalAnchor.replace(/[{}]/g, '\\$&'), 'g'),
+                escapedValue
+              );
+              replacementCount++;
+            }
+            
+            console.log(`[ContractFilling] Всего заменено якорей: ${replacementCount}`);
+            
+          } catch (parseError: any) {
+            console.warn('[ContractFilling] Не удалось распарсить XML, используем простую замену:', parseError.message);
+            
+            // Fallback: простая замена в XML строке
+            let replacementCount = 0;
+            const patterns = [
+              { fullPattern: /\{\{([^}]+)\}\}/g, name: 'double_braces' },
+              { fullPattern: /\{([^}]+)\}/g, name: 'single_braces' }
+            ];
+
+            for (const { fullPattern, name } of patterns) {
+              xmlContent = xmlContent.replace(fullPattern, (match: string, anchorName: string) => {
+                const normalizedAnchor = this.normalizeAnchor(anchorName);
+                
+                if (normalizedData.hasOwnProperty(normalizedAnchor)) {
+                  const value = normalizedData[normalizedAnchor];
                   const escapedValue = String(value)
                     .replace(/&/g, '&amp;')
                     .replace(/</g, '&lt;')
@@ -746,19 +882,17 @@ export class ContractFillingController {
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&apos;');
                   
-                  console.log(`[ContractFilling] Замена: "${match}" -> "${value}" (экранировано: "${escapedValue}")`);
+                  console.log(`[ContractFilling] Замена: "${match}" -> "${value}"`);
                   replacementCount++;
                   return escapedValue;
                 }
-              }
-
-              console.log(`[ContractFilling] Якорь "${normalizedAnchor}" не найден в данных`);
-              // Если не нашли, возвращаем оригинал
-              return match;
-            });
+                
+                return match;
+              });
+            }
+            
+            console.log(`[ContractFilling] Всего заменено якорей (fallback): ${replacementCount}`);
           }
-
-          console.log(`[ContractFilling] Всего заменено якорей: ${replacementCount}`);
 
           // Обновляем содержимое в ZIP
           zip.updateFile(entry.entryName, Buffer.from(xmlContent, 'utf-8'));
