@@ -21,9 +21,27 @@ const createContragentsTable = async (): Promise<void> => {
     } else {
       console.log('📋 Создание таблицы contragents...');
       
-      // Создаем таблицу через synchronize
-      // TypeORM автоматически создаст таблицу на основе entity
-      await AppDataSource.synchronize();
+      // Создаем таблицу напрямую через SQL
+      await queryRunner.query(`
+        CREATE TABLE IF NOT EXISTS contragents (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          data JSONB NOT NULL,
+          user_id INTEGER,
+          club_id INTEGER,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_contragent_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+          CONSTRAINT fk_contragent_club FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE SET NULL
+        )
+      `);
+      
+      // Создаем индекс для быстрого поиска по user_id
+      await queryRunner.query(`
+        CREATE INDEX IF NOT EXISTS idx_contragents_user_id ON contragents(user_id)
+      `);
+      
+      await queryRunner.release();
       
       console.log('✅ Таблица contragents создана успешно\n');
     }

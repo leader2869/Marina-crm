@@ -766,7 +766,25 @@ export class ContractFillingController {
       console.log('[ContractFilling] Запрос на получение контрагентов');
       
       if (!AppDataSource.isInitialized) {
+        console.error('[ContractFilling] База данных не инициализирована');
         throw new AppError('База данных не подключена', 503);
+      }
+
+      // Проверяем существование таблицы
+      try {
+        const queryRunner = AppDataSource.createQueryRunner();
+        const tableExists = await queryRunner.hasTable('contragents');
+        await queryRunner.release();
+        
+        if (!tableExists) {
+          console.warn('[ContractFilling] Таблица contragents не существует, возвращаем пустой список');
+          // Возвращаем пустой список вместо ошибки
+          res.json({ contragents: [] });
+          return;
+        }
+      } catch (tableCheckError: any) {
+        console.error('[ContractFilling] Ошибка при проверке таблицы:', tableCheckError.message);
+        // Если не можем проверить таблицу, пробуем выполнить запрос
       }
 
       const contragentRepository = AppDataSource.getRepository(Contragent);
@@ -788,8 +806,8 @@ export class ContractFillingController {
         filename: `${c.id}.json`, // Для совместимости
         name: c.name,
         data: c.data,
-        created_at: c.created_at.toISOString(),
-        updated_at: c.updated_at.toISOString(),
+        created_at: c.created_at ? c.created_at.toISOString() : new Date().toISOString(),
+        updated_at: c.updated_at ? c.updated_at.toISOString() : new Date().toISOString(),
       }));
 
       console.log('[ContractFilling] Всего загружено контрагентов:', formattedContragents.length);
@@ -797,8 +815,19 @@ export class ContractFillingController {
     } catch (error: any) {
       console.error('[ContractFilling] Ошибка при загрузке контрагентов:', {
         message: error.message,
-        stack: error.stack
+        stack: error.stack,
+        code: error.code,
+        name: error.name,
+        detail: error.detail
       });
+      
+      // Если таблица не существует, возвращаем пустой список
+      if (error.message && (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01')) {
+        console.warn('[ContractFilling] Таблица не существует, возвращаем пустой список');
+        res.json({ contragents: [] });
+        return;
+      }
+      
       next(new AppError(error.message || 'Ошибка при загрузке контрагентов', 500));
     }
   }
@@ -817,7 +846,25 @@ export class ContractFillingController {
       }
 
       if (!AppDataSource.isInitialized) {
+        console.error('[ContractFilling] База данных не инициализирована');
         throw new AppError('База данных не подключена', 503);
+      }
+
+      // Проверяем существование таблицы
+      try {
+        const queryRunner = AppDataSource.createQueryRunner();
+        const tableExists = await queryRunner.hasTable('contragents');
+        await queryRunner.release();
+        
+        if (!tableExists) {
+          console.error('[ContractFilling] Таблица contragents не существует');
+          throw new AppError('Таблица контрагентов не создана. Запустите: npm run create-contragents-table', 500);
+        }
+      } catch (tableCheckError: any) {
+        if (tableCheckError.message && tableCheckError.message.includes('не создана')) {
+          throw tableCheckError;
+        }
+        console.warn('[ContractFilling] Не удалось проверить таблицу, продолжаем:', tableCheckError.message);
       }
 
       const contragentRepository = AppDataSource.getRepository(Contragent);
