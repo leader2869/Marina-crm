@@ -153,25 +153,39 @@ export class ContractFillingController {
               console.error(`[ContractFilling] Ошибка при парсинге метаданных ${file}:`, parseError.message);
             }
           } else if (file.match(/\.(doc|docx)$/i)) {
+            // Пропускаем файлы, которые уже имеют метаданные
+            const metadataFile = file + '.json';
+            if (files.includes(metadataFile)) {
+              continue; // Этот файл уже обработан через метаданные
+            }
+            
             // Если есть файл без метаданных, создаем метаданные на лету
             const templateFilePath = path.join(TEMPLATES_FOLDER, file);
             if (fs.existsSync(templateFilePath)) {
               // Пытаемся извлечь якоря (но не блокируем, если не получится)
               try {
                 const anchors = await this.extractAnchorsFromDoc(templateFilePath);
+                const stats = fs.statSync(templateFilePath);
                 templates.push({
                   filename: file,
+                  original_filename: file, // Для старых шаблонов без метаданных
                   anchors: anchors || [],
-                  created_at: fs.statSync(templateFilePath).mtime.toISOString()
+                  created_at: stats.mtime.toISOString()
                 });
               } catch (error: any) {
                 console.warn(`[ContractFilling] Не удалось извлечь якоря из ${file}:`, error.message);
                 // Все равно добавляем шаблон, но с пустыми якорями
-                templates.push({
-                  filename: file,
-                  anchors: [],
-                  created_at: fs.statSync(templateFilePath).mtime.toISOString()
-                });
+                try {
+                  const stats = fs.statSync(templateFilePath);
+                  templates.push({
+                    filename: file,
+                    original_filename: file,
+                    anchors: [],
+                    created_at: stats.mtime.toISOString()
+                  });
+                } catch (statError: any) {
+                  console.error(`[ContractFilling] Ошибка при получении статистики файла ${file}:`, statError.message);
+                }
               }
             }
           }
