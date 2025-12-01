@@ -195,17 +195,43 @@ export default function ContractFilling() {
         }),
       })
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Ошибка при сохранении контрагента' }))
+        let errorMessage = 'Ошибка при сохранении контрагента'
+        
+        if (errorData.error) {
+          if (typeof errorData.error === 'object') {
+            // Формат Vercel: { error: { code, message } }
+            errorMessage = errorData.error.message || errorData.error.code || errorMessage
+          } else if (typeof errorData.error === 'string') {
+            // Простой формат: { error: "message" }
+            errorMessage = errorData.error
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        }
+        
+        showMessage('error', errorMessage)
+        return
+      }
+
       const data = await response.json()
 
       if (data.success) {
         showMessage('success', data.message || 'Контрагент сохранен')
         loadContragents()
         setShowSaveContragentModal(false)
+        setContragentName('')
       } else {
-        showMessage('error', data.error || 'Ошибка при сохранении контрагента')
+        const errorMessage = typeof data.error === 'object'
+          ? data.error?.message || data.error?.code || 'Ошибка при сохранении контрагента'
+          : data.error || 'Ошибка при сохранении контрагента'
+        showMessage('error', errorMessage)
       }
     } catch (error: any) {
-      showMessage('error', `Ошибка: ${error.message}`)
+      console.error('[ContractFilling] Ошибка при сохранении контрагента:', error)
+      const errorMessage = error?.message || error?.toString() || 'Неизвестная ошибка'
+      showMessage('error', `Ошибка: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -225,16 +251,39 @@ export default function ContractFilling() {
         }
       })
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Ошибка при удалении контрагента' }))
+        let errorMessage = 'Ошибка при удалении контрагента'
+        
+        if (errorData.error) {
+          if (typeof errorData.error === 'object') {
+            errorMessage = errorData.error.message || errorData.error.code || errorMessage
+          } else if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        }
+        
+        showMessage('error', errorMessage)
+        return
+      }
+
       const data = await response.json()
 
       if (data.success) {
         showMessage('success', 'Контрагент удален')
         loadContragents()
       } else {
-        showMessage('error', data.error || 'Ошибка при удалении контрагента')
+        const errorMessage = typeof data.error === 'object'
+          ? data.error?.message || data.error?.code || 'Ошибка при удалении контрагента'
+          : data.error || 'Ошибка при удалении контрагента'
+        showMessage('error', errorMessage)
       }
     } catch (error: any) {
-      showMessage('error', `Ошибка: ${error.message}`)
+      console.error('[ContractFilling] Ошибка при удалении контрагента:', error)
+      const errorMessage = error?.message || error?.toString() || 'Неизвестная ошибка'
+      showMessage('error', `Ошибка: ${errorMessage}`)
     }
   }
 
