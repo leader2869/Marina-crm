@@ -1,6 +1,8 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
+import { AppDataSource } from '../../config/database';
+import { Contragent } from '../../entities/Contragent';
 import { UserRole } from '../../types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -762,52 +764,36 @@ export class ContractFillingController {
   async getContragents(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       console.log('[ContractFilling] Запрос на получение контрагентов');
-      const contragents: any[] = [];
-
-      const folderExists = fs.existsSync(CONTRAGENTS_FOLDER);
-      console.log('[ContractFilling] Проверка папки контрагентов:', {
-        folder: CONTRAGENTS_FOLDER,
-        folderAbsolute: path.resolve(CONTRAGENTS_FOLDER),
-        exists: folderExists
-      });
-
-      if (!folderExists) {
-        console.log('[ContractFilling] Папка контрагентов не существует, возвращаем пустой список');
-        res.json({ contragents: [] });
-        return;
+      
+      if (!AppDataSource.isInitialized) {
+        throw new AppError('База данных не подключена', 503);
       }
 
-      const files = fs.readdirSync(CONTRAGENTS_FOLDER);
-      console.log('[ContractFilling] Файлы в папке контрагентов:', files);
-
-      for (const file of files) {
-        if (file.endsWith('.json')) {
-          try {
-          const filepath = path.join(CONTRAGENTS_FOLDER, file);
-          const contragent = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
-          contragent.filename = file;
-          contragents.push(contragent);
-            console.log('[ContractFilling] Загружен контрагент:', {
-              filename: file,
-              name: contragent.name,
-              hasData: !!contragent.data,
-              dataKeys: contragent.data ? Object.keys(contragent.data).length : 0
-            });
-          } catch (fileError: any) {
-            console.error(`[ContractFilling] Ошибка при чтении файла ${file}:`, fileError.message);
-          }
-        }
+      const contragentRepository = AppDataSource.getRepository(Contragent);
+      
+      // Получаем контрагентов для текущего пользователя или клуба
+      const where: any = {};
+      if (req.userId) {
+        where.userId = req.userId;
       }
-
-      // Сортируем по дате обновления
-      contragents.sort((a, b) => {
-        const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
-        const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
-        return dateB - dateA;
+      
+      const contragents = await contragentRepository.find({
+        where,
+        order: { updated_at: 'DESC' },
       });
 
-      console.log('[ContractFilling] Всего загружено контрагентов:', contragents.length);
-      res.json({ contragents });
+      // Преобразуем для совместимости с фронтендом
+      const formattedContragents = contragents.map(c => ({
+        id: c.id,
+        filename: `${c.id}.json`, // Для совместимости
+        name: c.name,
+        data: c.data,
+        created_at: c.created_at.toISOString(),
+        updated_at: c.updated_at.toISOString(),
+      }));
+
+      console.log('[ContractFilling] Всего загружено контрагентов:', formattedContragents.length);
+      res.json({ contragents: formattedContragents });
     } catch (error: any) {
       console.error('[ContractFilling] Ошибка при загрузке контрагентов:', {
         message: error.message,
@@ -830,28 +816,37 @@ export class ContractFillingController {
         throw new AppError('Нет данных для сохранения', 400);
       }
 
-      // Создаем безопасное имя файла
-      const safeName = name.replace(/[^\w\-а-яА-ЯёЁ\s]/gi, '').replace(/\s+/g, '_');
-      if (!safeName) {
-        throw new AppError('Некорректное имя контрагента', 400);
+      if (!AppDataSource.isInitialized) {
+        throw new AppError('База данных не подключена', 503);
       }
 
-      const contragentInfo = {
+      const contragentRepository = AppDataSource.getRepository(Contragent);
+      
+      // Создаем новый контрагент
+      const contragent = contragentRepository.create({
         name: name.trim(),
         data: data,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+        userId: req.userId || null,
+      });
 
-      const filepath = path.join(CONTRAGENTS_FOLDER, `${safeName}.json`);
-      fs.writeFileSync(filepath, JSON.stringify(contragentInfo, null, 2), 'utf-8');
+      const savedContragent = await contragentRepository.save(contragent);
+
+      console.log('[ContractFilling] Контрагент сохранен в БД:', {
+        id: savedContragent.id,
+        name: savedContragent.name
+      });
 
       res.json({
         success: true,
         message: `Контрагент "${name}" сохранен`,
-        filename: `${safeName}.json`
+        filename: `${savedContragent.id}.json`, // Для совместимости
+        id: savedContragent.id
       });
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка при сохранении контрагента:', {
+        message: error.message,
+        stack: error.stack
+      });
       next(new AppError(error.message || 'Ошибка при сохранении контрагента', 500));
     }
   }
@@ -860,15 +855,44 @@ export class ContractFillingController {
   async getContragent(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { filename } = req.params;
-      const filepath = path.join(CONTRAGENTS_FOLDER, filename);
+      
+      // Извлекаем ID из filename (формат: "123.json" или просто "123")
+      const id = parseInt(filename.replace('.json', ''));
+      
+      if (isNaN(id)) {
+        throw new AppError('Некорректный ID контрагента', 400);
+      }
 
-      if (!fs.existsSync(filepath)) {
+      if (!AppDataSource.isInitialized) {
+        throw new AppError('База данных не подключена', 503);
+      }
+
+      const contragentRepository = AppDataSource.getRepository(Contragent);
+      
+      const where: any = { id };
+      if (req.userId) {
+        where.userId = req.userId;
+      }
+      
+      const contragent = await contragentRepository.findOne({ where });
+
+      if (!contragent) {
         throw new AppError('Контрагент не найден', 404);
       }
 
-      const contragent = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
-      res.json(contragent);
+      // Преобразуем для совместимости с фронтендом
+      res.json({
+        id: contragent.id,
+        name: contragent.name,
+        data: contragent.data,
+        created_at: contragent.created_at.toISOString(),
+        updated_at: contragent.updated_at.toISOString(),
+      });
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка при загрузке контрагента:', {
+        message: error.message,
+        stack: error.stack
+      });
       next(new AppError(error.message || 'Ошибка при загрузке контрагента', 500));
     }
   }
@@ -877,19 +901,44 @@ export class ContractFillingController {
   async deleteContragent(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { filename } = req.params;
-      const filepath = path.join(CONTRAGENTS_FOLDER, filename);
+      
+      // Извлекаем ID из filename (формат: "123.json" или просто "123")
+      const id = parseInt(filename.replace('.json', ''));
+      
+      if (isNaN(id)) {
+        throw new AppError('Некорректный ID контрагента', 400);
+      }
 
-      if (!fs.existsSync(filepath)) {
+      if (!AppDataSource.isInitialized) {
+        throw new AppError('База данных не подключена', 503);
+      }
+
+      const contragentRepository = AppDataSource.getRepository(Contragent);
+      
+      const where: any = { id };
+      if (req.userId) {
+        where.userId = req.userId;
+      }
+      
+      const contragent = await contragentRepository.findOne({ where });
+
+      if (!contragent) {
         throw new AppError('Контрагент не найден', 404);
       }
 
-      fs.unlinkSync(filepath);
+      await contragentRepository.remove(contragent);
+
+      console.log('[ContractFilling] Контрагент удален из БД:', id);
 
       res.json({
         success: true,
         message: 'Контрагент удален'
       });
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка при удалении контрагента:', {
+        message: error.message,
+        stack: error.stack
+      });
       next(new AppError(error.message || 'Ошибка при удалении контрагента', 500));
     }
   }

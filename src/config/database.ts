@@ -21,6 +21,7 @@ import { IncomeCategory } from '../entities/IncomeCategory';
 import { VesselOwnerExpenseCategory } from '../entities/VesselOwnerExpenseCategory';
 import { AgentOrder } from '../entities/AgentOrder';
 import { AgentOrderResponse } from '../entities/AgentOrderResponse';
+import { Contragent } from '../entities/Contragent';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -103,6 +104,7 @@ export const AppDataSource = new DataSource({
     VesselOwnerExpenseCategory,
     AgentOrder,
     AgentOrderResponse,
+    Contragent,
   ],
   migrations: ['src/database/migrations/**/*.ts'],
   subscribers: ['src/database/subscribers/**/*.ts'],
