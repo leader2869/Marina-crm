@@ -104,6 +104,12 @@ export class ContractFillingController {
       const templates: any[] = [];
 
       if (!fs.existsSync(TEMPLATES_FOLDER)) {
+        console.log('[ContractFilling] Папка шаблонов не существует, создаем:', TEMPLATES_FOLDER);
+        try {
+          fs.mkdirSync(TEMPLATES_FOLDER, { recursive: true });
+        } catch (mkdirError: any) {
+          console.error('[ContractFilling] Ошибка при создании папки шаблонов:', mkdirError.message);
+        }
         res.json({ templates: [] });
         return;
       }
@@ -112,39 +118,62 @@ export class ContractFillingController {
       console.log('[ContractFilling] Файлы в папке шаблонов:', files);
       
       for (const file of files) {
-        if (file.endsWith('.json')) {
-          const metadataPath = path.join(TEMPLATES_FOLDER, file);
-          const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-          
-          // Проверяем, что файл шаблона существует
-          const templateFilePath = path.join(TEMPLATES_FOLDER, metadata.filename);
-          if (fs.existsSync(templateFilePath)) {
-            templates.push(metadata);
-          } else {
-            console.warn(`[ContractFilling] Файл шаблона не найден: ${templateFilePath}`);
-          }
-        } else if (file.match(/\.(doc|docx)$/i)) {
-          // Если есть файл без метаданных, создаем метаданные на лету
-          const templateFilePath = path.join(TEMPLATES_FOLDER, file);
-          if (fs.existsSync(templateFilePath)) {
-            // Пытаемся извлечь якоря
+        try {
+          if (file.endsWith('.json')) {
+            const metadataPath = path.join(TEMPLATES_FOLDER, file);
             try {
-              const anchors = await this.extractAnchorsFromDoc(templateFilePath);
-              templates.push({
-                filename: file,
-                anchors: anchors,
-                created_at: fs.statSync(templateFilePath).mtime.toISOString()
-              });
-            } catch (error: any) {
-              console.warn(`[ContractFilling] Не удалось извлечь якоря из ${file}:`, error.message);
+              const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+              
+              // Проверяем, что файл шаблона существует
+              if (metadata.filename) {
+                const templateFilePath = path.join(TEMPLATES_FOLDER, metadata.filename);
+                if (fs.existsSync(templateFilePath)) {
+                  templates.push(metadata);
+                } else {
+                  console.warn(`[ContractFilling] Файл шаблона не найден: ${templateFilePath}`);
+                }
+              } else {
+                console.warn(`[ContractFilling] Метаданные без filename: ${file}`);
+              }
+            } catch (parseError: any) {
+              console.error(`[ContractFilling] Ошибка при парсинге метаданных ${file}:`, parseError.message);
+            }
+          } else if (file.match(/\.(doc|docx)$/i)) {
+            // Если есть файл без метаданных, создаем метаданные на лету
+            const templateFilePath = path.join(TEMPLATES_FOLDER, file);
+            if (fs.existsSync(templateFilePath)) {
+              // Пытаемся извлечь якоря (но не блокируем, если не получится)
+              try {
+                const anchors = await this.extractAnchorsFromDoc(templateFilePath);
+                templates.push({
+                  filename: file,
+                  anchors: anchors || [],
+                  created_at: fs.statSync(templateFilePath).mtime.toISOString()
+                });
+              } catch (error: any) {
+                console.warn(`[ContractFilling] Не удалось извлечь якоря из ${file}:`, error.message);
+                // Все равно добавляем шаблон, но с пустыми якорями
+                templates.push({
+                  filename: file,
+                  anchors: [],
+                  created_at: fs.statSync(templateFilePath).mtime.toISOString()
+                });
+              }
             }
           }
+        } catch (fileError: any) {
+          console.error(`[ContractFilling] Ошибка при обработке файла ${file}:`, fileError.message);
+          // Продолжаем обработку других файлов
         }
       }
 
       console.log('[ContractFilling] Возвращаем шаблоны:', templates.map(t => t.filename));
       res.json({ templates });
     } catch (error: any) {
+      console.error('[ContractFilling] Критическая ошибка в getTemplates:', {
+        message: error.message,
+        stack: error.stack
+      });
       next(new AppError(error.message || 'Ошибка при загрузке шаблонов', 500));
     }
   }
