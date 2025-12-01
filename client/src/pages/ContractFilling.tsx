@@ -11,7 +11,6 @@ interface Contragent {
 
 export default function ContractFilling() {
   const [step, setStep] = useState<'upload' | 'fill' | 'result'>('upload')
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [uploadedFilename, setUploadedFilename] = useState('')
   const [anchors, setAnchors] = useState<string[]>([])
   const [formData, setFormData] = useState<Record<string, string>>({})
@@ -58,7 +57,6 @@ export default function ContractFilling() {
     }
 
     setLoading(true)
-    setUploadedFile(selectedFile)
 
     const formData = new FormData()
     formData.append('file', selectedFile)
@@ -79,7 +77,6 @@ export default function ContractFilling() {
           ? errorData.error?.message || errorData.error?.code || 'Ошибка при загрузке файла'
           : errorData.error || 'Ошибка при загрузке файла'
         showMessage('error', errorMessage)
-        setUploadedFile(null)
         return
       }
 
@@ -101,11 +98,9 @@ export default function ContractFilling() {
         showMessage('success', `Документ загружен. Найдено якорей: ${foundAnchors.length}`)
       } else {
         showMessage('error', data.error || 'Ошибка при загрузке файла')
-        setUploadedFile(null)
       }
     } catch (error: any) {
       showMessage('error', `Ошибка: ${error.message}`)
-      setUploadedFile(null)
     } finally {
       setLoading(false)
     }
@@ -312,7 +307,6 @@ export default function ContractFilling() {
   }
 
   const startNew = () => {
-    setUploadedFile(null)
     setUploadedFilename('')
     setAnchors([])
     setFormData({})
