@@ -3,6 +3,7 @@ import { FileText, Upload, Download, Save, X, Trash2, Edit2 } from 'lucide-react
 
 interface Template {
   filename: string
+  original_filename?: string // Оригинальное имя файла для отображения
   anchors: string[]
   created_at: string
   id?: string // Уникальный идентификатор для React key
@@ -563,9 +564,11 @@ export default function ContractFilling() {
                     htmlFor={`template-${template.filename}`}
                     className="flex-1 cursor-pointer"
                   >
-                    <div className="font-medium text-gray-800">{template.filename}</div>
+                    <div className="font-medium text-gray-800">
+                      {template.original_filename || template.filename}
+                    </div>
                     <div className="text-sm text-gray-500">
-                      {template.anchors.length} якорей
+                      {template.anchors.length} якорей • {template.created_at ? new Date(template.created_at).toLocaleString('ru-RU') : ''}
                     </div>
                   </label>
                   <div className="flex gap-2">
