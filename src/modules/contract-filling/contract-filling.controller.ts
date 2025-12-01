@@ -71,27 +71,41 @@ export class ContractFillingController {
       }
 
       const sourcePath = path.join(UPLOAD_FOLDER, filename);
-      const templatePath = path.join(TEMPLATES_FOLDER, filename);
 
       if (!fs.existsSync(sourcePath)) {
         throw new AppError('Файл не найден', 404);
       }
 
-      // Копируем файл в папку шаблонов
+      // Определяем расширение файла
+      const ext = path.extname(filename).toLowerCase() || '.docx';
+      
+      // Генерируем имя файла на основе даты и времени
+      const now = new Date();
+      const timestamp = now.toISOString()
+        .replace(/[:.]/g, '-')
+        .slice(0, -5) // Убираем миллисекунды и Z
+        .replace('T', '_'); // Заменяем T на подчеркивание
+      
+      const templateFilename = `template_${timestamp}${ext}`;
+      const templatePath = path.join(TEMPLATES_FOLDER, templateFilename);
+
+      // Копируем файл в папку шаблонов с новым именем
       fs.copyFileSync(sourcePath, templatePath);
 
       // Сохраняем метаданные
       const metadata = {
-        filename: filename,
+        filename: templateFilename,
+        original_filename: filename, // Сохраняем оригинальное имя для справки
         anchors: anchors || [],
-        created_at: new Date().toISOString()
+        created_at: now.toISOString()
       };
-      const metadataPath = path.join(TEMPLATES_FOLDER, filename + '.json');
+      const metadataPath = path.join(TEMPLATES_FOLDER, templateFilename + '.json');
       fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
 
       res.json({
         success: true,
-        message: 'Шаблон сохранен'
+        message: 'Шаблон сохранен',
+        filename: templateFilename
       });
     } catch (error: any) {
       next(new AppError(error.message || 'Ошибка при сохранении шаблона', 500));

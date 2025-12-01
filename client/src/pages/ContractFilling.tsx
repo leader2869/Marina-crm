@@ -121,7 +121,7 @@ export default function ContractFilling() {
         setUploadedFilename(data.filename)
         setAnchors(data.anchors || [])
         showMessage('success', data.message || 'Документ загружен успешно')
-        loadTemplates()
+        // Не загружаем шаблоны сразу, так как шаблон еще не сохранен
       } else {
         showMessage('error', data.error || 'Ошибка при загрузке файла')
       }
@@ -158,6 +158,10 @@ export default function ContractFilling() {
 
       if (data.success) {
         showMessage('success', 'Шаблон успешно сохранен!')
+        // Очищаем загруженный файл и якоря после сохранения
+        setUploadedFilename('')
+        setAnchors([])
+        // Загружаем обновленный список шаблонов
         loadTemplates()
       } else {
         showMessage('error', data.error || 'Ошибка при сохранении шаблона')
