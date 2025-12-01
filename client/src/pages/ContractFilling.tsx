@@ -53,6 +53,17 @@ export default function ContractFilling() {
       const response = await fetch(`${API_URL}/templates`, {
         headers: getAuthHeaders()
       })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Ошибка при загрузке шаблонов' }))
+        const errorMessage = typeof errorData.error === 'object'
+          ? errorData.error?.message || errorData.error?.code || 'Ошибка при загрузке шаблонов'
+          : errorData.error || 'Ошибка при загрузке шаблонов'
+        showMessage('error', errorMessage)
+        setTemplates([])
+        return
+      }
+
       const data = await response.json()
       // Добавляем уникальный ID для каждого шаблона
       const templatesWithId = (data.templates || []).map((template: Template, index: number) => ({
@@ -60,8 +71,11 @@ export default function ContractFilling() {
         id: template.filename + '_' + index + '_' + (template.created_at || Date.now())
       }))
       setTemplates(templatesWithId)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка загрузки шаблонов:', error)
+      const errorMessage = error?.message || 'Ошибка при загрузке шаблонов'
+      showMessage('error', errorMessage)
+      setTemplates([])
     }
   }
 
