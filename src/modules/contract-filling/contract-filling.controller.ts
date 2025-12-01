@@ -29,16 +29,41 @@ try {
   });
   
   // Логируем информацию о путях при инициализации
+  let uploadFilesList: string[] = [];
+  let templateFilesList: string[] = [];
+  
+  try {
+    if (fs.existsSync(UPLOAD_FOLDER)) {
+      uploadFilesList = fs.readdirSync(UPLOAD_FOLDER);
+    }
+  } catch (e: any) {
+    console.error('[ContractFilling] Ошибка чтения папки загрузок при инициализации:', e.message);
+  }
+  
+  try {
+    if (fs.existsSync(TEMPLATES_FOLDER)) {
+      templateFilesList = fs.readdirSync(TEMPLATES_FOLDER);
+    }
+  } catch (e: any) {
+    console.error('[ContractFilling] Ошибка чтения папки шаблонов при инициализации:', e.message);
+  }
+  
   console.log('[ContractFilling] Инициализация путей:', {
     isVercel,
     baseFolder,
+    baseFolderAbsolute: path.resolve(baseFolder),
     cwd: process.cwd(),
+    cwdAbsolute: path.resolve(process.cwd()),
     uploadFolder: UPLOAD_FOLDER,
+    uploadFolderAbsolute: path.resolve(UPLOAD_FOLDER),
     templatesFolder: TEMPLATES_FOLDER,
+    templatesFolderAbsolute: path.resolve(TEMPLATES_FOLDER),
     uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
     templatesFolderExists: fs.existsSync(TEMPLATES_FOLDER),
-    uploadFiles: fs.existsSync(UPLOAD_FOLDER) ? fs.readdirSync(UPLOAD_FOLDER).length : 0,
-    templateFiles: fs.existsSync(TEMPLATES_FOLDER) ? fs.readdirSync(TEMPLATES_FOLDER).length : 0
+    uploadFilesCount: uploadFilesList.length,
+    uploadFiles: uploadFilesList,
+    templateFilesCount: templateFilesList.length,
+    templateFiles: templateFilesList
   });
 } catch (error: any) {
   console.error('[ContractFilling] Ошибка при создании папок:', error.message);
@@ -423,19 +448,51 @@ export class ContractFillingController {
         let templateFiles: string[] = [];
         
         try {
-          if (fs.existsSync(UPLOAD_FOLDER)) {
-            uploadFiles = fs.readdirSync(UPLOAD_FOLDER).filter(f => f.match(/\.(doc|docx)$/i));
+          const uploadExists = fs.existsSync(UPLOAD_FOLDER);
+          console.log('[ContractFilling] Проверка папки загрузок:', {
+            path: UPLOAD_FOLDER,
+            exists: uploadExists,
+            absolutePath: path.resolve(UPLOAD_FOLDER)
+          });
+          
+          if (uploadExists) {
+            const allUploadFiles = fs.readdirSync(UPLOAD_FOLDER);
+            console.log('[ContractFilling] Все файлы в папке загрузок:', allUploadFiles);
+            uploadFiles = allUploadFiles.filter(f => f.match(/\.(doc|docx)$/i));
+            console.log('[ContractFilling] Отфильтрованные DOCX файлы в загрузках:', uploadFiles);
+          } else {
+            console.warn('[ContractFilling] Папка загрузок не существует:', UPLOAD_FOLDER);
           }
         } catch (error: any) {
-          console.error('[ContractFilling] Ошибка чтения папки загрузок:', error.message);
+          console.error('[ContractFilling] Ошибка чтения папки загрузок:', {
+            message: error.message,
+            stack: error.stack,
+            path: UPLOAD_FOLDER
+          });
         }
         
         try {
-          if (fs.existsSync(TEMPLATES_FOLDER)) {
-            templateFiles = fs.readdirSync(TEMPLATES_FOLDER).filter(f => f.match(/\.(doc|docx)$/i));
+          const templatesExists = fs.existsSync(TEMPLATES_FOLDER);
+          console.log('[ContractFilling] Проверка папки шаблонов:', {
+            path: TEMPLATES_FOLDER,
+            exists: templatesExists,
+            absolutePath: path.resolve(TEMPLATES_FOLDER)
+          });
+          
+          if (templatesExists) {
+            const allTemplateFiles = fs.readdirSync(TEMPLATES_FOLDER);
+            console.log('[ContractFilling] Все файлы в папке шаблонов:', allTemplateFiles);
+            templateFiles = allTemplateFiles.filter(f => f.match(/\.(doc|docx)$/i));
+            console.log('[ContractFilling] Отфильтрованные DOCX файлы в шаблонах:', templateFiles);
+          } else {
+            console.warn('[ContractFilling] Папка шаблонов не существует:', TEMPLATES_FOLDER);
           }
         } catch (error: any) {
-          console.error('[ContractFilling] Ошибка чтения папки шаблонов:', error.message);
+          console.error('[ContractFilling] Ошибка чтения папки шаблонов:', {
+            message: error.message,
+            stack: error.stack,
+            path: TEMPLATES_FOLDER
+          });
         }
         
         const allFiles = [...uploadFiles, ...templateFiles];
@@ -493,18 +550,56 @@ export class ContractFillingController {
           console.log('[ContractFilling] Найден похожий файл:', {
             matchingFile,
             templatePath,
-            exists: fs.existsSync(templatePath)
+            uploadPath,
+            templatePathCheck,
+            uploadPathExists: fs.existsSync(uploadPath),
+            templatePathCheckExists: fs.existsSync(templatePathCheck),
+            finalPath: templatePath,
+            finalPathExists: fs.existsSync(templatePath)
           });
         } else {
-          console.error('[ContractFilling] Файл не найден:', {
-            template_filename,
-            decodedFilename,
-            uploadFiles,
-            templateFiles,
-            uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
-            templatesFolderExists: fs.existsSync(TEMPLATES_FOLDER)
+          // Пробуем найти файл напрямую по имени (на случай, если он не попал в список)
+          const directUploadPath = path.join(UPLOAD_FOLDER, template_filename);
+          const directDecodedUploadPath = path.join(UPLOAD_FOLDER, decodedFilename);
+          const directTemplatePath = path.join(TEMPLATES_FOLDER, template_filename);
+          const directDecodedTemplatePath = path.join(TEMPLATES_FOLDER, decodedFilename);
+          
+          console.log('[ContractFilling] Прямая проверка путей:', {
+            directUploadPath,
+            directUploadPathExists: fs.existsSync(directUploadPath),
+            directDecodedUploadPath,
+            directDecodedUploadPathExists: fs.existsSync(directDecodedUploadPath),
+            directTemplatePath,
+            directTemplatePathExists: fs.existsSync(directTemplatePath),
+            directDecodedTemplatePath,
+            directDecodedTemplatePathExists: fs.existsSync(directDecodedTemplatePath)
           });
-          throw new AppError(`Файл не найден: ${template_filename}. Доступные файлы в загрузках: ${uploadFiles.length > 0 ? uploadFiles.join(', ') : '(папка пуста или не существует)'}, в шаблонах: ${templateFiles.length > 0 ? templateFiles.join(', ') : '(папка пуста или не существует)'}`, 404);
+          
+          if (fs.existsSync(directUploadPath)) {
+            templatePath = directUploadPath;
+            console.log('[ContractFilling] Файл найден по прямому пути (upload, оригинальное имя):', templatePath);
+          } else if (fs.existsSync(directDecodedUploadPath)) {
+            templatePath = directDecodedUploadPath;
+            console.log('[ContractFilling] Файл найден по прямому пути (upload, декодированное имя):', templatePath);
+          } else if (fs.existsSync(directTemplatePath)) {
+            templatePath = directTemplatePath;
+            console.log('[ContractFilling] Файл найден по прямому пути (template, оригинальное имя):', templatePath);
+          } else if (fs.existsSync(directDecodedTemplatePath)) {
+            templatePath = directDecodedTemplatePath;
+            console.log('[ContractFilling] Файл найден по прямому пути (template, декодированное имя):', templatePath);
+          } else {
+            console.error('[ContractFilling] Файл не найден:', {
+              template_filename,
+              decodedFilename,
+              uploadFiles,
+              templateFiles,
+              uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
+              templatesFolderExists: fs.existsSync(TEMPLATES_FOLDER),
+              uploadFolderAbsolute: path.resolve(UPLOAD_FOLDER),
+              templatesFolderAbsolute: path.resolve(TEMPLATES_FOLDER)
+            });
+            throw new AppError(`Файл не найден: ${template_filename}. Доступные файлы в загрузках: ${uploadFiles.length > 0 ? uploadFiles.join(', ') : '(папка пуста или не существует)'}, в шаблонах: ${templateFiles.length > 0 ? templateFiles.join(', ') : '(папка пуста или не существует)'}`, 404);
+          }
         }
       }
       
