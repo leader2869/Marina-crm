@@ -547,6 +547,43 @@ export class ContractFillingController {
         throw new AppError('Не удалось создать выходной файл', 500);
       }
 
+      // Проверяем, что файл действительно отличается от исходного
+      const outputStats = fs.statSync(outputPath);
+      const templateStats = fs.statSync(templatePath);
+      
+      console.log('[ContractFilling] Сравнение файлов:', {
+        templatePath,
+        outputPath,
+        templateSize: templateStats.size,
+        outputSize: outputStats.size,
+        sizesMatch: templateStats.size === outputStats.size
+      });
+
+      // Проверяем содержимое заполненного файла
+      try {
+        const checkZip = new AdmZip(outputPath);
+        const checkEntry = checkZip.getEntry('word/document.xml');
+        if (checkEntry) {
+          const checkContent = checkEntry.getData().toString('utf-8');
+          const checkText = checkContent.replace(/<[^>]+>/g, '');
+          
+          // Проверяем, что хотя бы один якорь был заменен
+          const hasReplacedData = Object.values(filteredData).some(value => 
+            checkText.includes(String(value))
+          );
+          
+          if (!hasReplacedData && Object.keys(filteredData).length > 0) {
+            console.warn('[ContractFilling] ВНИМАНИЕ: Заполненные данные не найдены в выходном файле!');
+            console.warn('[ContractFilling] Данные для заполнения:', Object.keys(filteredData));
+            console.warn('[ContractFilling] Первые 300 символов текста файла:', checkText.substring(0, 300));
+          } else {
+            console.log('[ContractFilling] Подтверждено: данные успешно добавлены в файл');
+          }
+        }
+      } catch (checkError: any) {
+        console.warn('[ContractFilling] Не удалось проверить содержимое файла:', checkError.message);
+      }
+
       console.log('[ContractFilling] Договор успешно заполнен:', outputPath);
 
       res.json({
@@ -574,8 +611,21 @@ export class ContractFillingController {
       const decodedFilename = decodeURIComponent(filename);
       const filepath = path.join(OUTPUT_FOLDER, decodedFilename);
 
+      console.log('[ContractFilling] Запрос на скачивание файла:', {
+        filename,
+        decodedFilename,
+        filepath,
+        exists: fs.existsSync(filepath),
+        outputFolder: OUTPUT_FOLDER
+      });
+
       if (!fs.existsSync(filepath)) {
         throw new AppError('Файл не найден', 404);
+      }
+
+      // Проверяем, что это действительно заполненный файл (начинается с filled_)
+      if (!decodedFilename.startsWith('filled_')) {
+        console.warn('[ContractFilling] ВНИМАНИЕ: Скачивается файл, который не является заполненным:', decodedFilename);
       }
 
       // Определяем MIME тип
@@ -589,6 +639,13 @@ export class ContractFillingController {
 
       // Читаем файл
       const fileBuffer = fs.readFileSync(filepath);
+      const stats = fs.statSync(filepath);
+      
+      console.log('[ContractFilling] Файл готов к скачиванию:', {
+        filename: decodedFilename,
+        size: stats.size,
+        contentType
+      });
       
       // Устанавливаем заголовки
       res.setHeader('Content-Type', contentType);
@@ -598,6 +655,10 @@ export class ContractFillingController {
       // Отправляем файл
       res.send(fileBuffer);
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка при скачивании файла:', {
+        message: error.message,
+        stack: error.stack
+      });
       next(new AppError(error.message || 'Ошибка при скачивании файла', 500));
     }
   }
@@ -1025,14 +1086,19 @@ export class ContractFillingController {
               console.log(`[ContractFilling] Пытаемся заменить ${anchorMatches.length - replacementCount} оставшихся якорей`);
               
               // Заменяем якоря в каждом элементе w:t
+              // Важно: используем глобальную переменную для отслеживания уже замененных якорей
+              const replacedAnchors = new Set<string>();
+              
               xmlContent = xmlContent.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, (match, textContent) => {
                 let modifiedText = textContent;
                 let wasModified = false;
                 
                 for (const anchorMatch of anchorMatches) {
-                  if (textContent.includes(anchorMatch.original) && !xmlContent.includes(anchorMatch.escapedValue)) {
+                  // Проверяем, что якорь еще не был заменен и содержится в этом элементе
+                  if (textContent.includes(anchorMatch.original) && !replacedAnchors.has(anchorMatch.original)) {
                     modifiedText = modifiedText.replace(new RegExp(anchorMatch.original.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&'), 'g'), anchorMatch.escapedValue);
                     wasModified = true;
+                    replacedAnchors.add(anchorMatch.original);
                     replacementCount++;
                     console.log(`[ContractFilling] Замена в элементе w:t: "${anchorMatch.original}" -> "${anchorMatch.value}"`);
                   }
@@ -1044,17 +1110,72 @@ export class ContractFillingController {
                 return match;
               });
               
+              // Проверяем, что все якоря были заменены
+              const remainingAnchors = anchorMatches.filter(m => !replacedAnchors.has(m.original));
+              if (remainingAnchors.length > 0) {
+                console.warn(`[ContractFilling] Не удалось заменить ${remainingAnchors.length} якорей:`, remainingAnchors.map(m => m.original));
+              }
+              
               // Если все еще остались не замененные якоря, пробуем найти их разбитыми
               // Собираем текст из нескольких соседних элементов w:t
               const textOnly = xmlContent.replace(/<[^>]+>/g, '');
-              for (const match of anchorMatches) {
-                if (textOnly.includes(match.original) && !xmlContent.includes(match.escapedValue)) {
+              const stillMissing = anchorMatches.filter(m => !replacedAnchors.has(m.original));
+              
+              for (const match of stillMissing) {
+                if (textOnly.includes(match.original)) {
                   console.warn(`[ContractFilling] Якорь "${match.original}" найден в тексте, но не может быть заменен (возможно, разбит на несколько элементов)`);
+                  
+                  // Пробуем более агрессивную замену - ищем якорь даже если он разбит тегами
+                  // Создаем паттерн, который находит якорь даже если он разбит
+                  const anchorChars = match.original.split('');
+                  const flexiblePatternParts: string[] = [];
+                  
+                  for (let i = 0; i < anchorChars.length; i++) {
+                    const char = anchorChars[i];
+                    const escapedChar = char.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&');
+                    
+                    if (i === 0) {
+                      flexiblePatternParts.push(escapedChar);
+                    } else {
+                      // Между символами могут быть XML теги
+                      flexiblePatternParts.push(`(?:<[^>]*>)*${escapedChar}`);
+                    }
+                  }
+                  
+                  const flexiblePattern = new RegExp(flexiblePatternParts.join(''), 'g');
+                  
+                  // Пробуем заменить разбитый якорь
+                  let foundBroken = false;
+                  xmlContent = xmlContent.replace(flexiblePattern, (matched) => {
+                    const matchedText = matched.replace(/<[^>]+>/g, '');
+                    if (matchedText === match.original && !replacedAnchors.has(match.original)) {
+                      foundBroken = true;
+                      replacedAnchors.add(match.original);
+                      replacementCount++;
+                      console.log(`[ContractFilling] Замена разбитого якоря: "${match.original}" -> "${match.value}"`);
+                      // Заменяем на значение, вставляя его в первый элемент w:t
+                      return match.escapedValue;
+                    }
+                    return matched;
+                  });
+                  
+                  if (!foundBroken) {
+                    console.warn(`[ContractFilling] Не удалось заменить разбитый якорь "${match.original}"`);
+                  }
                 }
               }
             }
             
             console.log(`[ContractFilling] Всего заменено якорей: ${replacementCount}`);
+            
+            // Проверяем, что изменения действительно применены
+            const finalTextCheck = xmlContent.replace(/<[^>]+>/g, '');
+            const remainingAnchorsInText = anchorMatches.filter(m => finalTextCheck.includes(m.original));
+            if (remainingAnchorsInText.length > 0) {
+              console.warn(`[ContractFilling] ВНИМАНИЕ: ${remainingAnchorsInText.length} якорей все еще присутствуют в XML после замены:`, remainingAnchorsInText.map(m => m.original));
+            } else {
+              console.log('[ContractFilling] Все якоря успешно заменены в XML');
+            }
             
           } catch (parseError: any) {
             console.warn('[ContractFilling] Не удалось распарсить XML, используем простую замену:', parseError.message);
@@ -1092,13 +1213,33 @@ export class ContractFillingController {
           }
 
           // Обновляем содержимое в ZIP
+          console.log('[ContractFilling] Обновляем document.xml в ZIP архиве');
           zip.updateFile(entry.entryName, Buffer.from(xmlContent, 'utf-8'));
+          
+          // Проверяем, что файл действительно обновлен
+          const updatedEntry = zip.getEntry(entry.entryName);
+          if (updatedEntry) {
+            const updatedContent = updatedEntry.getData().toString('utf-8');
+            const sampleText = updatedContent.replace(/<[^>]+>/g, '').substring(0, 200);
+            console.log('[ContractFilling] Проверка обновленного XML (первые 200 символов текста):', sampleText);
+          }
         }
       }
 
       // Сохраняем измененный файл
       console.log('[ContractFilling] Сохраняем файл:', outputPath);
       zip.writeZip(outputPath);
+      
+      // Проверяем сохраненный файл
+      if (fs.existsSync(outputPath)) {
+        const savedZip = new AdmZip(outputPath);
+        const savedEntry = savedZip.getEntry('word/document.xml');
+        if (savedEntry) {
+          const savedContent = savedEntry.getData().toString('utf-8');
+          const savedText = savedContent.replace(/<[^>]+>/g, '').substring(0, 200);
+          console.log('[ContractFilling] Проверка сохраненного файла (первые 200 символов текста):', savedText);
+        }
+      }
       
       // Проверяем, что файл создан
       if (!fs.existsSync(outputPath)) {
