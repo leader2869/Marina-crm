@@ -42,13 +42,38 @@ export class ContractFillingController {
 
       const file = req.file;
       const filename = file.originalname;
+      
+      // Убеждаемся, что папка существует
+      if (!fs.existsSync(UPLOAD_FOLDER)) {
+        console.log('[ContractFilling] Создаем папку UPLOAD_FOLDER:', UPLOAD_FOLDER);
+        fs.mkdirSync(UPLOAD_FOLDER, { recursive: true });
+      }
+      
       const filepath = path.join(UPLOAD_FOLDER, filename);
+      
+      console.log('[ContractFilling] Сохранение файла:', {
+        filename,
+        filepath,
+        fileSize: file.buffer.length,
+        uploadFolder: UPLOAD_FOLDER,
+        folderExists: fs.existsSync(UPLOAD_FOLDER)
+      });
 
       // Сохраняем файл
       fs.writeFileSync(filepath, file.buffer);
+      
+      // Проверяем, что файл действительно сохранен
+      if (!fs.existsSync(filepath)) {
+        throw new AppError('Не удалось сохранить файл', 500);
+      }
+      
+      const savedFileSize = fs.statSync(filepath).size;
+      console.log('[ContractFilling] Файл сохранен успешно, размер:', savedFileSize, 'байт');
 
       // Извлекаем якоря из документа
       const anchors = await this.extractAnchorsFromDoc(filepath);
+      
+      console.log('[ContractFilling] Найдено якорей:', anchors.length);
 
       res.json({
         success: true,
@@ -57,6 +82,10 @@ export class ContractFillingController {
         message: `Документ загружен. Найдено якорей: ${anchors.length}`
       });
     } catch (error: any) {
+      console.error('[ContractFilling] Ошибка в upload:', {
+        message: error.message,
+        stack: error.stack
+      });
       next(new AppError(error.message || 'Ошибка при загрузке файла', 500));
     }
   }
@@ -355,18 +384,44 @@ export class ContractFillingController {
       }
 
       if (!fs.existsSync(templatePath)) {
-        // Пробуем найти файл по списку файлов в папке загрузок
-        const uploadFiles = fs.existsSync(UPLOAD_FOLDER) ? fs.readdirSync(UPLOAD_FOLDER) : [];
-        const templateFiles = fs.existsSync(TEMPLATES_FOLDER) ? fs.readdirSync(TEMPLATES_FOLDER) : [];
-        const allFiles = [...uploadFiles, ...templateFiles];
-        console.log('[ContractFilling] Файлы в папках:', { uploadFiles, templateFiles });
+        // Убеждаемся, что папки существуют
+        if (!fs.existsSync(UPLOAD_FOLDER)) {
+          console.log('[ContractFilling] Создаем папку UPLOAD_FOLDER:', UPLOAD_FOLDER);
+          fs.mkdirSync(UPLOAD_FOLDER, { recursive: true });
+        }
+        if (!fs.existsSync(TEMPLATES_FOLDER)) {
+          console.log('[ContractFilling] Создаем папку TEMPLATES_FOLDER:', TEMPLATES_FOLDER);
+          fs.mkdirSync(TEMPLATES_FOLDER, { recursive: true });
+        }
         
-        // Ищем файл, который может быть похожим
+        // Пробуем найти файл по списку файлов в папке загрузок
+        const uploadFiles = fs.existsSync(UPLOAD_FOLDER) ? fs.readdirSync(UPLOAD_FOLDER).filter(f => f.match(/\.(doc|docx)$/i)) : [];
+        const templateFiles = fs.existsSync(TEMPLATES_FOLDER) ? fs.readdirSync(TEMPLATES_FOLDER).filter(f => f.match(/\.(doc|docx)$/i)) : [];
+        const allFiles = [...uploadFiles, ...templateFiles];
+        
+        console.log('[ContractFilling] Поиск файла:', {
+          template_filename,
+          decodedFilename,
+          uploadFolder: UPLOAD_FOLDER,
+          templatesFolder: TEMPLATES_FOLDER,
+          uploadFiles,
+          templateFiles,
+          allFiles
+        });
+        
+        // Ищем файл, который может быть похожим (без учета регистра)
+        const templateLower = template_filename.toLowerCase();
+        const decodedLower = decodedFilename.toLowerCase();
+        
         const matchingFile = allFiles.find(file => {
-          if (!file.match(/\.(doc|docx)$/i)) return false;
           const fileLower = file.toLowerCase();
-          const templateLower = template_filename.toLowerCase();
-          return fileLower.includes(templateLower) || templateLower.includes(fileLower);
+          // Точное совпадение или частичное
+          return fileLower === templateLower || 
+                 fileLower === decodedLower ||
+                 fileLower.includes(templateLower) || 
+                 templateLower.includes(fileLower) ||
+                 fileLower.includes(decodedLower) ||
+                 decodedLower.includes(fileLower);
         });
 
         if (matchingFile) {
@@ -374,11 +429,25 @@ export class ContractFillingController {
           const uploadPath = path.join(UPLOAD_FOLDER, matchingFile);
           const templatePathCheck = path.join(TEMPLATES_FOLDER, matchingFile);
           templatePath = fs.existsSync(uploadPath) ? uploadPath : templatePathCheck;
-          console.log('[ContractFilling] Найден похожий файл:', templatePath);
+          console.log('[ContractFilling] Найден похожий файл:', {
+            matchingFile,
+            templatePath,
+            exists: fs.existsSync(templatePath)
+          });
         } else {
-          throw new AppError(`Файл не найден: ${template_filename}. Доступные файлы в загрузках: ${uploadFiles.join(', ')}, в шаблонах: ${templateFiles.join(', ')}`, 404);
+          console.error('[ContractFilling] Файл не найден:', {
+            template_filename,
+            decodedFilename,
+            uploadFiles,
+            templateFiles,
+            uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
+            templatesFolderExists: fs.existsSync(TEMPLATES_FOLDER)
+          });
+          throw new AppError(`Файл не найден: ${template_filename}. Доступные файлы в загрузках: ${uploadFiles.length > 0 ? uploadFiles.join(', ') : '(папка пуста или не существует)'}, в шаблонах: ${templateFiles.length > 0 ? templateFiles.join(', ') : '(папка пуста или не существует)'}`, 404);
         }
       }
+      
+      console.log('[ContractFilling] Используем файл:', templatePath, 'существует:', fs.existsSync(templatePath));
 
       // Фильтруем пустые значения
       const filteredData: Record<string, string> = {};
