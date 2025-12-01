@@ -27,6 +27,19 @@ try {
       fs.mkdirSync(folder, { recursive: true });
     }
   });
+  
+  // Логируем информацию о путях при инициализации
+  console.log('[ContractFilling] Инициализация путей:', {
+    isVercel,
+    baseFolder,
+    cwd: process.cwd(),
+    uploadFolder: UPLOAD_FOLDER,
+    templatesFolder: TEMPLATES_FOLDER,
+    uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
+    templatesFolderExists: fs.existsSync(TEMPLATES_FOLDER),
+    uploadFiles: fs.existsSync(UPLOAD_FOLDER) ? fs.readdirSync(UPLOAD_FOLDER).length : 0,
+    templateFiles: fs.existsSync(TEMPLATES_FOLDER) ? fs.readdirSync(TEMPLATES_FOLDER).length : 0
+  });
 } catch (error: any) {
   console.error('[ContractFilling] Ошибка при создании папок:', error.message);
   // Не блокируем запуск, но логируем ошибку
@@ -362,6 +375,17 @@ export class ContractFillingController {
         decodedFilename = template_filename;
       }
 
+      console.log('[ContractFilling] Начало поиска файла:', {
+        template_filename,
+        decodedFilename,
+        uploadFolder: UPLOAD_FOLDER,
+        templatesFolder: TEMPLATES_FOLDER,
+        uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
+        templatesFolderExists: fs.existsSync(TEMPLATES_FOLDER),
+        cwd: process.cwd(),
+        isVercel
+      });
+
       // Сначала ищем файл в папке загрузок (UPLOAD_FOLDER)
       let templatePath = path.join(UPLOAD_FOLDER, decodedFilename);
       console.log('[ContractFilling] Проверка файла в папке загрузок:', templatePath, 'существует:', fs.existsSync(templatePath));
@@ -395,33 +419,70 @@ export class ContractFillingController {
         }
         
         // Пробуем найти файл по списку файлов в папке загрузок
-        const uploadFiles = fs.existsSync(UPLOAD_FOLDER) ? fs.readdirSync(UPLOAD_FOLDER).filter(f => f.match(/\.(doc|docx)$/i)) : [];
-        const templateFiles = fs.existsSync(TEMPLATES_FOLDER) ? fs.readdirSync(TEMPLATES_FOLDER).filter(f => f.match(/\.(doc|docx)$/i)) : [];
+        let uploadFiles: string[] = [];
+        let templateFiles: string[] = [];
+        
+        try {
+          if (fs.existsSync(UPLOAD_FOLDER)) {
+            uploadFiles = fs.readdirSync(UPLOAD_FOLDER).filter(f => f.match(/\.(doc|docx)$/i));
+          }
+        } catch (error: any) {
+          console.error('[ContractFilling] Ошибка чтения папки загрузок:', error.message);
+        }
+        
+        try {
+          if (fs.existsSync(TEMPLATES_FOLDER)) {
+            templateFiles = fs.readdirSync(TEMPLATES_FOLDER).filter(f => f.match(/\.(doc|docx)$/i));
+          }
+        } catch (error: any) {
+          console.error('[ContractFilling] Ошибка чтения папки шаблонов:', error.message);
+        }
+        
         const allFiles = [...uploadFiles, ...templateFiles];
         
+        // Детальное логирование для отладки
         console.log('[ContractFilling] Поиск файла:', {
           template_filename,
           decodedFilename,
           uploadFolder: UPLOAD_FOLDER,
           templatesFolder: TEMPLATES_FOLDER,
+          uploadFolderExists: fs.existsSync(UPLOAD_FOLDER),
+          templatesFolderExists: fs.existsSync(TEMPLATES_FOLDER),
           uploadFiles,
           templateFiles,
-          allFiles
+          allFiles,
+          cwd: process.cwd(),
+          isVercel
         });
         
+        // Логируем байтовые представления имен файлов для отладки кодировки
+        if (uploadFiles.length > 0 || templateFiles.length > 0) {
+          console.log('[ContractFilling] Детали файлов:', {
+            templateFilenameBytes: Buffer.from(template_filename, 'utf8').toString('hex'),
+            decodedFilenameBytes: Buffer.from(decodedFilename, 'utf8').toString('hex'),
+            uploadFilesBytes: uploadFiles.map(f => Buffer.from(f, 'utf8').toString('hex')),
+            templateFilesBytes: templateFiles.map(f => Buffer.from(f, 'utf8').toString('hex'))
+          });
+        }
+        
         // Ищем файл, который может быть похожим (без учета регистра)
-        const templateLower = template_filename.toLowerCase();
-        const decodedLower = decodedFilename.toLowerCase();
+        // Нормализуем имена файлов для сравнения (убираем лишние пробелы, приводим к нижнему регистру)
+        const normalizeFileName = (name: string) => name.toLowerCase().trim().replace(/\s+/g, ' ');
+        const templateLower = normalizeFileName(template_filename);
+        const decodedLower = normalizeFileName(decodedFilename);
         
         const matchingFile = allFiles.find(file => {
-          const fileLower = file.toLowerCase();
+          const fileLower = normalizeFileName(file);
           // Точное совпадение или частичное
           return fileLower === templateLower || 
                  fileLower === decodedLower ||
                  fileLower.includes(templateLower) || 
                  templateLower.includes(fileLower) ||
                  fileLower.includes(decodedLower) ||
-                 decodedLower.includes(fileLower);
+                 decodedLower.includes(fileLower) ||
+                 // Также проверяем без расширения
+                 fileLower.replace(/\.(doc|docx)$/i, '') === templateLower.replace(/\.(doc|docx)$/i, '') ||
+                 fileLower.replace(/\.(doc|docx)$/i, '') === decodedLower.replace(/\.(doc|docx)$/i, '');
         });
 
         if (matchingFile) {
@@ -797,82 +858,12 @@ export class ContractFillingController {
           try {
             const parsed = await parseStringAsync(xmlContent);
             
-            // Функция для рекурсивного обхода и замены якорей в XML структуре
-            const replaceInNode = (node: any): any => {
-              if (typeof node === 'string') {
-                return node;
-              }
-              
-              if (Array.isArray(node)) {
-                return node.map(n => replaceInNode(n));
-              }
-              
-              if (node && typeof node === 'object') {
-                const result: any = {};
-                
-                // Обрабатываем текстовые элементы w:t
-                if (node['w:t']) {
-                  const textContent = Array.isArray(node['w:t']) 
-                    ? node['w:t'].map((t: any) => typeof t === 'string' ? t : (t._ || t)).join('')
-                    : (typeof node['w:t'] === 'string' ? node['w:t'] : (node['w:t']._ || ''));
-                  
-                  // Ищем якоря в тексте
-                  let modifiedText = textContent;
-                  const patterns = [
-                    { fullPattern: /\{\{([^}]+)\}\}/g, name: 'double_braces' },
-                    { fullPattern: /\{([^}]+)\}/g, name: 'single_braces' }
-                  ];
-                  
-                  for (const { fullPattern, name } of patterns) {
-                    modifiedText = modifiedText.replace(fullPattern, (match: string, anchorName: string) => {
-                      const normalizedAnchor = this.normalizeAnchor(anchorName);
-                      console.log(`[ContractFilling] Найден якорь "${match}" (${name}), нормализован: "${normalizedAnchor}"`);
-                      
-                      if (normalizedData.hasOwnProperty(normalizedAnchor)) {
-                        const value = normalizedData[normalizedAnchor];
-                        console.log(`[ContractFilling] Замена: "${match}" -> "${value}"`);
-                        return value;
-                      }
-                      
-                      console.log(`[ContractFilling] Якорь "${normalizedAnchor}" не найден в данных`);
-                      return match;
-                    });
-                  }
-                  
-                  // Если текст изменился, обновляем узел
-                  if (modifiedText !== textContent) {
-                    result['w:t'] = modifiedText;
-                    // Копируем остальные свойства узла
-                    for (const key in node) {
-                      if (key !== 'w:t') {
-                        result[key] = replaceInNode(node[key]);
-                      }
-                    }
-                    return result;
-                  }
-                }
-                
-                // Рекурсивно обрабатываем все дочерние элементы
-                for (const key in node) {
-                  result[key] = replaceInNode(node[key]);
-                }
-                
-                return result;
-              }
-              
-              return node;
-            };
-            
-            const modifiedParsed = replaceInNode(parsed);
-            
-            // Конвертируем обратно в XML строку
-            // Используем простой подход - заменяем в исходном XML
-            // Но сначала соберем весь текст документа для поиска якорей
+            // Извлекаем весь текст документа для поиска якорей
             const fullText = this.extractTextFromXmlNode(parsed);
             console.log('[ContractFilling] Извлеченный текст (первые 500 символов):', fullText.substring(0, 500));
             
             // Ищем все якоря в тексте
-            const anchorMatches: Array<{ original: string; normalized: string; value: string }> = [];
+            const anchorMatches: Array<{ original: string; normalized: string; value: string; escapedValue: string }> = [];
             const patterns = [
               { fullPattern: /\{\{([^}]+)\}\}/g, name: 'double_braces' },
               { fullPattern: /\{([^}]+)\}/g, name: 'single_braces' }
@@ -880,50 +871,187 @@ export class ContractFillingController {
             
             for (const { fullPattern } of patterns) {
               let match;
+              // Сбрасываем lastIndex для повторного использования regex
+              fullPattern.lastIndex = 0;
               while ((match = fullPattern.exec(fullText)) !== null) {
                 const normalizedAnchor = this.normalizeAnchor(match[1]);
                 if (normalizedData.hasOwnProperty(normalizedAnchor)) {
+                  const value = normalizedData[normalizedAnchor];
+                  // Экранируем значение для XML
+                  const escapedValue = String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&apos;');
+                  
                   anchorMatches.push({
                     original: match[0],
                     normalized: normalizedAnchor,
-                    value: normalizedData[normalizedAnchor]
+                    value: value,
+                    escapedValue: escapedValue
                   });
+                  
+                  console.log(`[ContractFilling] Найден якорь для замены: "${match[0]}" -> "${value}"`);
+                } else {
+                  console.log(`[ContractFilling] Якорь "${normalizedAnchor}" не найден в данных`);
                 }
               }
             }
             
             console.log('[ContractFilling] Найдено якорей для замены:', anchorMatches.length);
             
-            // Заменяем якоря в XML, используя более агрессивный подход
-            // Удаляем XML теги временно, заменяем, затем восстанавливаем структуру
-            let replacementCount = 0;
-            
-            // Создаем карту замен: оригинальный якорь -> значение
-            const replacementMap: Record<string, string> = {};
-            for (const match of anchorMatches) {
-              // Экранируем значение для XML
-              const escapedValue = String(match.value)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&apos;');
-              replacementMap[match.original] = escapedValue;
+            if (anchorMatches.length === 0) {
+              console.warn('[ContractFilling] Не найдено якорей для замены. Проверьте данные:', {
+                normalizedDataKeys: Object.keys(normalizedData),
+                fullTextSample: fullText.substring(0, 200)
+              });
             }
             
-            // Заменяем все якоря в XML
-            for (const [originalAnchor, escapedValue] of Object.entries(replacementMap)) {
-              // Заменяем якорь, даже если он разбит на несколько элементов
-              // Ищем паттерн якоря в XML и заменяем его
-              const anchorPattern = originalAnchor.replace(/[{}]/g, '\\$&');
-              const regex = new RegExp(anchorPattern.replace(/\{\{/g, '\\{\\{').replace(/\}\}/g, '\\}\\}'), 'g');
+            // Функция для рекурсивного обхода и замены якорей в XML структуре
+            // Этот подход правильно обрабатывает разбитые якоря
+            const replaceInNode = (node: any, parentText: string = ''): { node: any; text: string } => {
+              if (typeof node === 'string') {
+                return { node, text: node };
+              }
               
-              // Более простой подход: заменяем якорь в тексте между тегами
-              xmlContent = xmlContent.replace(
-                new RegExp(originalAnchor.replace(/[{}]/g, '\\$&'), 'g'),
-                escapedValue
-              );
-              replacementCount++;
+              if (Array.isArray(node)) {
+                let combinedText = '';
+                const processedNodes = node.map(n => {
+                  const result = replaceInNode(n, parentText + combinedText);
+                  combinedText += result.text;
+                  return result.node;
+                });
+                return { node: processedNodes, text: combinedText };
+              }
+              
+              if (node && typeof node === 'object') {
+                const result: any = {};
+                let nodeText = '';
+                
+                // Обрабатываем текстовые элементы w:t
+                if (node['w:t']) {
+                  const textContent = Array.isArray(node['w:t']) 
+                    ? node['w:t'].map((t: any) => typeof t === 'string' ? t : (t._ || t || '')).join('')
+                    : (typeof node['w:t'] === 'string' ? node['w:t'] : (node['w:t']._ || node['w:t'] || ''));
+                  
+                  nodeText = textContent;
+                  
+                  // Собираем контекст для поиска разбитых якорей
+                  const contextText = parentText + textContent;
+                  
+                  // Ищем якоря в контексте
+                  let modifiedText = textContent;
+                  let hasReplacement = false;
+                  
+                  for (const match of anchorMatches) {
+                    // Проверяем, содержится ли якорь в контексте
+                    if (contextText.includes(match.original)) {
+                      // Если якорь полностью в этом элементе, заменяем его
+                      if (textContent.includes(match.original)) {
+                        modifiedText = modifiedText.replace(match.original, match.escapedValue);
+                        hasReplacement = true;
+                        console.log(`[ContractFilling] Замена в элементе: "${match.original}" -> "${match.value}"`);
+                      }
+                    }
+                  }
+                  
+                  // Если текст изменился, обновляем узел
+                  if (hasReplacement) {
+                    result['w:t'] = modifiedText;
+                    // Копируем остальные свойства узла
+                    for (const key in node) {
+                      if (key !== 'w:t') {
+                        const childResult = replaceInNode(node[key], parentText + modifiedText);
+                        result[key] = childResult.node;
+                        nodeText += childResult.text;
+                      }
+                    }
+                    return { node: result, text: modifiedText };
+                  } else {
+                    result['w:t'] = textContent;
+                    // Копируем остальные свойства узла
+                    for (const key in node) {
+                      if (key !== 'w:t') {
+                        const childResult = replaceInNode(node[key], parentText + nodeText);
+                        result[key] = childResult.node;
+                        nodeText += childResult.text;
+                      }
+                    }
+                    return { node: result, text: nodeText };
+                  }
+                }
+                
+                // Рекурсивно обрабатываем все дочерние элементы
+                for (const key in node) {
+                  const childResult = replaceInNode(node[key], parentText + nodeText);
+                  result[key] = childResult.node;
+                  nodeText += childResult.text;
+                }
+                
+                return { node: result, text: nodeText };
+              }
+              
+              return { node, text: '' };
+            };
+            
+            // Применяем замену
+            const modifiedResult = replaceInNode(parsed);
+            
+            // Конвертируем обратно в XML строку
+            // Используем простой подход - заменяем в исходном XML строке
+            // Это более надежно, чем пытаться сериализовать обратно в XML
+            let replacementCount = 0;
+            
+            // Заменяем якоря в XML строке
+            // Важно: якоря могут быть разбиты на несколько элементов w:t
+            // Используем простой и надежный подход: заменяем якоря в тексте между тегами w:t
+            
+            // Сначала пробуем простую замену для целых якорей
+            for (const match of anchorMatches) {
+              const escapedAnchor = match.original.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&');
+              const simplePattern = new RegExp(escapedAnchor, 'g');
+              
+              if (xmlContent.includes(match.original)) {
+                xmlContent = xmlContent.replace(simplePattern, match.escapedValue);
+                replacementCount++;
+                console.log(`[ContractFilling] Замена в XML: "${match.original}" -> "${match.value}"`);
+              }
+            }
+            
+            // Если остались не замененные якоря, они могут быть разбиты на несколько элементов w:t
+            // Используем более простой подход: заменяем в каждом элементе w:t отдельно
+            if (replacementCount < anchorMatches.length) {
+              console.log(`[ContractFilling] Пытаемся заменить ${anchorMatches.length - replacementCount} оставшихся якорей`);
+              
+              // Заменяем якоря в каждом элементе w:t
+              xmlContent = xmlContent.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, (match, textContent) => {
+                let modifiedText = textContent;
+                let wasModified = false;
+                
+                for (const anchorMatch of anchorMatches) {
+                  if (textContent.includes(anchorMatch.original) && !xmlContent.includes(anchorMatch.escapedValue)) {
+                    modifiedText = modifiedText.replace(new RegExp(anchorMatch.original.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&'), 'g'), anchorMatch.escapedValue);
+                    wasModified = true;
+                    replacementCount++;
+                    console.log(`[ContractFilling] Замена в элементе w:t: "${anchorMatch.original}" -> "${anchorMatch.value}"`);
+                  }
+                }
+                
+                if (wasModified) {
+                  return match.replace(textContent, modifiedText);
+                }
+                return match;
+              });
+              
+              // Если все еще остались не замененные якоря, пробуем найти их разбитыми
+              // Собираем текст из нескольких соседних элементов w:t
+              const textOnly = xmlContent.replace(/<[^>]+>/g, '');
+              for (const match of anchorMatches) {
+                if (textOnly.includes(match.original) && !xmlContent.includes(match.escapedValue)) {
+                  console.warn(`[ContractFilling] Якорь "${match.original}" найден в тексте, но не может быть заменен (возможно, разбит на несколько элементов)`);
+                }
+              }
             }
             
             console.log(`[ContractFilling] Всего заменено якорей: ${replacementCount}`);
