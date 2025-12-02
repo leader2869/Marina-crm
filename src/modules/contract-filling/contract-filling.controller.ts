@@ -480,6 +480,48 @@ export class ContractFillingController {
         let uploadFiles: string[] = [];
         let templateFiles: string[] = [];
         
+        // Функция для нормализации имени файла для сравнения
+        const normalizeFilename = (filename: string): string => {
+          return filename
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, ' ') // Множественные пробелы в один
+            .replace(/[^\w\s\-а-яА-ЯёЁ.]/g, ''); // Удаляем спецсимволы
+        };
+        
+        // Функция для поиска файла по частичному совпадению
+        const findFileByPartialMatch = (files: string[], searchName: string): string | null => {
+          const normalizedSearch = normalizeFilename(searchName);
+          
+          // Сначала пробуем точное совпадение (после нормализации)
+          for (const file of files) {
+            if (normalizeFilename(file) === normalizedSearch) {
+              return file;
+            }
+          }
+          
+          // Потом пробуем частичное совпадение
+          for (const file of files) {
+            const normalizedFile = normalizeFilename(file);
+            if (normalizedFile.includes(normalizedSearch) || normalizedSearch.includes(normalizedFile)) {
+              return file;
+            }
+          }
+          
+          // Пробуем найти по ключевым словам
+          const searchWords = normalizedSearch.split(/\s+/).filter(w => w.length > 2);
+          for (const file of files) {
+            const normalizedFile = normalizeFilename(file);
+            const fileWords = normalizedFile.split(/\s+/).filter(w => w.length > 2);
+            const matchCount = searchWords.filter(sw => fileWords.some(fw => fw.includes(sw) || sw.includes(fw))).length;
+            if (matchCount >= Math.min(2, searchWords.length)) {
+              return file;
+            }
+          }
+          
+          return null;
+        };
+        
         try {
           const uploadExists = fs.existsSync(UPLOAD_FOLDER);
           console.log('[ContractFilling] Проверка папки загрузок:', {
@@ -493,6 +535,13 @@ export class ContractFillingController {
             console.log('[ContractFilling] Все файлы в папке загрузок:', allUploadFiles);
             uploadFiles = allUploadFiles.filter(f => f.match(/\.(doc|docx)$/i));
             console.log('[ContractFilling] Отфильтрованные DOCX файлы в загрузках:', uploadFiles);
+            
+            // Пробуем найти файл по частичному совпадению
+            const foundFile = findFileByPartialMatch(uploadFiles, decodedFilename) || findFileByPartialMatch(uploadFiles, template_filename);
+            if (foundFile) {
+              templatePath = path.join(UPLOAD_FOLDER, foundFile);
+              console.log('[ContractFilling] Файл найден по частичному совпадению:', foundFile);
+            }
           } else {
             console.warn('[ContractFilling] Папка загрузок не существует:', UPLOAD_FOLDER);
           }
@@ -504,28 +553,38 @@ export class ContractFillingController {
           });
         }
         
-        try {
-          const templatesExists = fs.existsSync(TEMPLATES_FOLDER);
-          console.log('[ContractFilling] Проверка папки шаблонов:', {
-            path: TEMPLATES_FOLDER,
-            exists: templatesExists,
-            absolutePath: path.resolve(TEMPLATES_FOLDER)
-          });
-          
-          if (templatesExists) {
-            const allTemplateFiles = fs.readdirSync(TEMPLATES_FOLDER);
-            console.log('[ContractFilling] Все файлы в папке шаблонов:', allTemplateFiles);
-            templateFiles = allTemplateFiles.filter(f => f.match(/\.(doc|docx)$/i));
-            console.log('[ContractFilling] Отфильтрованные DOCX файлы в шаблонах:', templateFiles);
-          } else {
-            console.warn('[ContractFilling] Папка шаблонов не существует:', TEMPLATES_FOLDER);
+        // Если файл все еще не найден, пробуем в папке шаблонов
+        if (!fs.existsSync(templatePath)) {
+          try {
+            const templatesExists = fs.existsSync(TEMPLATES_FOLDER);
+            console.log('[ContractFilling] Проверка папки шаблонов:', {
+              path: TEMPLATES_FOLDER,
+              exists: templatesExists,
+              absolutePath: path.resolve(TEMPLATES_FOLDER)
+            });
+            
+            if (templatesExists) {
+              const allTemplateFiles = fs.readdirSync(TEMPLATES_FOLDER);
+              console.log('[ContractFilling] Все файлы в папке шаблонов:', allTemplateFiles);
+              templateFiles = allTemplateFiles.filter(f => f.match(/\.(doc|docx)$/i));
+              console.log('[ContractFilling] Отфильтрованные DOCX файлы в шаблонах:', templateFiles);
+              
+              // Пробуем найти файл по частичному совпадению
+              const foundFile = findFileByPartialMatch(templateFiles, decodedFilename) || findFileByPartialMatch(templateFiles, template_filename);
+              if (foundFile) {
+                templatePath = path.join(TEMPLATES_FOLDER, foundFile);
+                console.log('[ContractFilling] Файл найден в шаблонах по частичному совпадению:', foundFile);
+              }
+            } else {
+              console.warn('[ContractFilling] Папка шаблонов не существует:', TEMPLATES_FOLDER);
+            }
+          } catch (error: any) {
+            console.error('[ContractFilling] Ошибка чтения папки шаблонов:', {
+              message: error.message,
+              stack: error.stack,
+              path: TEMPLATES_FOLDER
+            });
           }
-        } catch (error: any) {
-          console.error('[ContractFilling] Ошибка чтения папки шаблонов:', {
-            message: error.message,
-            stack: error.stack,
-            path: TEMPLATES_FOLDER
-          });
         }
         
         const allFiles = [...uploadFiles, ...templateFiles];
