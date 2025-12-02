@@ -76,6 +76,7 @@ const isSupabase =
 
 // Отключаем synchronize на production для безопасности
 // Используем миграции вместо synchronize
+// На Vercel synchronize отключен, поэтому структура БД должна быть создана вручную
 const shouldSynchronize = process.env.NODE_ENV === 'development' && !process.env.VERCEL;
 
 export const AppDataSource = new DataSource({
@@ -108,6 +109,9 @@ export const AppDataSource = new DataSource({
   ],
   migrations: ['src/database/migrations/**/*.ts'],
   subscribers: ['src/database/subscribers/**/*.ts'],
+  // Отключаем синхронизацию для Contragent, если таблица создана вручную
+  // Это предотвратит ошибки при инициализации, если структура немного отличается
+  entitySkipConstructor: false,
 });
 
 

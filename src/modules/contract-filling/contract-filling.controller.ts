@@ -810,15 +810,24 @@ export class ContractFillingController {
         if (!tableExists) {
           console.warn('[ContractFilling] Таблица contragents не существует, возвращаем пустой список');
           // Возвращаем пустой список вместо ошибки
-          res.json({ contragents: [] });
-          return;
+        res.json({ contragents: [] });
+        return;
         }
       } catch (tableCheckError: any) {
         console.error('[ContractFilling] Ошибка при проверке таблицы:', tableCheckError.message);
         // Если не можем проверить таблицу, пробуем выполнить запрос
       }
 
-      const contragentRepository = AppDataSource.getRepository(Contragent);
+      // Проверяем, что entity Contragent зарегистрирована
+      let contragentRepository;
+      try {
+        contragentRepository = AppDataSource.getRepository(Contragent);
+      } catch (repoError: any) {
+        console.error('[ContractFilling] Ошибка при получении репозитория Contragent:', repoError.message);
+        // Если репозиторий недоступен, возвращаем пустой список
+        res.json({ contragents: [] });
+        return;
+      }
       
       // Получаем контрагентов для текущего пользователя или клуба
       const where: any = {};

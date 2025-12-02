@@ -83,28 +83,12 @@ const initializeApp = async (): Promise<void> => {
       }
       
       // Проверяем, не связана ли ошибка с entity Contragent
-      if (error.message && (error.message.includes('contragents') || error.message.includes('Contragent') || error.message.includes('user_id') || error.message.includes('club_id'))) {
-        console.error('❌ Ошибка связана с entity Contragent:', error.message);
+      if (error.message && (error.message.includes('contragents') || error.message.includes('Contragent') || error.message.includes('user_id') || error.message.includes('club_id') || error.message.includes('column') && error.message.includes('does not exist'))) {
+        console.error('❌ Ошибка связана с entity Contragent или структурой таблицы:', error.message);
         console.error('❌ Stack:', error.stack);
-        console.error('💡 Возможно, таблица contragents имеет неправильную структуру');
-        console.error('💡 Запустите: npm run create-contragents-table');
-        console.error('💡 Или проверьте, что таблица существует и имеет правильную структуру');
-        
-        // Если ошибка связана с Contragent, пробуем инициализировать без неё
-        console.log('🔄 Пробуем инициализировать БД без entity Contragent...');
-        try {
-          // Временно исключаем Contragent из entities
-          const tempDataSource = new DataSource({
-            ...AppDataSource.options,
-            entities: AppDataSource.options.entities?.filter((e: any) => e.name !== 'Contragent') || []
-          });
-          await tempDataSource.initialize();
-          console.log('✅ БД инициализирована без Contragent');
-          // Используем временный DataSource для основных операций
-          // Но это не идеальное решение, лучше исправить структуру таблицы
-        } catch (tempError: any) {
-          console.error('❌ Не удалось инициализировать БД даже без Contragent:', tempError.message);
-        }
+        console.error('💡 Возможно, таблица contragents имеет неправильную структуру или не существует');
+        console.error('💡 На Vercel запустите SQL для создания таблицы:');
+        console.error('💡 CREATE TABLE IF NOT EXISTS contragents (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, data JSONB NOT NULL, user_id INTEGER, club_id INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);');
       }
       
       console.error('❌ Ошибка при подключении к базе данных:', error.message);
