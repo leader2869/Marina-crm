@@ -224,7 +224,19 @@ export class AuthController {
       } else {
         // Ищем по email
         console.log(`[Login] Поиск пользователя по email: ${emailOrPhone}`);
-        user = await userRepository.findOne({ where: { email: emailOrPhone } });
+        try {
+          user = await userRepository.findOne({ 
+            where: { email: emailOrPhone, isActive: true } 
+          });
+        } catch (dbError: any) {
+          console.error('[Auth Login] Ошибка при поиске пользователя по email:', {
+            message: dbError.message,
+            stack: dbError.stack,
+            code: dbError.code,
+            detail: dbError.detail
+          });
+          throw new AppError(`Ошибка при поиске пользователя: ${dbError.message}`, 500);
+        }
       }
 
       if (!user) {
