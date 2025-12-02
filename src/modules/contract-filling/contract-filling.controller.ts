@@ -907,7 +907,14 @@ export class ContractFillingController {
         console.warn('[ContractFilling] Не удалось проверить таблицу, продолжаем:', tableCheckError.message);
       }
 
-      const contragentRepository = AppDataSource.getRepository(Contragent);
+      // Проверяем, что entity Contragent зарегистрирована
+      let contragentRepository;
+      try {
+        contragentRepository = AppDataSource.getRepository(Contragent);
+      } catch (repoError: any) {
+        console.error('[ContractFilling] Ошибка при получении репозитория Contragent:', repoError.message);
+        throw new AppError('Функционал контрагентов временно недоступен', 503);
+      }
       
       // Создаем новый контрагент
       const contragent = contragentRepository.create({
@@ -954,7 +961,14 @@ export class ContractFillingController {
         throw new AppError('База данных не подключена', 503);
       }
 
-      const contragentRepository = AppDataSource.getRepository(Contragent);
+      // Проверяем, что entity Contragent зарегистрирована
+      let contragentRepository;
+      try {
+        contragentRepository = AppDataSource.getRepository(Contragent);
+      } catch (repoError: any) {
+        console.error('[ContractFilling] Ошибка при получении репозитория Contragent:', repoError.message);
+        throw new AppError('Функционал контрагентов временно недоступен', 503);
+      }
       
       const where: any = { id };
       if (req.userId) {
@@ -1000,7 +1014,14 @@ export class ContractFillingController {
         throw new AppError('База данных не подключена', 503);
       }
 
-      const contragentRepository = AppDataSource.getRepository(Contragent);
+      // Проверяем, что entity Contragent зарегистрирована
+      let contragentRepository;
+      try {
+        contragentRepository = AppDataSource.getRepository(Contragent);
+      } catch (repoError: any) {
+        console.error('[ContractFilling] Ошибка при получении репозитория Contragent:', repoError.message);
+        throw new AppError('Функционал контрагентов временно недоступен', 503);
+      }
       
       const where: any = { id };
       if (req.userId) {

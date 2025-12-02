@@ -105,7 +105,9 @@ export const AppDataSource = new DataSource({
     VesselOwnerExpenseCategory,
     AgentOrder,
     AgentOrderResponse,
-    Contragent,
+    // Contragent - временно исключена для диагностики ошибки 500
+    // Раскомментируйте после исправления проблемы
+    // Contragent,
   ],
   migrations: ['src/database/migrations/**/*.ts'],
   subscribers: ['src/database/subscribers/**/*.ts'],
