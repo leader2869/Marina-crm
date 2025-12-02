@@ -25,14 +25,14 @@ export class Contragent {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ name: 'user_id', nullable: true })
+  @Column({ name: 'user_id', nullable: true, select: false })
   userId: number;
 
   @ManyToOne(() => Club, { nullable: true })
   @JoinColumn({ name: 'club_id' })
   club: Club;
 
-  @Column({ name: 'club_id', nullable: true })
+  @Column({ name: 'club_id', nullable: true, select: false })
   clubId: number;
 
   @CreateDateColumn({ name: 'created_at' })
