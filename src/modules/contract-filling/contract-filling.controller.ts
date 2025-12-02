@@ -1316,53 +1316,95 @@ export class ContractFillingController {
             // Важно: якоря могут быть разбиты на несколько элементов w:t
             // Используем простой и надежный подход: заменяем якоря в тексте между тегами w:t
             
-            // Сначала пробуем простую замену для целых якорей
+            // Сначала пробуем простую замену для целых якорей (ВСЕ вхождения)
             for (const match of anchorMatches) {
               const escapedAnchor = match.original.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&');
               const simplePattern = new RegExp(escapedAnchor, 'g');
               
-              if (xmlContent.includes(match.original)) {
+              // Подсчитываем количество вхождений перед заменой
+              const matchesBefore = xmlContent.match(simplePattern);
+              if (matchesBefore && matchesBefore.length > 0) {
                 xmlContent = xmlContent.replace(simplePattern, match.escapedValue);
-                replacementCount++;
-                console.log(`[ContractFilling] Замена в XML: "${match.original}" -> "${match.value}"`);
+                replacementCount += matchesBefore.length;
+                console.log(`[ContractFilling] Замена в XML (${matchesBefore.length} вхождений): "${match.original}" -> "${match.value}"`);
               }
             }
             
-            // Если остались не замененные якоря, они могут быть разбиты на несколько элементов w:t
-            // Используем более простой подход: заменяем в каждом элементе w:t отдельно
-            if (replacementCount < anchorMatches.length) {
-              console.log(`[ContractFilling] Пытаемся заменить ${anchorMatches.length - replacementCount} оставшихся якорей`);
+            // Проверяем, остались ли не замененные якоря (могут быть разбиты на несколько элементов w:t)
+            const textOnly = xmlContent.replace(/<[^>]+>/g, '');
+            const remainingAnchors = anchorMatches.filter(m => textOnly.includes(m.original));
+            
+            if (remainingAnchors.length > 0) {
+              console.log(`[ContractFilling] Пытаемся заменить ${remainingAnchors.length} оставшихся якорей (возможно разбитых)`);
               
-              // Заменяем якоря в каждом элементе w:t
-              // Важно: используем глобальную переменную для отслеживания уже замененных якорей
-              const replacedAnchors = new Set<string>();
-              
-              xmlContent = xmlContent.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, (match, textContent) => {
+              // Заменяем якоря в каждом элементе w:t (ВСЕ вхождения в каждом элементе)
+              xmlContent = xmlContent.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, (fullMatch, textContent) => {
                 let modifiedText = textContent;
                 let wasModified = false;
+                let localCount = 0;
                 
-                for (const anchorMatch of anchorMatches) {
-                  // Проверяем, что якорь еще не был заменен и содержится в этом элементе
-                  if (textContent.includes(anchorMatch.original) && !replacedAnchors.has(anchorMatch.original)) {
-                    modifiedText = modifiedText.replace(new RegExp(anchorMatch.original.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&'), 'g'), anchorMatch.escapedValue);
+                for (const anchorMatch of remainingAnchors) {
+                  // Заменяем ВСЕ вхождения якоря в этом элементе
+                  if (textContent.includes(anchorMatch.original)) {
+                    const anchorPattern = new RegExp(anchorMatch.original.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&'), 'g');
+                    const count = (textContent.match(anchorPattern) || []).length;
+                    modifiedText = modifiedText.replace(anchorPattern, anchorMatch.escapedValue);
                     wasModified = true;
-                    replacedAnchors.add(anchorMatch.original);
-                    replacementCount++;
-                    console.log(`[ContractFilling] Замена в элементе w:t: "${anchorMatch.original}" -> "${anchorMatch.value}"`);
+                    localCount += count;
+                    console.log(`[ContractFilling] Замена в элементе w:t (${count} вхождений): "${anchorMatch.original}" -> "${anchorMatch.value}"`);
                   }
                 }
                 
                 if (wasModified) {
-                  return match.replace(textContent, modifiedText);
+                  replacementCount += localCount;
+                  return fullMatch.replace(textContent, modifiedText);
                 }
-                return match;
+                return fullMatch;
               });
               
-              // Проверяем, что все якоря были заменены
-              const remainingAnchors = anchorMatches.filter(m => !replacedAnchors.has(m.original));
-              if (remainingAnchors.length > 0) {
-                console.warn(`[ContractFilling] Не удалось заменить ${remainingAnchors.length} якорей:`, remainingAnchors.map(m => m.original));
+              // Для разбитых якорей используем более сложный подход
+              // Ищем якоря, которые могут быть разбиты между элементами w:t
+              for (const anchorMatch of remainingAnchors) {
+                const textOnlyAfter = xmlContent.replace(/<[^>]+>/g, '');
+                if (textOnlyAfter.includes(anchorMatch.original)) {
+                  // Создаем паттерн, который находит якорь даже если он разбит тегами
+                  const anchorChars = anchorMatch.original.split('');
+                  const flexiblePatternParts: string[] = [];
+                  
+                  for (let i = 0; i < anchorChars.length; i++) {
+                    const char = anchorChars[i];
+                    const escapedChar = char.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&');
+                    
+                    if (i === 0) {
+                      flexiblePatternParts.push(escapedChar);
+                    } else {
+                      // Между символами могут быть XML теги
+                      flexiblePatternParts.push(`(?:<[^>]*>)*${escapedChar}`);
+                    }
+                  }
+                  
+                  const flexiblePattern = new RegExp(flexiblePatternParts.join(''), 'g');
+                  
+                  // Заменяем разбитый якорь (все вхождения)
+                  let foundCount = 0;
+                  xmlContent = xmlContent.replace(flexiblePattern, (matched) => {
+                    const matchedText = matched.replace(/<[^>]+>/g, '');
+                    if (matchedText === anchorMatch.original) {
+                      foundCount++;
+                      console.log(`[ContractFilling] Замена разбитого якоря (${foundCount}): "${anchorMatch.original}" -> "${anchorMatch.value}"`);
+                      return anchorMatch.escapedValue;
+                    }
+                    return matched;
+                  });
+                  
+                  if (foundCount > 0) {
+                    replacementCount += foundCount;
+                  } else {
+                    console.warn(`[ContractFilling] Не удалось заменить разбитый якорь "${anchorMatch.original}"`);
+                  }
+                }
               }
+            }
               
               // Если все еще остались не замененные якоря, пробуем найти их разбитыми
               // Собираем текст из нескольких соседних элементов w:t
