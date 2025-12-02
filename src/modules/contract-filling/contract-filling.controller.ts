@@ -1106,11 +1106,14 @@ export class ContractFillingController {
               let match;
               while ((match = pattern.exec(fullText)) !== null) {
                 // Очищаем якорь от лишних символов, но сохраняем кириллицу и пробелы
-                const anchor = match[1]
+                let anchor = match[1]
                   .trim()
                   .replace(/[\r\n\t]/g, ' ') // Заменяем переносы на пробелы
                   .replace(/\s+/g, ' ')      // Множественные пробелы в один
                   .replace(/[^\w\s\-а-яА-ЯёЁ]/g, ''); // Удаляем спецсимволы, кроме букв, цифр, пробелов и дефисов
+                
+                // Удаляем "preserve" в конце якоря (без учета регистра)
+                anchor = anchor.replace(/preserve\s*$/i, '').trim();
                 
                 if (anchor && anchor.length > 0) {
                   anchors.add(anchor);
@@ -1135,10 +1138,13 @@ export class ContractFillingController {
             for (const pattern of patterns) {
               let match;
               while ((match = pattern.exec(textWithoutTags)) !== null) {
-                const anchor = match[1]
+                let anchor = match[1]
                   .trim()
                   .replace(/\s+/g, ' ')
                   .replace(/[^\w\s\-а-яА-ЯёЁ]/g, '');
+                
+                // Удаляем "preserve" в конце якоря (без учета регистра)
+                anchor = anchor.replace(/preserve\s*$/i, '').trim();
                 
                 if (anchor && anchor.length > 0) {
                   anchors.add(anchor);
@@ -1157,12 +1163,17 @@ export class ContractFillingController {
 
   // Нормализация якоря для сравнения
   private normalizeAnchor(anchor: string): string {
-    return anchor
+    let normalized = anchor
       .trim()
       .replace(/[\r\n\t]/g, ' ')
       .replace(/\s+/g, ' ')
       .replace(/[^\w\s\-а-яА-ЯёЁ]/g, '')
       .toLowerCase();
+    
+    // Удаляем "preserve" в конце якоря (без учета регистра)
+    normalized = normalized.replace(/preserve\s*$/i, '').trim();
+    
+    return normalized;
   }
 
   // Замена якорей в DOCX файле
