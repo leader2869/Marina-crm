@@ -15,7 +15,38 @@ const parseStringAsync = promisify(parseString);
 // Папки для хранения файлов
 // На Vercel используем /tmp для временных файлов
 const isVercel = !!process.env.VERCEL;
-const baseFolder = isVercel ? '/tmp' : process.cwd();
+
+// Определяем корневую папку проекта
+// Пробуем несколько вариантов, чтобы найти правильный путь
+const getProjectRoot = () => {
+  if (isVercel) {
+    return '/tmp';
+  }
+  
+  const cwd = process.cwd();
+  
+  // Список возможных путей для проверки
+  const possiblePaths = [
+    cwd, // Текущая рабочая директория
+    path.resolve(cwd, '..'), // На уровень выше
+    path.resolve(__dirname, '../../..'), // Относительно этого файла (3 уровня вверх)
+  ];
+  
+  // Проверяем каждый путь на наличие папки contract-uploads
+  for (const possiblePath of possiblePaths) {
+    const uploadsPath = path.join(possiblePath, 'contract-uploads');
+    if (fs.existsSync(uploadsPath)) {
+      console.log('[ContractFilling] Найден корень проекта:', possiblePath);
+      return possiblePath;
+    }
+  }
+  
+  // Если не нашли, используем cwd и создадим папки там
+  console.warn('[ContractFilling] Не найдена папка contract-uploads, используем cwd:', cwd);
+  return cwd;
+};
+
+const baseFolder = getProjectRoot();
 
 const UPLOAD_FOLDER = path.join(baseFolder, 'contract-uploads');
 const TEMPLATES_FOLDER = path.join(baseFolder, 'contract-templates');
