@@ -151,7 +151,17 @@ export class AuthController {
         throw new AppError('База данных не подключена', 503);
       }
 
-      const userRepository = AppDataSource.getRepository(User);
+      let userRepository;
+      try {
+        userRepository = AppDataSource.getRepository(User);
+      } catch (repoError: any) {
+        console.error('[Auth Login] Ошибка при получении репозитория User:', {
+          message: repoError.message,
+          stack: repoError.stack,
+          name: repoError.name
+        });
+        throw new AppError(`Ошибка доступа к базе данных: ${repoError.message}`, 500);
+      }
       
       // Определяем, что введено: email или телефон
       // Проверяем, содержит ли строка символ @ (это email) или начинается с цифр/+
@@ -355,7 +365,18 @@ export class AuthController {
         throw new AppError('База данных не подключена', 503);
       }
 
-      const userRepository = AppDataSource.getRepository(User);
+      let userRepository;
+      try {
+        userRepository = AppDataSource.getRepository(User);
+      } catch (repoError: any) {
+        console.error('[Auth getProfile] Ошибка при получении репозитория User:', {
+          message: repoError.message,
+          stack: repoError.stack,
+          name: repoError.name
+        });
+        throw new AppError(`Ошибка доступа к базе данных: ${repoError.message}`, 500);
+      }
+      
       const user = await userRepository.findOne({
         where: { id: req.userId },
         relations: ['ownedClubs', 'vessels', 'managedClub'],

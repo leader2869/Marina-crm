@@ -25,6 +25,11 @@ export const errorHandler = (
     url: req.url,
     method: req.method,
     isAppError: err instanceof AppError,
+    name: err.name,
+    // Добавляем дополнительную информацию для TypeORM ошибок
+    ...(err as any).code && { code: (err as any).code },
+    ...(err as any).detail && { detail: (err as any).detail },
+    ...(err as any).hint && { hint: (err as any).hint },
   });
 
   const statusCode = err instanceof AppError ? err.statusCode : 500;
