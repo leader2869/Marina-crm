@@ -192,11 +192,22 @@ export class AuthController {
         
         // Ищем пользователя по нормализованному номеру телефона
         // Используем SQL функцию для нормализации телефона в базе
-        const users = await userRepository
-          .createQueryBuilder('user')
-          .where('user.isActive = :isActive', { isActive: true })
-          .andWhere('user.phone IS NOT NULL')
-          .getMany();
+        let users;
+        try {
+          users = await userRepository
+            .createQueryBuilder('user')
+            .where('user.isActive = :isActive', { isActive: true })
+            .andWhere('user.phone IS NOT NULL')
+            .getMany();
+        } catch (dbError: any) {
+          console.error('[Auth Login] Ошибка при поиске пользователя по телефону:', {
+            message: dbError.message,
+            stack: dbError.stack,
+            code: dbError.code,
+            detail: dbError.detail
+          });
+          throw new AppError(`Ошибка при поиске пользователя: ${dbError.message}`, 500);
+        }
         
         // Фильтруем в памяти по нормализованному номеру
         user = users.find(u => {
