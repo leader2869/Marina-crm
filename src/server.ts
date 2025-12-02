@@ -56,6 +56,21 @@ const initializeApp = async (): Promise<void> => {
       await Promise.race([initPromise, timeoutPromise]);
       
       console.log('✅ База данных подключена');
+      
+      // Проверяем, что все entities загружены правильно
+      try {
+        const entityMetadatas = AppDataSource.entityMetadatas;
+        console.log(`[DB Init] Загружено entities: ${entityMetadatas.length}`);
+        
+        // Проверяем, что Contragent entity загружена
+        const contragentMetadata = entityMetadatas.find(m => m.name === 'Contragent');
+        if (contragentMetadata) {
+          console.log('[DB Init] Entity Contragent загружена успешно');
+        }
+      } catch (metadataError: any) {
+        console.warn('[DB Init] Предупреждение при проверке metadata:', metadataError.message);
+      }
+      
       isInitialized = true;
       initializationError = null;
     } catch (error: any) {
@@ -66,9 +81,19 @@ const initializeApp = async (): Promise<void> => {
         initializationError = null;
         return;
       }
+      
+      // Проверяем, не связана ли ошибка с entity Contragent
+      if (error.message && (error.message.includes('contragents') || error.message.includes('Contragent'))) {
+        console.error('❌ Ошибка связана с entity Contragent:', error.message);
+        console.error('❌ Stack:', error.stack);
+        console.error('💡 Возможно, таблица contragents имеет неправильную структуру');
+        console.error('💡 Запустите: npm run create-contragents-table');
+      }
+      
       console.error('❌ Ошибка при подключении к базе данных:', error.message);
       console.error('❌ Stack:', error.stack);
       console.error('❌ Code:', error.code);
+      console.error('❌ Detail:', error.detail);
       initializationError = error;
       // Не блокируем запуск приложения, но логируем ошибку
     }
