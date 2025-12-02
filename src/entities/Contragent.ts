@@ -25,20 +25,20 @@ export class Contragent {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ nullable: true })
+  @Column({ name: 'user_id', nullable: true })
   userId: number;
 
   @ManyToOne(() => Club, { nullable: true })
   @JoinColumn({ name: 'club_id' })
   club: Club;
 
-  @Column({ nullable: true })
+  @Column({ name: 'club_id', nullable: true })
   clubId: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 }
 
