@@ -917,12 +917,16 @@ export class ContractFillingController {
       }
       
       // Создаем новый контрагент
-      const contragent = contragentRepository.create({
+      const contragentData: Partial<Contragent> = {
         name: name.trim(),
         data: data,
-        userId: req.userId || null,
-      });
-
+      };
+      
+      if (req.userId) {
+        contragentData.userId = req.userId;
+      }
+      
+      const contragent = contragentRepository.create(contragentData);
       const savedContragent = await contragentRepository.save(contragent);
 
       console.log('[ContractFilling] Контрагент сохранен в БД:', {
@@ -1435,64 +1439,14 @@ export class ContractFillingController {
                 }
               }
             }
-              
-              // Если все еще остались не замененные якоря, пробуем найти их разбитыми
-              // Собираем текст из нескольких соседних элементов w:t
-              const textOnly = xmlContent.replace(/<[^>]+>/g, '');
-              const stillMissing = anchorMatches.filter(m => !replacedAnchors.has(m.original));
-              
-              for (const match of stillMissing) {
-                if (textOnly.includes(match.original)) {
-                  console.warn(`[ContractFilling] Якорь "${match.original}" найден в тексте, но не может быть заменен (возможно, разбит на несколько элементов)`);
-                  
-                  // Пробуем более агрессивную замену - ищем якорь даже если он разбит тегами
-                  // Создаем паттерн, который находит якорь даже если он разбит
-                  const anchorChars = match.original.split('');
-                  const flexiblePatternParts: string[] = [];
-                  
-                  for (let i = 0; i < anchorChars.length; i++) {
-                    const char = anchorChars[i];
-                    const escapedChar = char.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&');
-                    
-                    if (i === 0) {
-                      flexiblePatternParts.push(escapedChar);
-                    } else {
-                      // Между символами могут быть XML теги
-                      flexiblePatternParts.push(`(?:<[^>]*>)*${escapedChar}`);
-                    }
-                  }
-                  
-                  const flexiblePattern = new RegExp(flexiblePatternParts.join(''), 'g');
-                  
-                  // Пробуем заменить разбитый якорь
-                  let foundBroken = false;
-                  xmlContent = xmlContent.replace(flexiblePattern, (matched) => {
-                    const matchedText = matched.replace(/<[^>]+>/g, '');
-                    if (matchedText === match.original && !replacedAnchors.has(match.original)) {
-                      foundBroken = true;
-                      replacedAnchors.add(match.original);
-              replacementCount++;
-                      console.log(`[ContractFilling] Замена разбитого якоря: "${match.original}" -> "${match.value}"`);
-                      // Заменяем на значение, вставляя его в первый элемент w:t
-                      return match.escapedValue;
-                    }
-                    return matched;
-                  });
-                  
-                  if (!foundBroken) {
-                    console.warn(`[ContractFilling] Не удалось заменить разбитый якорь "${match.original}"`);
-                  }
-                }
-              }
-            }
             
             console.log(`[ContractFilling] Всего заменено якорей: ${replacementCount}`);
             
             // Проверяем, что изменения действительно применены
             const finalTextCheck = xmlContent.replace(/<[^>]+>/g, '');
-            const remainingAnchorsInText = anchorMatches.filter(m => finalTextCheck.includes(m.original));
+            const remainingAnchorsInText = anchorMatches.filter((m: any) => finalTextCheck.includes(m.original));
             if (remainingAnchorsInText.length > 0) {
-              console.warn(`[ContractFilling] ВНИМАНИЕ: ${remainingAnchorsInText.length} якорей все еще присутствуют в XML после замены:`, remainingAnchorsInText.map(m => m.original));
+              console.warn(`[ContractFilling] ВНИМАНИЕ: ${remainingAnchorsInText.length} якорей все еще присутствуют в XML после замены:`, remainingAnchorsInText.map((m: any) => m.original));
             } else {
               console.log('[ContractFilling] Все якоря успешно заменены в XML');
             }
