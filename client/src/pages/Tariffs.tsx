@@ -175,9 +175,9 @@ export default function Tariffs() {
         alert('Укажите сумму для тарифа')
         return
       }
-      if (parseFloat(tariffForm.amount) < 0) {
-        alert('Сумма не может быть отрицательной')
-        return
+    if (parseFloat(tariffForm.amount) < 0) {
+      alert('Сумма не может быть отрицательной')
+      return
       }
     }
 
@@ -548,39 +548,39 @@ export default function Tariffs() {
                       const isSelected = tariffForm.selectedMonths.includes(month.value)
                       return (
                         <div
-                          key={month.value}
+                        key={month.value}
                           className={`flex items-center gap-3 p-3 rounded border ${
                             isSelected ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-200'
                           }`}
-                        >
+                      >
                           <label className="flex items-center cursor-pointer flex-shrink-0">
-                            <input
-                              type="checkbox"
+                        <input
+                          type="checkbox"
                               checked={isSelected}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setTariffForm({
-                                    ...tariffForm,
-                                    selectedMonths: [...tariffForm.selectedMonths, month.value].sort((a, b) => a - b),
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setTariffForm({
+                                ...tariffForm,
+                                selectedMonths: [...tariffForm.selectedMonths, month.value].sort((a, b) => a - b),
                                     monthlyAmounts: {
                                       ...tariffForm.monthlyAmounts,
                                       [month.value]: tariffForm.monthlyAmounts[month.value] || '',
                                     },
-                                  })
-                                } else {
+                              })
+                            } else {
                                   const newMonthlyAmounts = { ...tariffForm.monthlyAmounts }
                                   delete newMonthlyAmounts[month.value]
-                                  setTariffForm({
-                                    ...tariffForm,
-                                    selectedMonths: tariffForm.selectedMonths.filter((m) => m !== month.value),
+                              setTariffForm({
+                                ...tariffForm,
+                                selectedMonths: tariffForm.selectedMonths.filter((m) => m !== month.value),
                                     monthlyAmounts: newMonthlyAmounts,
-                                  })
-                                }
-                              }}
-                              className="mr-2"
-                            />
+                              })
+                            }
+                          }}
+                          className="mr-2"
+                        />
                             <span className="text-sm font-medium text-gray-900 w-24">{month.name}</span>
-                          </label>
+                      </label>
                           {isSelected && (
                             <div className="flex-1 flex items-center gap-2">
                               <label className="text-sm text-gray-600 whitespace-nowrap">Сумма (руб):</label>
@@ -617,21 +617,21 @@ export default function Tariffs() {
 
               {/* Сумма - только для оплаты за сезон */}
               {tariffForm.type === TariffType.SEASON_PAYMENT && (
-                <div>
-                  <label htmlFor="tariff-amount" className="block text-sm font-medium text-gray-700 mb-1">
-                    Сумма (руб) *
-                  </label>
-                  <input
-                    id="tariff-amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={tariffForm.amount}
-                    onChange={(e) => setTariffForm({ ...tariffForm, amount: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                    placeholder="0.00"
-                  />
-                </div>
+              <div>
+                <label htmlFor="tariff-amount" className="block text-sm font-medium text-gray-700 mb-1">
+                  Сумма (руб) *
+                </label>
+                <input
+                  id="tariff-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={tariffForm.amount}
+                  onChange={(e) => setTariffForm({ ...tariffForm, amount: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  placeholder="0.00"
+                />
+              </div>
               )}
 
               {/* Выбор мест */}

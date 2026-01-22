@@ -4,6 +4,8 @@ import { Tariff } from '../../entities/Tariff';
 import { TariffBerth } from '../../entities/TariffBerth';
 import { Club } from '../../entities/Club';
 import { Berth } from '../../entities/Berth';
+import { BookingRule } from '../../entities/BookingRule';
+import { Booking } from '../../entities/Booking';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { TariffType } from '../../entities/Tariff';
@@ -438,6 +440,27 @@ export class TariffsController {
       if (req.userRole === 'club_owner' && req.userId !== tariff.club.ownerId) {
         throw new AppError('Доступ запрещен', 403);
       }
+
+      // Удаляем или обновляем связанные правила бронирования
+      const bookingRuleRepository = AppDataSource.getRepository(BookingRule);
+      const relatedRules = await bookingRuleRepository.find({
+        where: { tariffId: tariff.id },
+      });
+
+      if (relatedRules.length > 0) {
+        // Устанавливаем tariffId в null для связанных правил (правила остаются, но становятся общими для клуба)
+        await bookingRuleRepository.update(
+          { tariffId: tariff.id },
+          { tariffId: null }
+        );
+      }
+
+      // Обновляем связанные бронирования (устанавливаем tariffId в null)
+      const bookingRepository = AppDataSource.getRepository(Booking);
+      await bookingRepository.update(
+        { tariffId: tariff.id },
+        { tariffId: null }
+      );
 
       // Удаляем связи с местами (каскадное удаление)
       const tariffBerthRepository = AppDataSource.getRepository(TariffBerth);

@@ -155,10 +155,10 @@ const corsOptions = {
       // Проверяем, содержит ли origin один из разрешенных доменов
       const isAllowed = allowedDomains.some(domain => origin.includes(domain.replace(/https?:\/\//, '')));
       if (isAllowed) {
-        callback(null, true);
-      } else {
-        console.log(`[CORS] Заблокирован origin: ${origin}, разрешены: ${allowedOrigins.join(', ')}`);
-        callback(new Error('Not allowed by CORS'));
+      callback(null, true);
+    } else {
+      console.log(`[CORS] Заблокирован origin: ${origin}, разрешены: ${allowedOrigins.join(', ')}`);
+      callback(new Error('Not allowed by CORS'));
       }
     }
   },
