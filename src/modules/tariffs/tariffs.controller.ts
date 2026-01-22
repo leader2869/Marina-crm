@@ -58,10 +58,15 @@ export class TariffsController {
   // Создать новый тариф
   async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { clubId, name, type, amount, season, berthIds, months } = req.body;
+      const { clubId, name, type, amount, season, berthIds, months, monthlyAmounts } = req.body;
 
-      if (!clubId || !name || !type || !amount) {
+      if (!clubId || !name || !type) {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
+      }
+
+      // Для оплаты за сезон amount обязателен
+      if (type === TariffType.SEASON_PAYMENT && !amount) {
+        throw new AppError('Сумма обязательна для оплаты за сезон', 400);
       }
 
       if (!Object.values(TariffType).includes(type)) {
@@ -111,16 +116,43 @@ export class TariffsController {
         if (invalidMonths.length > 0) {
           throw new AppError('Месяца должны быть в диапазоне от 1 до 12', 400);
         }
+        // Валидация monthlyAmounts для помесячной оплаты
+        if (!monthlyAmounts || typeof monthlyAmounts !== 'object') {
+          throw new AppError('Для помесячной оплаты необходимо указать суммы для каждого месяца', 400);
+        }
+        // Проверяем, что для каждого выбранного месяца указана сумма
+        for (const month of months) {
+          if (!monthlyAmounts[month] || parseFloat(monthlyAmounts[month]) <= 0) {
+            const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+            throw new AppError(`Необходимо указать сумму для месяца "${monthNames[month]}"`, 400);
+          }
+        }
       }
 
       const tariffRepository = AppDataSource.getRepository(Tariff);
+      // Преобразуем monthlyAmounts в числа для помесячной оплаты
+      const monthlyAmountsNumeric: { [month: number]: number } | null = 
+        type === TariffType.MONTHLY_PAYMENT && monthlyAmounts
+          ? Object.keys(monthlyAmounts).reduce((acc, monthStr) => {
+              const month = parseInt(monthStr);
+              acc[month] = parseFloat(monthlyAmounts[month]);
+              return acc;
+            }, {} as { [month: number]: number })
+          : null;
+
+      // Для помесячной оплаты amount можно не указывать или использовать сумму всех месяцев
+      const totalAmount = type === TariffType.MONTHLY_PAYMENT && monthlyAmountsNumeric
+        ? Object.values(monthlyAmountsNumeric).reduce((sum, amount) => sum + amount, 0)
+        : parseFloat(amount || '0');
+
       const tariff = tariffRepository.create({
         name,
         type,
-        amount: parseFloat(amount),
+        amount: totalAmount,
         season: tariffSeason,
         clubId: parseInt(clubId),
         months: type === TariffType.MONTHLY_PAYMENT ? months : null,
+        monthlyAmounts: monthlyAmountsNumeric,
       });
 
       const savedTariff = await tariffRepository.save(tariff);
@@ -158,7 +190,7 @@ export class TariffsController {
   async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const { name, type, amount, season, berthIds, months } = req.body;
+      const { name, type, amount, season, berthIds, months, monthlyAmounts } = req.body;
 
       const tariffRepository = AppDataSource.getRepository(Tariff);
       const tariff = await tariffRepository.findOne({
@@ -182,6 +214,7 @@ export class TariffsController {
         amount: tariff.amount,
         season: tariff.season,
         months: tariff.months,
+        monthlyAmounts: tariff.monthlyAmounts,
         clubId: tariff.clubId,
       };
 
@@ -212,9 +245,32 @@ export class TariffsController {
           throw new AppError('Месяца должны быть в диапазоне от 1 до 12', 400);
         }
         tariff.months = months;
+        // Валидация и обновление monthlyAmounts для помесячной оплаты
+        if (monthlyAmounts !== undefined) {
+          if (!monthlyAmounts || typeof monthlyAmounts !== 'object') {
+            throw new AppError('Для помесячной оплаты необходимо указать суммы для каждого месяца', 400);
+          }
+          // Проверяем, что для каждого выбранного месяца указана сумма
+          for (const month of months) {
+            if (!monthlyAmounts[month] || parseFloat(monthlyAmounts[month]) <= 0) {
+              const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+              throw new AppError(`Необходимо указать сумму для месяца "${monthNames[month]}"`, 400);
+            }
+          }
+          // Преобразуем monthlyAmounts в числа
+          const monthlyAmountsNumeric: { [month: number]: number } = {};
+          Object.keys(monthlyAmounts).forEach((monthStr) => {
+            const month = parseInt(monthStr);
+            monthlyAmountsNumeric[month] = parseFloat(monthlyAmounts[month]);
+          });
+          tariff.monthlyAmounts = monthlyAmountsNumeric;
+          // Обновляем amount как сумму всех месяцев
+          tariff.amount = Object.values(monthlyAmountsNumeric).reduce((sum, amount) => sum + amount, 0);
+        }
       } else if (type !== undefined && type === TariffType.SEASON_PAYMENT) {
         // Для оплаты за сезон месяцы не нужны
         tariff.months = null;
+        tariff.monthlyAmounts = null;
       } else if (months !== undefined) {
         // Если тип не меняется, но месяцы переданы
         if (tariff.type === TariffType.MONTHLY_PAYMENT) {
@@ -226,9 +282,54 @@ export class TariffsController {
             throw new AppError('Месяца должны быть в диапазоне от 1 до 12', 400);
           }
           tariff.months = months;
+          // Обновляем monthlyAmounts если переданы
+          if (monthlyAmounts !== undefined) {
+            if (!monthlyAmounts || typeof monthlyAmounts !== 'object') {
+              throw new AppError('Для помесячной оплаты необходимо указать суммы для каждого месяца', 400);
+            }
+            // Проверяем, что для каждого выбранного месяца указана сумма
+            for (const month of months) {
+              if (!monthlyAmounts[month] || parseFloat(monthlyAmounts[month]) <= 0) {
+                const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+                throw new AppError(`Необходимо указать сумму для месяца "${monthNames[month]}"`, 400);
+              }
+            }
+            // Преобразуем monthlyAmounts в числа
+            const monthlyAmountsNumeric: { [month: number]: number } = {};
+            Object.keys(monthlyAmounts).forEach((monthStr) => {
+              const month = parseInt(monthStr);
+              monthlyAmountsNumeric[month] = parseFloat(monthlyAmounts[month]);
+            });
+            tariff.monthlyAmounts = monthlyAmountsNumeric;
+            // Обновляем amount как сумму всех месяцев
+            tariff.amount = Object.values(monthlyAmountsNumeric).reduce((sum, amount) => sum + amount, 0);
+          }
         } else {
           tariff.months = null;
+          tariff.monthlyAmounts = null;
         }
+      } else if (monthlyAmounts !== undefined && tariff.type === TariffType.MONTHLY_PAYMENT) {
+        // Если месяцы не меняются, но monthlyAmounts переданы
+        if (!monthlyAmounts || typeof monthlyAmounts !== 'object') {
+          throw new AppError('Для помесячной оплаты необходимо указать суммы для каждого месяца', 400);
+        }
+        const currentMonths = tariff.months || [];
+        // Проверяем, что для каждого выбранного месяца указана сумма
+        for (const month of currentMonths) {
+          if (!monthlyAmounts[month] || parseFloat(monthlyAmounts[month]) <= 0) {
+            const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+            throw new AppError(`Необходимо указать сумму для месяца "${monthNames[month]}"`, 400);
+          }
+        }
+        // Преобразуем monthlyAmounts в числа
+        const monthlyAmountsNumeric: { [month: number]: number } = {};
+        Object.keys(monthlyAmounts).forEach((monthStr) => {
+          const month = parseInt(monthStr);
+          monthlyAmountsNumeric[month] = parseFloat(monthlyAmounts[month]);
+        });
+        tariff.monthlyAmounts = monthlyAmountsNumeric;
+        // Обновляем amount как сумму всех месяцев
+        tariff.amount = Object.values(monthlyAmountsNumeric).reduce((sum, amount) => sum + amount, 0);
       }
 
       await tariffRepository.save(tariff);
@@ -280,6 +381,7 @@ export class TariffsController {
         amount: updatedTariff!.amount,
         season: updatedTariff!.season,
         months: updatedTariff!.months,
+        monthlyAmounts: updatedTariff!.monthlyAmounts,
         clubId: updatedTariff!.clubId,
       };
 

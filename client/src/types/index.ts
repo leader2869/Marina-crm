@@ -146,6 +146,7 @@ export interface Tariff {
   season: number
   clubId: number
   months?: number[] | null // Месяца для помесячной оплаты (1-12)
+  monthlyAmounts?: { [month: number]: number } | null // Суммы для каждого месяца (ключ - номер месяца 1-12, значение - сумма). Используется для MONTHLY_PAYMENT
   berths?: Berth[]
   createdAt: string
   updatedAt: string
