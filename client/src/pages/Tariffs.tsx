@@ -22,6 +22,7 @@ export default function Tariffs() {
     amount: '',
     selectedBerthIds: [] as number[],
     selectedMonths: [] as number[],
+    monthlyAmounts: {} as { [month: number]: string }, // Суммы для каждого месяца
   })
   const [saving, setSaving] = useState(false)
 
@@ -90,6 +91,7 @@ export default function Tariffs() {
       amount: '',
       selectedBerthIds: [],
       selectedMonths: [],
+      monthlyAmounts: {},
     })
     setShowAddModal(true)
   }
@@ -103,17 +105,27 @@ export default function Tariffs() {
       amount: '',
       selectedBerthIds: [],
       selectedMonths: [],
+      monthlyAmounts: {},
     })
   }
 
   const handleEditClick = (tariff: Tariff) => {
     setEditingTariff(tariff)
+    // Преобразуем monthlyAmounts из объекта в строки для формы
+    const monthlyAmountsForm: { [month: number]: string } = {}
+    if (tariff.monthlyAmounts) {
+      Object.keys(tariff.monthlyAmounts).forEach((monthStr) => {
+        const month = parseInt(monthStr)
+        monthlyAmountsForm[month] = tariff.monthlyAmounts![month].toString()
+      })
+    }
     setTariffForm({
       name: tariff.name,
       type: tariff.type,
       amount: tariff.amount.toString(),
       selectedBerthIds: tariff.berths?.map((b) => b.id) || [],
       selectedMonths: tariff.months || [],
+      monthlyAmounts: monthlyAmountsForm,
     })
     setShowAddModal(true)
   }
@@ -141,14 +153,21 @@ export default function Tariffs() {
   const handleSave = async () => {
     if (!selectedClub) return
 
-    if (!tariffForm.name || !tariffForm.amount) {
+    if (!tariffForm.name) {
       alert('Заполните все обязательные поля')
       return
     }
 
-    if (parseFloat(tariffForm.amount) < 0) {
-      alert('Сумма не может быть отрицательной')
-      return
+    // Для оплаты за сезон сумма обязательна
+    if (tariffForm.type === TariffType.SEASON_PAYMENT) {
+      if (!tariffForm.amount) {
+        alert('Укажите сумму для тарифа')
+        return
+      }
+      if (parseFloat(tariffForm.amount) < 0) {
+        alert('Сумма не может быть отрицательной')
+        return
+      }
     }
 
     if (tariffForm.selectedBerthIds.length === 0) {
@@ -162,16 +181,43 @@ export default function Tariffs() {
       return
     }
 
+    // Для помесячной оплаты проверяем, что для каждого выбранного месяца указана сумма
+    if (tariffForm.type === TariffType.MONTHLY_PAYMENT) {
+      for (const month of tariffForm.selectedMonths) {
+        const monthAmount = tariffForm.monthlyAmounts[month]
+        if (!monthAmount || parseFloat(monthAmount) <= 0) {
+          const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+          alert(`Укажите сумму для месяца "${monthNames[month]}"`)
+          return
+        }
+      }
+    }
+
     setSaving(true)
     try {
+      // Преобразуем monthlyAmounts из строк в числа
+      const monthlyAmountsNumeric: { [month: number]: number } = {}
+      if (tariffForm.type === TariffType.MONTHLY_PAYMENT && tariffForm.selectedMonths.length > 0) {
+        tariffForm.selectedMonths.forEach((month) => {
+          monthlyAmountsNumeric[month] = parseFloat(tariffForm.monthlyAmounts[month] || '0')
+        })
+      }
+
+      // Для помесячной оплаты amount можно не указывать или использовать сумму всех месяцев
+      // Для обратной совместимости используем сумму всех месяцев или 0
+      const totalMonthlyAmount = tariffForm.type === TariffType.MONTHLY_PAYMENT
+        ? Object.values(monthlyAmountsNumeric).reduce((sum, amount) => sum + amount, 0)
+        : parseFloat(tariffForm.amount || '0')
+
       const data = {
         clubId: selectedClub.id,
         name: tariffForm.name,
         type: tariffForm.type,
-        amount: parseFloat(tariffForm.amount),
+        amount: totalMonthlyAmount,
         season: selectedClub.season || new Date().getFullYear(),
         berthIds: tariffForm.selectedBerthIds,
         months: tariffForm.type === TariffType.MONTHLY_PAYMENT ? tariffForm.selectedMonths : null,
+        monthlyAmounts: tariffForm.type === TariffType.MONTHLY_PAYMENT ? monthlyAmountsNumeric : null,
       }
 
       if (editingTariff) {
@@ -441,7 +487,7 @@ export default function Tariffs() {
                       type="radio"
                       value={TariffType.SEASON_PAYMENT}
                       checked={tariffForm.type === TariffType.SEASON_PAYMENT}
-                      onChange={(e) => setTariffForm({ ...tariffForm, type: e.target.value as TariffType, selectedMonths: [] })}
+                      onChange={(e) => setTariffForm({ ...tariffForm, type: e.target.value as TariffType, selectedMonths: [], monthlyAmounts: {} })}
                       className="mr-2"
                     />
                     <span className="text-sm text-gray-900">Оплата всего сезона сразу</span>
@@ -451,7 +497,7 @@ export default function Tariffs() {
                       type="radio"
                       value={TariffType.MONTHLY_PAYMENT}
                       checked={tariffForm.type === TariffType.MONTHLY_PAYMENT}
-                      onChange={(e) => setTariffForm({ ...tariffForm, type: e.target.value as TariffType })}
+                      onChange={(e) => setTariffForm({ ...tariffForm, type: e.target.value as TariffType, monthlyAmounts: {} })}
                       className="mr-2"
                     />
                     <span className="text-sm text-gray-900">Помесячная оплата (фиксированная ежемесячная ставка)</span>
@@ -463,9 +509,9 @@ export default function Tariffs() {
               {tariffForm.type === TariffType.MONTHLY_PAYMENT && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Выберите месяцы для оплаты *
+                    Выберите месяцы для оплаты и укажите сумму для каждого месяца *
                   </label>
-                  <div className="grid grid-cols-3 gap-2 border border-gray-300 rounded-md p-4">
+                  <div className="grid grid-cols-1 gap-3 border border-gray-300 rounded-md p-4">
                     {[
                       { value: 1, name: 'Январь' },
                       { value: 2, name: 'Февраль' },
@@ -479,32 +525,68 @@ export default function Tariffs() {
                       { value: 10, name: 'Октябрь' },
                       { value: 11, name: 'Ноябрь' },
                       { value: 12, name: 'Декабрь' },
-                    ].map((month) => (
-                      <label
-                        key={month.value}
-                        className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={tariffForm.selectedMonths.includes(month.value)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setTariffForm({
-                                ...tariffForm,
-                                selectedMonths: [...tariffForm.selectedMonths, month.value].sort((a, b) => a - b),
-                              })
-                            } else {
-                              setTariffForm({
-                                ...tariffForm,
-                                selectedMonths: tariffForm.selectedMonths.filter((m) => m !== month.value),
-                              })
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-900">{month.name}</span>
-                      </label>
-                    ))}
+                    ].map((month) => {
+                      const isSelected = tariffForm.selectedMonths.includes(month.value)
+                      return (
+                        <div
+                          key={month.value}
+                          className={`flex items-center gap-3 p-3 rounded border ${
+                            isSelected ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-200'
+                          }`}
+                        >
+                          <label className="flex items-center cursor-pointer flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setTariffForm({
+                                    ...tariffForm,
+                                    selectedMonths: [...tariffForm.selectedMonths, month.value].sort((a, b) => a - b),
+                                    monthlyAmounts: {
+                                      ...tariffForm.monthlyAmounts,
+                                      [month.value]: tariffForm.monthlyAmounts[month.value] || '',
+                                    },
+                                  })
+                                } else {
+                                  const newMonthlyAmounts = { ...tariffForm.monthlyAmounts }
+                                  delete newMonthlyAmounts[month.value]
+                                  setTariffForm({
+                                    ...tariffForm,
+                                    selectedMonths: tariffForm.selectedMonths.filter((m) => m !== month.value),
+                                    monthlyAmounts: newMonthlyAmounts,
+                                  })
+                                }
+                              }}
+                              className="mr-2"
+                            />
+                            <span className="text-sm font-medium text-gray-900 w-24">{month.name}</span>
+                          </label>
+                          {isSelected && (
+                            <div className="flex-1 flex items-center gap-2">
+                              <label className="text-sm text-gray-600 whitespace-nowrap">Сумма (руб):</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={tariffForm.monthlyAmounts[month.value] || ''}
+                                onChange={(e) => {
+                                  setTariffForm({
+                                    ...tariffForm,
+                                    monthlyAmounts: {
+                                      ...tariffForm.monthlyAmounts,
+                                      [month.value]: e.target.value,
+                                    },
+                                  })
+                                }}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                   {tariffForm.selectedMonths.length > 0 && (
                     <p className="mt-2 text-sm text-gray-600">
@@ -514,22 +596,24 @@ export default function Tariffs() {
                 </div>
               )}
 
-              {/* Сумма */}
-              <div>
-                <label htmlFor="tariff-amount" className="block text-sm font-medium text-gray-700 mb-1">
-                  Сумма (руб) *
-                </label>
-                <input
-                  id="tariff-amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={tariffForm.amount}
-                  onChange={(e) => setTariffForm({ ...tariffForm, amount: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                  placeholder="0.00"
-                />
-              </div>
+              {/* Сумма - только для оплаты за сезон */}
+              {tariffForm.type === TariffType.SEASON_PAYMENT && (
+                <div>
+                  <label htmlFor="tariff-amount" className="block text-sm font-medium text-gray-700 mb-1">
+                    Сумма (руб) *
+                  </label>
+                  <input
+                    id="tariff-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={tariffForm.amount}
+                    onChange={(e) => setTariffForm({ ...tariffForm, amount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
 
               {/* Выбор мест */}
               <div>
