@@ -39,9 +39,6 @@ export class Tariff {
   @Column({ type: 'json', nullable: true })
   months: number[] | null; // Месяца для помесячной оплаты (1-12)
 
-  @Column({ type: 'json', nullable: true })
-  monthlyAmounts: { [month: number]: number } | null; // Суммы для каждого месяца (ключ - номер месяца 1-12, значение - сумма)
-
   @CreateDateColumn()
   createdAt: Date;
 
