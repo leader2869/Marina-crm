@@ -1,6 +1,7 @@
 export enum TariffType {
   SEASON_PAYMENT = 'season_payment',
   MONTHLY_PAYMENT = 'monthly_payment',
+  MONTHLY_FLOATING_PAYMENT = 'monthly_floating_payment',
 }
 
 export enum UserRole {
@@ -146,6 +147,7 @@ export interface Tariff {
   season: number
   clubId: number
   months?: number[] | null // Месяца для помесячной оплаты (1-12)
+  monthlyAmounts?: { [month: number]: number } | null // Суммы для каждого месяца (ключ - номер месяца 1-12, значение - сумма). Используется для MONTHLY_FLOATING_PAYMENT
   berths?: Berth[]
   createdAt: string
   updatedAt: string

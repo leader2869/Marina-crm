@@ -58,10 +58,15 @@ export class TariffsController {
   // Создать новый тариф
   async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { clubId, name, type, amount, season, berthIds, months } = req.body;
+      const { clubId, name, type, amount, season, berthIds, months, monthlyAmounts } = req.body;
 
-      if (!clubId || !name || !type || !amount) {
+      if (!clubId || !name || !type) {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
+      }
+
+      // Для оплаты за сезон и фиксированной помесячной оплаты amount обязателен
+      if ((type === TariffType.SEASON_PAYMENT || type === TariffType.MONTHLY_PAYMENT) && !amount) {
+        throw new AppError('Сумма обязательна для этого типа тарифа', 400);
       }
 
       if (!Object.values(TariffType).includes(type)) {
@@ -102,7 +107,7 @@ export class TariffsController {
       }
 
       // Валидация месяцев для помесячной оплаты
-      if (type === TariffType.MONTHLY_PAYMENT) {
+      if (type === TariffType.MONTHLY_PAYMENT || type === TariffType.MONTHLY_FLOATING_PAYMENT) {
         if (!months || !Array.isArray(months) || months.length === 0) {
           throw new AppError('Для помесячной оплаты необходимо выбрать хотя бы один месяц', 400);
         }
@@ -113,14 +118,39 @@ export class TariffsController {
         }
       }
 
+      // Валидация monthlyAmounts для плавающей ставки
+      if (type === TariffType.MONTHLY_FLOATING_PAYMENT) {
+        if (!monthlyAmounts || typeof monthlyAmounts !== 'object') {
+          throw new AppError('Для плавающей помесячной оплаты необходимо указать суммы для каждого месяца', 400);
+        }
+        // Проверяем, что для каждого выбранного месяца указана сумма
+        for (const month of months) {
+          if (!monthlyAmounts[month] || parseFloat(monthlyAmounts[month]) <= 0) {
+            const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+            throw new AppError(`Необходимо указать сумму для месяца "${monthNames[month]}"`, 400);
+          }
+        }
+      }
+
       const tariffRepository = AppDataSource.getRepository(Tariff);
+      // Преобразуем monthlyAmounts в числа для плавающей ставки
+      const monthlyAmountsNumeric: { [month: number]: number } | null = 
+        type === TariffType.MONTHLY_FLOATING_PAYMENT && monthlyAmounts
+          ? Object.keys(monthlyAmounts).reduce((acc, monthStr) => {
+              const month = parseInt(monthStr);
+              acc[month] = parseFloat(monthlyAmounts[month]);
+              return acc;
+            }, {} as { [month: number]: number })
+          : null;
+
       const tariff = tariffRepository.create({
         name,
         type,
         amount: parseFloat(amount),
         season: tariffSeason,
         clubId: parseInt(clubId),
-        months: type === TariffType.MONTHLY_PAYMENT ? months : null,
+        months: (type === TariffType.MONTHLY_PAYMENT || type === TariffType.MONTHLY_FLOATING_PAYMENT) ? months : null,
+        monthlyAmounts: monthlyAmountsNumeric,
       });
 
       const savedTariff = await tariffRepository.save(tariff);
@@ -158,7 +188,7 @@ export class TariffsController {
   async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const { name, type, amount, season, berthIds, months } = req.body;
+      const { name, type, amount, season, berthIds, months, monthlyAmounts } = req.body;
 
       const tariffRepository = AppDataSource.getRepository(Tariff);
       const tariff = await tariffRepository.findOne({
@@ -182,6 +212,7 @@ export class TariffsController {
         amount: tariff.amount,
         season: tariff.season,
         months: tariff.months,
+        monthlyAmounts: tariff.monthlyAmounts,
         clubId: tariff.clubId,
       };
 
@@ -201,7 +232,7 @@ export class TariffsController {
       if (season !== undefined) tariff.season = parseInt(season);
       
       // Обновляем месяцы для помесячной оплаты
-      if (type !== undefined && type === TariffType.MONTHLY_PAYMENT) {
+      if (type !== undefined && (type === TariffType.MONTHLY_PAYMENT || type === TariffType.MONTHLY_FLOATING_PAYMENT)) {
         // Валидация месяцев для помесячной оплаты
         if (!months || !Array.isArray(months) || months.length === 0) {
           throw new AppError('Для помесячной оплаты необходимо выбрать хотя бы один месяц', 400);
@@ -212,12 +243,36 @@ export class TariffsController {
           throw new AppError('Месяца должны быть в диапазоне от 1 до 12', 400);
         }
         tariff.months = months;
+        // Валидация и обновление monthlyAmounts для плавающей ставки
+        if (type === TariffType.MONTHLY_FLOATING_PAYMENT && monthlyAmounts !== undefined) {
+          if (!monthlyAmounts || typeof monthlyAmounts !== 'object') {
+            throw new AppError('Для плавающей помесячной оплаты необходимо указать суммы для каждого месяца', 400);
+          }
+          // Проверяем, что для каждого выбранного месяца указана сумма
+          for (const month of months) {
+            if (!monthlyAmounts[month] || parseFloat(monthlyAmounts[month]) <= 0) {
+              const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+              throw new AppError(`Необходимо указать сумму для месяца "${monthNames[month]}"`, 400);
+            }
+          }
+          // Преобразуем monthlyAmounts в числа
+          const monthlyAmountsNumeric: { [month: number]: number } = {};
+          Object.keys(monthlyAmounts).forEach((monthStr) => {
+            const month = parseInt(monthStr);
+            monthlyAmountsNumeric[month] = parseFloat(monthlyAmounts[month]);
+          });
+          tariff.monthlyAmounts = monthlyAmountsNumeric;
+        } else if (type === TariffType.MONTHLY_PAYMENT) {
+          // Для фиксированной ставки monthlyAmounts не нужны
+          tariff.monthlyAmounts = null;
+        }
       } else if (type !== undefined && type === TariffType.SEASON_PAYMENT) {
         // Для оплаты за сезон месяцы не нужны
         tariff.months = null;
+        tariff.monthlyAmounts = null;
       } else if (months !== undefined) {
         // Если тип не меняется, но месяцы переданы
-        if (tariff.type === TariffType.MONTHLY_PAYMENT) {
+        if (tariff.type === TariffType.MONTHLY_PAYMENT || tariff.type === TariffType.MONTHLY_FLOATING_PAYMENT) {
           if (!months || !Array.isArray(months) || months.length === 0) {
             throw new AppError('Для помесячной оплаты необходимо выбрать хотя бы один месяц', 400);
           }
@@ -226,9 +281,50 @@ export class TariffsController {
             throw new AppError('Месяца должны быть в диапазоне от 1 до 12', 400);
           }
           tariff.months = months;
+          // Обновляем monthlyAmounts если переданы и тип плавающий
+          if (monthlyAmounts !== undefined && tariff.type === TariffType.MONTHLY_FLOATING_PAYMENT) {
+            if (!monthlyAmounts || typeof monthlyAmounts !== 'object') {
+              throw new AppError('Для плавающей помесячной оплаты необходимо указать суммы для каждого месяца', 400);
+            }
+            // Проверяем, что для каждого выбранного месяца указана сумма
+            for (const month of months) {
+              if (!monthlyAmounts[month] || parseFloat(monthlyAmounts[month]) <= 0) {
+                const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+                throw new AppError(`Необходимо указать сумму для месяца "${monthNames[month]}"`, 400);
+              }
+            }
+            // Преобразуем monthlyAmounts в числа
+            const monthlyAmountsNumeric: { [month: number]: number } = {};
+            Object.keys(monthlyAmounts).forEach((monthStr) => {
+              const month = parseInt(monthStr);
+              monthlyAmountsNumeric[month] = parseFloat(monthlyAmounts[month]);
+            });
+            tariff.monthlyAmounts = monthlyAmountsNumeric;
+          }
         } else {
           tariff.months = null;
+          tariff.monthlyAmounts = null;
         }
+      } else if (monthlyAmounts !== undefined && tariff.type === TariffType.MONTHLY_FLOATING_PAYMENT) {
+        // Если месяцы не меняются, но monthlyAmounts переданы
+        if (!monthlyAmounts || typeof monthlyAmounts !== 'object') {
+          throw new AppError('Для плавающей помесячной оплаты необходимо указать суммы для каждого месяца', 400);
+        }
+        const currentMonths = tariff.months || [];
+        // Проверяем, что для каждого выбранного месяца указана сумма
+        for (const month of currentMonths) {
+          if (!monthlyAmounts[month] || parseFloat(monthlyAmounts[month]) <= 0) {
+            const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+            throw new AppError(`Необходимо указать сумму для месяца "${monthNames[month]}"`, 400);
+          }
+        }
+        // Преобразуем monthlyAmounts в числа
+        const monthlyAmountsNumeric: { [month: number]: number } = {};
+        Object.keys(monthlyAmounts).forEach((monthStr) => {
+          const month = parseInt(monthStr);
+          monthlyAmountsNumeric[month] = parseFloat(monthlyAmounts[month]);
+        });
+        tariff.monthlyAmounts = monthlyAmountsNumeric;
       }
 
       await tariffRepository.save(tariff);
@@ -280,6 +376,7 @@ export class TariffsController {
         amount: updatedTariff!.amount,
         season: updatedTariff!.season,
         months: updatedTariff!.months,
+        monthlyAmounts: updatedTariff!.monthlyAmounts,
         clubId: updatedTariff!.clubId,
       };
 
