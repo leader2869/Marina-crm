@@ -119,9 +119,23 @@ const corsOptions = {
       return;
     }
     
+    // Разрешаем домен 1marina.ru
+    if (origin && (origin.includes('1marina.ru') || origin.includes('marina-crm.vercel.app'))) {
+      callback(null, true);
+      return;
+    }
+    
     // В production разрешаем указанный frontend URL или все (если не указан)
     const allowedOrigins = config.frontendUrl 
-      ? [config.frontendUrl, 'http://localhost:5173', 'http://localhost:3000']
+      ? [
+          config.frontendUrl, 
+          'http://localhost:5173', 
+          'http://localhost:3000',
+          'https://www.1marina.ru',
+          'https://1marina.ru',
+          'http://www.1marina.ru',
+          'http://1marina.ru'
+        ]
       : ['*'];
     
     // Разрешаем запросы без origin (same-origin requests) или из списка разрешенных

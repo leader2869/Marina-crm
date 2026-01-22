@@ -36,7 +36,8 @@
     "create-contragents-table": "ts-node src/database/create-contragents-table.ts",
     "create-agent-orders-tables": "ts-node src/database/create-agent-orders-tables.ts",
     "add-start-time-hours-to-agent-orders": "ts-node src/database/add-start-time-hours-to-agent-orders.ts",
-    "add-budget-from-to-to-agent-orders": "ts-node src/database/add-budget-from-to-to-agent-orders.ts"
+    "add-budget-from-to-to-agent-orders": "ts-node src/database/add-budget-from-to-to-agent-orders.ts",
+    "add-monthly-amounts-to-tariffs": "ts-node src/database/add-monthly-amounts-to-tariffs.ts"
   },
   "keywords": [
     "crm",
