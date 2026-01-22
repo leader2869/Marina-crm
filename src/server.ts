@@ -107,50 +107,68 @@ const initializeApp = async (): Promise<void> => {
 // Разрешаем все источники в development, или указанный в production
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Список разрешенных доменов
+    const allowedDomains = [
+      'https://www.1marina.ru',
+      'https://1marina.ru',
+      'http://www.1marina.ru',
+      'http://1marina.ru',
+      'https://marina-crm.vercel.app',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://localhost:3001',
+    ];
+    
     // В development разрешаем все источники
     if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
       callback(null, true);
       return;
     }
     
-    // На Vercel фронтенд и бэкенд на одном домене, поэтому разрешаем все origin
-    if (process.env.VERCEL) {
+    // На Vercel разрешаем все origin (включая 1marina.ru)
+    if (process.env.VERCEL || process.env.VERCEL_ENV) {
       callback(null, true);
       return;
     }
     
-    // Разрешаем домен 1marina.ru
-    if (origin && (origin.includes('1marina.ru') || origin.includes('marina-crm.vercel.app'))) {
+    // Разрешаем домен 1marina.ru в любом случае
+    if (origin && origin.includes('1marina.ru')) {
       callback(null, true);
       return;
     }
     
-    // В production разрешаем указанный frontend URL или все (если не указан)
+    // Разрешаем домен marina-crm.vercel.app
+    if (origin && origin.includes('marina-crm.vercel.app')) {
+      callback(null, true);
+      return;
+    }
+    
+    // В production разрешаем указанный frontend URL или из списка разрешенных
     const allowedOrigins = config.frontendUrl 
-      ? [
-          config.frontendUrl, 
-          'http://localhost:5173', 
-          'http://localhost:3000',
-          'https://www.1marina.ru',
-          'https://1marina.ru',
-          'http://www.1marina.ru',
-          'http://1marina.ru'
-        ]
-      : ['*'];
+      ? [config.frontendUrl, ...allowedDomains]
+      : allowedDomains;
     
     // Разрешаем запросы без origin (same-origin requests) или из списка разрешенных
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log(`[CORS] Заблокирован origin: ${origin}, разрешены: ${allowedOrigins.join(', ')}`);
-      callback(new Error('Not allowed by CORS'));
+      // Проверяем, содержит ли origin один из разрешенных доменов
+      const isAllowed = allowedDomains.some(domain => origin.includes(domain.replace(/https?:\/\//, '')));
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.log(`[CORS] Заблокирован origin: ${origin}, разрешены: ${allowedOrigins.join(', ')}`);
+        callback(new Error('Not allowed by CORS'));
+      }
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposedHeaders: ['Authorization'],
   maxAge: 86400, // 24 часа
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
