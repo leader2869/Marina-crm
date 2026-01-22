@@ -47,6 +47,7 @@ export class TariffsController {
       const tariffsWithBerths = tariffs.map((tariff) => ({
         ...tariff,
         berths: tariff.tariffBerths?.map((tb) => tb.berth) || [],
+        monthlyAmounts: tariff.monthlyAmounts || null, // Обеспечиваем, что monthlyAmounts всегда определен
       }));
 
       res.json(tariffsWithBerths);

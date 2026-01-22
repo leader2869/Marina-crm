@@ -76,7 +76,12 @@ export default function Tariffs() {
       const response = await tariffsService.getByClub(clubId)
       // Axios interceptor уже разворачивает response.data, поэтому response - это уже данные
       const tariffsData = Array.isArray(response) ? response : (response?.data || [])
-      setTariffs(tariffsData)
+      // Обеспечиваем, что monthlyAmounts всегда определен для каждого тарифа
+      const normalizedTariffs = tariffsData.map((tariff: any) => ({
+        ...tariff,
+        monthlyAmounts: tariff.monthlyAmounts || null,
+      }))
+      setTariffs(normalizedTariffs)
     } catch (err: any) {
       console.error('Ошибка загрузки тарифов:', err)
       setError(err.error || err.message || 'Ошибка загрузки тарифов')
@@ -113,11 +118,17 @@ export default function Tariffs() {
     setEditingTariff(tariff)
     // Преобразуем monthlyAmounts из объекта в строки для формы
     const monthlyAmountsForm: { [month: number]: string } = {}
-    if (tariff.monthlyAmounts) {
-      Object.keys(tariff.monthlyAmounts).forEach((monthStr) => {
-        const month = parseInt(monthStr)
-        monthlyAmountsForm[month] = tariff.monthlyAmounts![month].toString()
-      })
+    if (tariff.monthlyAmounts && typeof tariff.monthlyAmounts === 'object') {
+      try {
+        Object.keys(tariff.monthlyAmounts).forEach((monthStr) => {
+          const month = parseInt(monthStr)
+          if (!isNaN(month) && tariff.monthlyAmounts && tariff.monthlyAmounts[month] !== undefined) {
+            monthlyAmountsForm[month] = tariff.monthlyAmounts[month].toString()
+          }
+        })
+      } catch (e) {
+        console.error('Ошибка при обработке monthlyAmounts:', e)
+      }
     }
     setTariffForm({
       name: tariff.name,
@@ -183,9 +194,13 @@ export default function Tariffs() {
 
     // Для помесячной оплаты проверяем, что для каждого выбранного месяца указана сумма
     if (tariffForm.type === TariffType.MONTHLY_PAYMENT) {
+      if (!tariffForm.monthlyAmounts || typeof tariffForm.monthlyAmounts !== 'object') {
+        alert('Укажите суммы для выбранных месяцев')
+        return
+      }
       for (const month of tariffForm.selectedMonths) {
         const monthAmount = tariffForm.monthlyAmounts[month]
-        if (!monthAmount || parseFloat(monthAmount) <= 0) {
+        if (!monthAmount || isNaN(parseFloat(monthAmount)) || parseFloat(monthAmount) <= 0) {
           const monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
           alert(`Укажите сумму для месяца "${monthNames[month]}"`)
           return
@@ -197,9 +212,13 @@ export default function Tariffs() {
     try {
       // Преобразуем monthlyAmounts из строк в числа для помесячной оплаты
       const monthlyAmountsNumeric: { [month: number]: number } | null = 
-        tariffForm.type === TariffType.MONTHLY_PAYMENT && tariffForm.selectedMonths.length > 0
+        tariffForm.type === TariffType.MONTHLY_PAYMENT && tariffForm.selectedMonths.length > 0 && tariffForm.monthlyAmounts
           ? tariffForm.selectedMonths.reduce((acc, month) => {
-              acc[month] = parseFloat(tariffForm.monthlyAmounts[month] || '0')
+              const amountStr = tariffForm.monthlyAmounts[month] || '0'
+              const amount = parseFloat(amountStr)
+              if (!isNaN(amount) && amount > 0) {
+                acc[month] = amount
+              }
               return acc
             }, {} as { [month: number]: number })
           : null
