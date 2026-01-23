@@ -282,7 +282,7 @@ export default function Tariffs() {
   }
 
   const getTariffTypeText = (type: TariffType) => {
-    return type === TariffType.SEASON_PAYMENT ? 'Оплата всего сезона сразу' : 'Помесячная оплата'
+    return type === TariffType.SEASON_PAYMENT ? 'Оплата всего сезона сразу' : 'По-месячная оплата'
   }
 
   if (loading) {
@@ -519,7 +519,7 @@ export default function Tariffs() {
                       onChange={(e) => setTariffForm({ ...tariffForm, type: e.target.value as TariffType, monthlyAmounts: {} })}
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-900">Помесячная оплата (фиксированная ежемесячная ставка)</span>
+                    <span className="text-sm text-gray-900">По-месячная оплата</span>
                   </label>
                 </div>
               </div>

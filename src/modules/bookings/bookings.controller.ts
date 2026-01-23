@@ -535,8 +535,22 @@ export class BookingsController {
           const sortedMonths = [...intersectionMonths].sort((a, b) => a - b);
           const seasonYear = club.season || new Date().getFullYear();
           
-          // Рассчитываем стоимость: количество месяцев * стоимость за месяц
-          totalPrice = selectedTariff.amount * sortedMonths.length;
+          // Рассчитываем стоимость: используем monthlyAmounts если есть, иначе amount для каждого месяца
+          totalPrice = 0;
+          if (selectedTariff.monthlyAmounts && Object.keys(selectedTariff.monthlyAmounts).length > 0) {
+            // Если есть monthlyAmounts, суммируем суммы для каждого выбранного месяца
+            for (const month of sortedMonths) {
+              if (selectedTariff.monthlyAmounts[month]) {
+                totalPrice += parseFloat(String(selectedTariff.monthlyAmounts[month]));
+              } else {
+                // Если для месяца нет суммы в monthlyAmounts, используем общую amount
+                totalPrice += parseFloat(String(selectedTariff.amount));
+              }
+            }
+          } else {
+            // Если monthlyAmounts нет, используем общую сумму умноженную на количество месяцев
+            totalPrice = parseFloat(String(selectedTariff.amount)) * sortedMonths.length;
+          }
           
           // Если есть правило REQUIRE_DEPOSIT, добавляем залог к общей сумме
           if (depositRule && depositRule.parameters && depositRule.parameters.depositAmount) {

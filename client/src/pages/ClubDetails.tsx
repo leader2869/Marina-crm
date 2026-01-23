@@ -1725,7 +1725,11 @@ export default function ClubDetails() {
                       totalPrice = 0
                       
                       sortedMonths.forEach((monthNumber) => {
-                        const monthAmount = tariffAmount
+                        // Если есть monthlyAmounts, используем сумму для конкретного месяца, иначе используем общую сумму
+                        let monthAmount = tariffAmount
+                        if (selectedTariff.monthlyAmounts && selectedTariff.monthlyAmounts[monthNumber]) {
+                          monthAmount = parseFloat(String(selectedTariff.monthlyAmounts[monthNumber]))
+                        }
                         monthlyBreakdown.push({
                           month: `${monthNames[monthNumber - 1]} ${seasonYear}`,
                           amount: monthAmount,

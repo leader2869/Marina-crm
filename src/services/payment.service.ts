@@ -192,7 +192,7 @@ export class PaymentService {
     } else if (tariff.type === TariffType.MONTHLY_PAYMENT) {
       // Помесячная оплата
       const tariffMonths = tariff.months || [];
-      const monthlyAmount = parseFloat(String(tariff.amount));
+      const defaultMonthlyAmount = parseFloat(String(tariff.amount));
 
       // Получаем месяцы, которые нужно оплатить сразу (из правила REQUIRE_PAYMENT_MONTHS)
       const immediatePaymentMonths: number[] = [];
@@ -221,17 +221,23 @@ export class PaymentService {
         const seasonYear = club.season || new Date().getFullYear();
         const monthStartDate = new Date(seasonYear, month - 1, 1);
 
+        // Если есть monthlyAmounts, используем сумму для конкретного месяца, иначе используем общую сумму
+        let monthAmount = defaultMonthlyAmount;
+        if (tariff.monthlyAmounts && tariff.monthlyAmounts[month]) {
+          monthAmount = parseFloat(String(tariff.monthlyAmounts[month]));
+        }
+
         // Если месяц указан в правиле REQUIRE_PAYMENT_MONTHS - оплата сразу
         const isImmediatePayment = immediatePaymentMonths.includes(month);
         const dueDate = isImmediatePayment 
           ? new Date() // Сразу при бронировании (15 минут на оплату)
           : subDays(monthStartDate, 7); // За 7 дней до начала месяца
 
-        console.log(`[PaymentService] Месяц ${month}: ${isImmediatePayment ? 'немедленная оплата' : 'за 7 дней до начала'}, dueDate:`, dueDate.toISOString());
+        console.log(`[PaymentService] Месяц ${month}: сумма=${monthAmount}, ${isImmediatePayment ? 'немедленная оплата' : 'за 7 дней до начала'}, dueDate:`, dueDate.toISOString());
 
         schedule.push({
           type: PaymentType.MONTHLY,
-          amount: monthlyAmount,
+          amount: monthAmount,
           dueDate: dueDate,
           paymentOrder: paymentOrder++,
           month,
