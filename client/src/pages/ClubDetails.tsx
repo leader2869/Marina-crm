@@ -1271,17 +1271,6 @@ export default function ClubDetails() {
                     </div>
                   )
                 })()}
-                    ) : (
-                      <button
-                        onClick={() => setShowRegisterModal(true)}
-                        className="w-full flex items-center justify-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                      >
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Забронировать место
-                      </button>
-                    )}
-                  </div>
-                )}
                 {club && club.isActive && !isBerthBookable(berth) && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <button
