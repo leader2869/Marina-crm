@@ -237,10 +237,16 @@ export default function ClubDetails() {
       return
     }
 
-    // Проверяем, есть ли тарифы для места, и если есть, то тариф должен быть выбран
+    // Проверяем, что у места есть тарифы и тариф выбран
     const berthFromClub = club.berths?.find(b => b.id.toString() === bookingForm.berthId)
     const availableTariffs = berthFromClub?.tariffBerths?.filter(tb => tb.tariff) || []
-    if (availableTariffs.length > 0 && !bookingForm.tariffId) {
+    
+    if (availableTariffs.length === 0) {
+      setError('Невозможно забронировать место без тарифа. Обратитесь к администратору клуба.')
+      return
+    }
+    
+    if (!bookingForm.tariffId) {
       setError('Выберите тариф для оплаты бронирования')
       return
     }
@@ -1214,30 +1220,57 @@ export default function ClubDetails() {
                           })}
                         </div>
                       )
-                    } else if (berth.pricePerDay) {
-                      // Если нет тарифов, показываем pricePerDay
+                    } else {
+                      // Если нет тарифов, показываем сообщение
                       return (
-                        <div className="text-primary-600 font-semibold">
-                          {berth.pricePerDay.toLocaleString()} ₽/день
+                        <div className="text-red-600 font-semibold text-sm">
+                          Тариф не указан. Бронирование недоступно.
                         </div>
                       )
                     }
-                    return null
                   })()}
                   <div className={`mt-2 ${getBerthStatus(berth).color} font-semibold`}>
                     {getBerthStatus(berth).text}
                   </div>
                 </div>
-                {club && club.isActive && isBerthBookable(berth) && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    {user?.role === UserRole.VESSEL_OWNER ? (
-                      <button
-                        onClick={() => handleOpenBookingModalForBerth(berth)}
-                        className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                      >
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Забронировать
-                      </button>
+                {club && club.isActive && isBerthBookable(berth) && (() => {
+                  // Проверяем, есть ли тарифы для места
+                  const activeTariffs = berth.tariffBerths?.filter(tb => tb.tariff) || []
+                  const hasTariffs = activeTariffs.length > 0
+                  
+                  return (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      {user?.role === UserRole.VESSEL_OWNER ? (
+                        hasTariffs ? (
+                          <button
+                            onClick={() => handleOpenBookingModalForBerth(berth)}
+                            className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          >
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Забронировать
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            className="w-full flex items-center justify-center px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed"
+                            title="Невозможно забронировать место без тарифа"
+                          >
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Забронировать (недоступно)
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          onClick={() => setShowRegisterModal(true)}
+                          className="w-full flex items-center justify-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                        >
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Забронировать место
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
                     ) : (
                       <button
                         onClick={() => setShowRegisterModal(true)}
@@ -1692,8 +1725,18 @@ export default function ClubDetails() {
                           </p>
                         </div>
                       )
+                    } else {
+                      return (
+                        <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+                          <p className="text-sm font-medium text-red-800">
+                            Невозможно забронировать место без тарифа
+                          </p>
+                          <p className="mt-1 text-xs text-red-600">
+                            Обратитесь к администратору клуба для настройки тарифа.
+                          </p>
+                        </div>
+                      )
                     }
-                    return null
                   })()}
 
                   {/* Расчет стоимости */}
@@ -1882,12 +1925,20 @@ export default function ClubDetails() {
                     if (creatingBooking || userVessels.length === 0 || availableBerths.length === 0) {
                       return true
                     }
-                    // Если есть тарифы для места, тариф должен быть выбран
+                    // Проверяем наличие тарифов для места
                     const selectedBerth = club?.berths?.find(b => b.id.toString() === bookingForm.berthId)
                     const availableTariffs = selectedBerth?.tariffBerths?.filter(tb => tb.tariff) || []
-                    if (availableTariffs.length > 0 && !bookingForm.tariffId) {
+                    
+                    // Если нет тарифов, кнопка заблокирована
+                    if (availableTariffs.length === 0) {
                       return true
                     }
+                    
+                    // Если есть тарифы, но тариф не выбран, кнопка заблокирована
+                    if (!bookingForm.tariffId) {
+                      return true
+                    }
+                    
                     return false
                   })()}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"

@@ -565,25 +565,8 @@ export class BookingsController {
           endDate = new Date(seasonYear, lastMonth, 0); // 0 день следующего месяца = последний день текущего месяца
         }
       } else {
-        // Если тариф не выбран, используем стандартный расчет по дням
-        // Используем весь период навигации
-        const rentalMonths = club.rentalMonths || [];
-        if (rentalMonths.length === 0) {
-          throw new AppError('Период навигации не установлен для яхт-клуба', 400);
-        }
-        
-        const sortedMonths = [...rentalMonths].sort((a, b) => a - b);
-        const seasonYear = club.season || new Date().getFullYear();
-        
-        // Первый день первого месяца
-        startDate = new Date(seasonYear, sortedMonths[0] - 1, 1);
-        // Последний день последнего месяца
-        const lastMonth = sortedMonths[sortedMonths.length - 1];
-        endDate = new Date(seasonYear, lastMonth, 0);
-        
-        const days = differenceInDays(endDate, startDate) + 1;
-        const pricePerDay = berth.pricePerDay || berth.club.basePrice;
-        totalPrice = days * pricePerDay;
+        // Тариф обязателен для бронирования
+        throw new AppError('Невозможно забронировать место без тарифа. Обратитесь к администратору клуба.', 400);
       }
 
       // Проверка пересечений с другими бронированиями
