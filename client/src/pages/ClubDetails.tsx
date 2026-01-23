@@ -1179,8 +1179,34 @@ export default function ClubDetails() {
                   <div>Максимальная длина катера: {berth.length} м</div>
                   <div>Максимальная ширина катера: {berth.width} м</div>
                   {(() => {
-                    // Проверяем, есть ли тарифы для этого места
-                    const activeTariffs = berth.tariffBerths?.filter(tb => tb.tariff) || []
+                    // Проверяем, есть ли действующие тарифы для этого места
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    
+                    const activeTariffs = berth.tariffBerths?.filter(tb => {
+                      if (!tb.tariff) return false
+                      const tariff = tb.tariff
+                      
+                      // Если даты не указаны, тариф действует всегда
+                      if (!tariff.startDate && !tariff.endDate) return true
+                      
+                      // Проверяем дату начала
+                      if (tariff.startDate) {
+                        const startDate = new Date(tariff.startDate)
+                        startDate.setHours(0, 0, 0, 0)
+                        if (today < startDate) return false
+                      }
+                      
+                      // Проверяем дату окончания
+                      if (tariff.endDate) {
+                        const endDate = new Date(tariff.endDate)
+                        endDate.setHours(23, 59, 59, 999)
+                        if (today > endDate) return false
+                      }
+                      
+                      return true
+                    }) || []
+                    
                     if (activeTariffs.length > 0) {
                       // Показываем тарифы
                       return (
@@ -1234,8 +1260,33 @@ export default function ClubDetails() {
                   </div>
                 </div>
                 {club && club.isActive && isBerthBookable(berth) && (() => {
-                  // Проверяем, есть ли тарифы для места
-                  const activeTariffs = berth.tariffBerths?.filter(tb => tb.tariff) || []
+                  // Проверяем, есть ли действующие тарифы для места
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  
+                  const activeTariffs = berth.tariffBerths?.filter(tb => {
+                    if (!tb.tariff) return false
+                    const tariff = tb.tariff
+                    
+                    // Если даты не указаны, тариф действует всегда
+                    if (!tariff.startDate && !tariff.endDate) return true
+                    
+                    // Проверяем дату начала
+                    if (tariff.startDate) {
+                      const startDate = new Date(tariff.startDate)
+                      startDate.setHours(0, 0, 0, 0)
+                      if (today < startDate) return false
+                    }
+                    
+                    // Проверяем дату окончания
+                    if (tariff.endDate) {
+                      const endDate = new Date(tariff.endDate)
+                      endDate.setHours(23, 59, 59, 999)
+                      if (today > endDate) return false
+                    }
+                    
+                    return true
+                  }) || []
                   const hasTariffs = activeTariffs.length > 0
                   
                   return (
@@ -1659,7 +1710,33 @@ export default function ClubDetails() {
                   {/* Выбор тарифа */}
                   {(() => {
                     const selectedBerth = club?.berths?.find(b => b.id.toString() === bookingForm.berthId)
-                    const availableTariffs = selectedBerth?.tariffBerths?.filter(tb => tb.tariff) || []
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    
+                    // Фильтруем тарифы: показываем только действующие (если указаны даты)
+                    const availableTariffs = selectedBerth?.tariffBerths?.filter(tb => {
+                      if (!tb.tariff) return false
+                      const tariff = tb.tariff
+                      
+                      // Если даты не указаны, тариф действует всегда
+                      if (!tariff.startDate && !tariff.endDate) return true
+                      
+                      // Проверяем дату начала
+                      if (tariff.startDate) {
+                        const startDate = new Date(tariff.startDate)
+                        startDate.setHours(0, 0, 0, 0)
+                        if (today < startDate) return false
+                      }
+                      
+                      // Проверяем дату окончания
+                      if (tariff.endDate) {
+                        const endDate = new Date(tariff.endDate)
+                        endDate.setHours(23, 59, 59, 999)
+                        if (today > endDate) return false
+                      }
+                      
+                      return true
+                    }) || []
                     
                     if (availableTariffs.length > 0) {
                       return (

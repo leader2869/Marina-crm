@@ -61,7 +61,7 @@ export class TariffsController {
   // Создать новый тариф
   async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { clubId, name, type, amount, season, berthIds, months, monthlyAmounts } = req.body;
+      const { clubId, name, type, amount, season, berthIds, months, monthlyAmounts, startDate, endDate } = req.body;
 
       if (!clubId || !name || !type) {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
@@ -148,6 +148,28 @@ export class TariffsController {
         ? Object.values(monthlyAmountsNumeric).reduce((sum, amount) => sum + amount, 0)
         : parseFloat(amount || '0');
 
+      // Валидация дат
+      let parsedStartDate: Date | null = null;
+      let parsedEndDate: Date | null = null;
+
+      if (startDate) {
+        parsedStartDate = new Date(startDate);
+        if (isNaN(parsedStartDate.getTime())) {
+          throw new AppError('Неверный формат даты начала действия тарифа', 400);
+        }
+      }
+
+      if (endDate) {
+        parsedEndDate = new Date(endDate);
+        if (isNaN(parsedEndDate.getTime())) {
+          throw new AppError('Неверный формат даты окончания действия тарифа', 400);
+        }
+      }
+
+      if (parsedStartDate && parsedEndDate && parsedStartDate > parsedEndDate) {
+        throw new AppError('Дата начала действия тарифа не может быть позже даты окончания', 400);
+      }
+
       const tariff = tariffRepository.create({
         name,
         type,
@@ -156,6 +178,8 @@ export class TariffsController {
         clubId: parseInt(clubId),
         months: type === TariffType.MONTHLY_PAYMENT ? months : null,
         monthlyAmounts: monthlyAmountsNumeric,
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
       });
 
       const savedTariff = await tariffRepository.save(tariff);
@@ -193,7 +217,7 @@ export class TariffsController {
   async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const { name, type, amount, season, berthIds, months, monthlyAmounts } = req.body;
+      const { name, type, amount, season, berthIds, months, monthlyAmounts, startDate, endDate } = req.body;
 
       const tariffRepository = AppDataSource.getRepository(Tariff);
       const tariff = await tariffRepository.findOne({
@@ -333,6 +357,36 @@ export class TariffsController {
         tariff.monthlyAmounts = monthlyAmountsNumeric;
         // Обновляем amount как сумму всех месяцев
         tariff.amount = Object.values(monthlyAmountsNumeric).reduce((sum, amount) => sum + amount, 0);
+      }
+
+      // Обновляем даты действия тарифа
+      if (startDate !== undefined) {
+        if (startDate === null || startDate === '') {
+          tariff.startDate = null;
+        } else {
+          const parsedStartDate = new Date(startDate);
+          if (isNaN(parsedStartDate.getTime())) {
+            throw new AppError('Неверный формат даты начала действия тарифа', 400);
+          }
+          tariff.startDate = parsedStartDate;
+        }
+      }
+
+      if (endDate !== undefined) {
+        if (endDate === null || endDate === '') {
+          tariff.endDate = null;
+        } else {
+          const parsedEndDate = new Date(endDate);
+          if (isNaN(parsedEndDate.getTime())) {
+            throw new AppError('Неверный формат даты окончания действия тарифа', 400);
+          }
+          tariff.endDate = parsedEndDate;
+        }
+      }
+
+      // Валидация: дата начала не должна быть позже даты окончания
+      if (tariff.startDate && tariff.endDate && tariff.startDate > tariff.endDate) {
+        throw new AppError('Дата начала действия тарифа не может быть позже даты окончания', 400);
       }
 
       await tariffRepository.save(tariff);

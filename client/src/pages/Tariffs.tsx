@@ -23,6 +23,8 @@ export default function Tariffs() {
     selectedBerthIds: [] as number[],
     selectedMonths: [] as number[],
     monthlyAmounts: {} as { [month: number]: string }, // Суммы для каждого месяца
+    startDate: '', // Дата начала действия тарифа
+    endDate: '', // Дата окончания действия тарифа
   })
   const [saving, setSaving] = useState(false)
 
@@ -97,6 +99,8 @@ export default function Tariffs() {
       selectedBerthIds: [],
       selectedMonths: [],
       monthlyAmounts: {},
+      startDate: '',
+      endDate: '',
     })
     setShowAddModal(true)
   }
@@ -111,6 +115,8 @@ export default function Tariffs() {
       selectedBerthIds: [],
       selectedMonths: [],
       monthlyAmounts: {},
+      startDate: '',
+      endDate: '',
     })
   }
 
@@ -130,6 +136,14 @@ export default function Tariffs() {
         console.error('Ошибка при обработке monthlyAmounts:', e)
       }
     }
+    // Форматируем даты для input type="date" (YYYY-MM-DD)
+    const formatDateForInput = (dateString: string | null | undefined): string => {
+      if (!dateString) return ''
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return ''
+      return date.toISOString().split('T')[0]
+    }
+
     setTariffForm({
       name: tariff.name,
       type: tariff.type,
@@ -137,6 +151,8 @@ export default function Tariffs() {
       selectedBerthIds: tariff.berths?.map((b) => b.id) || [],
       selectedMonths: tariff.months || [],
       monthlyAmounts: monthlyAmountsForm,
+      startDate: formatDateForInput(tariff.startDate),
+      endDate: formatDateForInput(tariff.endDate),
     })
     setShowAddModal(true)
   }
@@ -208,6 +224,16 @@ export default function Tariffs() {
       }
     }
 
+    // Валидация дат
+    if (tariffForm.startDate && tariffForm.endDate) {
+      const startDate = new Date(tariffForm.startDate)
+      const endDate = new Date(tariffForm.endDate)
+      if (startDate > endDate) {
+        alert('Дата начала действия тарифа не может быть позже даты окончания')
+        return
+      }
+    }
+
     setSaving(true)
     try {
       // Преобразуем monthlyAmounts из строк в числа для помесячной оплаты
@@ -237,6 +263,8 @@ export default function Tariffs() {
         berthIds: tariffForm.selectedBerthIds,
         months: tariffForm.type === TariffType.MONTHLY_PAYMENT ? tariffForm.selectedMonths : null,
         monthlyAmounts: monthlyAmountsNumeric,
+        startDate: tariffForm.startDate || null,
+        endDate: tariffForm.endDate || null,
       }
 
       if (editingTariff) {
@@ -680,6 +708,40 @@ export default function Tariffs() {
                     Выбрано мест: {tariffForm.selectedBerthIds.length} из {berths.length}
                   </p>
                 )}
+              </div>
+
+              {/* Период действия тарифа */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="tariff-startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    Дата начала действия
+                  </label>
+                  <input
+                    id="tariff-startDate"
+                    type="date"
+                    value={tariffForm.startDate}
+                    onChange={(e) => setTariffForm({ ...tariffForm, startDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Если не указано, тариф действует с момента создания
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="tariff-endDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    Дата окончания действия
+                  </label>
+                  <input
+                    id="tariff-endDate"
+                    type="date"
+                    value={tariffForm.endDate}
+                    onChange={(e) => setTariffForm({ ...tariffForm, endDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Если не указано, тариф действует бессрочно
+                  </p>
+                </div>
               </div>
             </div>
 

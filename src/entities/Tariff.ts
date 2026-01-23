@@ -42,6 +42,12 @@ export class Tariff {
   @Column({ type: 'json', nullable: true })
   monthlyAmounts: { [month: number]: number } | null; // Суммы для каждого месяца (ключ - номер месяца 1-12, значение - сумма). Используется для MONTHLY_PAYMENT
 
+  @Column({ type: 'date', nullable: true })
+  startDate: Date | null; // Дата начала действия тарифа
+
+  @Column({ type: 'date', nullable: true })
+  endDate: Date | null; // Дата окончания действия тарифа
+
   @CreateDateColumn()
   createdAt: Date;
 

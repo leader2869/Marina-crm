@@ -184,16 +184,38 @@ export class ClubsController {
         .addOrderBy('berth.number', 'ASC') // От меньшего к большему по строке
         .getMany();
 
-      // Фильтруем тарифы по сезону клуба, если сезон указан
-      if (club.season) {
-        berths.forEach(berth => {
-          if (berth.tariffBerths) {
-            berth.tariffBerths = berth.tariffBerths.filter(tb => 
-              tb.tariff && (tb.tariff.season === club.season || !tb.tariff.season)
-            )
-          }
-        })
-      }
+      // Фильтруем тарифы по сезону клуба и датам действия
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      berths.forEach(berth => {
+        if (berth.tariffBerths) {
+          berth.tariffBerths = berth.tariffBerths.filter(tb => {
+            if (!tb.tariff) return false;
+            const tariff = tb.tariff;
+            
+            // Фильтр по сезону
+            if (club.season && tariff.season !== club.season && tariff.season) {
+              return false;
+            }
+            
+            // Фильтр по датам действия
+            if (tariff.startDate) {
+              const startDate = new Date(tariff.startDate);
+              startDate.setHours(0, 0, 0, 0);
+              if (today < startDate) return false;
+            }
+            
+            if (tariff.endDate) {
+              const endDate = new Date(tariff.endDate);
+              endDate.setHours(23, 59, 59, 999);
+              if (today > endDate) return false;
+            }
+            
+            return true;
+          });
+        }
+      });
 
       // Добавляем отсортированные места к клубу
       club.berths = berths;

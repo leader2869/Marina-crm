@@ -438,6 +438,26 @@ export class BookingsController {
           throw new AppError('Выбранный тариф не привязан к этому месту', 400);
         }
 
+        // Проверяем, что тариф действует (если указаны даты)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (selectedTariff.startDate) {
+          const startDate = new Date(selectedTariff.startDate);
+          startDate.setHours(0, 0, 0, 0);
+          if (today < startDate) {
+            throw new AppError('Тариф еще не действует. Дата начала действия: ' + startDate.toLocaleDateString('ru-RU'), 400);
+          }
+        }
+        
+        if (selectedTariff.endDate) {
+          const endDate = new Date(selectedTariff.endDate);
+          endDate.setHours(23, 59, 59, 999);
+          if (today > endDate) {
+            throw new AppError('Тариф больше не действует. Дата окончания действия: ' + endDate.toLocaleDateString('ru-RU'), 400);
+          }
+        }
+
         // Для тарифа используем его amount
         if (selectedTariff.type === 'season_payment') {
           // Оплата за весь сезон - используем полную сумму тарифа
