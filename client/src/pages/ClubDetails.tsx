@@ -1181,10 +1181,34 @@ export default function ClubDetails() {
                         <div className="space-y-1">
                           {activeTariffs.map((tb) => {
                             const tariff = tb.tariff!
-                            const tariffTypeText = tariff.type === 'season_payment' ? 'за сезон' : 'в месяц'
+                            let tariffTypeText = tariff.type === 'season_payment' ? 'за сезон' : 'в месяц'
+                            let displayAmount = tariff.amount
+                            
+                            // Для помесячной оплаты определяем сумму за месяц
+                            if (tariff.type === 'monthly_payment') {
+                              if (tariff.monthlyAmounts && Object.keys(tariff.monthlyAmounts).length > 0) {
+                                const amounts = Object.values(tariff.monthlyAmounts)
+                                const minAmount = Math.min(...amounts)
+                                const maxAmount = Math.max(...amounts)
+                                
+                                if (minAmount === maxAmount) {
+                                  // Если все суммы одинаковые, показываем одну сумму
+                                  displayAmount = minAmount
+                                } else {
+                                  // Если суммы разные, показываем диапазон
+                                  displayAmount = minAmount
+                                  tariffTypeText = `в месяц (от ${minAmount.toLocaleString()} до ${maxAmount.toLocaleString()} ₽)`
+                                }
+                              } else {
+                                // Если monthlyAmounts нет, используем общую сумму деленную на количество месяцев
+                                const monthsCount = tariff.months?.length || 1
+                                displayAmount = tariff.amount / monthsCount
+                              }
+                            }
+                            
                             return (
                               <div key={tb.id} className="text-primary-600 font-semibold">
-                                {tariff.name}: {tariff.amount.toLocaleString()} ₽ {tariffTypeText}
+                                {tariff.name}: {displayAmount.toLocaleString()} ₽ {tariffTypeText}
                               </div>
                             )
                           })}
@@ -1631,10 +1655,34 @@ export default function ClubDetails() {
                             <option value="">Выберите тариф</option>
                             {availableTariffs.map((tb) => {
                               const tariff = tb.tariff!
-                              const tariffTypeText = tariff.type === 'season_payment' ? 'за сезон' : 'в месяц'
+                              let tariffTypeText = tariff.type === 'season_payment' ? 'за сезон' : 'в месяц'
+                              let displayAmount = tariff.amount
+                              
+                              // Для помесячной оплаты определяем сумму за месяц
+                              if (tariff.type === 'monthly_payment') {
+                                if (tariff.monthlyAmounts && Object.keys(tariff.monthlyAmounts).length > 0) {
+                                  const amounts = Object.values(tariff.monthlyAmounts)
+                                  const minAmount = Math.min(...amounts)
+                                  const maxAmount = Math.max(...amounts)
+                                  
+                                  if (minAmount === maxAmount) {
+                                    // Если все суммы одинаковые, показываем одну сумму
+                                    displayAmount = minAmount
+                                  } else {
+                                    // Если суммы разные, показываем диапазон
+                                    displayAmount = minAmount
+                                    tariffTypeText = `в месяц (от ${minAmount.toLocaleString()} до ${maxAmount.toLocaleString()} ₽)`
+                                  }
+                                } else {
+                                  // Если monthlyAmounts нет, используем общую сумму деленную на количество месяцев
+                                  const monthsCount = tariff.months?.length || 1
+                                  displayAmount = tariff.amount / monthsCount
+                                }
+                              }
+                              
                               return (
                                 <option key={tb.id} value={tariff.id}>
-                                  {tariff.name} - {tariff.amount.toLocaleString()} ₽ {tariffTypeText}
+                                  {tariff.name} - {displayAmount.toLocaleString()} ₽ {tariffTypeText}
                                 </option>
                               )
                             })}
