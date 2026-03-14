@@ -848,7 +848,7 @@ export default function Layout() {
               <span className="text-sm text-gray-600">
                 {user?.firstName} {user?.lastName}
               </span>
-              {user?.role === UserRole.VESSEL_OWNER && (
+              {user && (
                 <button
                   onClick={logout}
                   className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
