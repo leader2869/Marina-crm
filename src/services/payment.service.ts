@@ -53,7 +53,10 @@ export class PaymentService {
       if (!Array.isArray(berthIds) || berthIds.length === 0) {
         return true;
       }
-      return berthIds.includes(booking.berthId);
+      const normalizedBerthIds = berthIds
+        .map((id: any) => Number(id))
+        .filter((id: number) => !Number.isNaN(id));
+      return normalizedBerthIds.includes(Number(booking.berthId));
     };
 
     // Проверяем, требуется ли залог

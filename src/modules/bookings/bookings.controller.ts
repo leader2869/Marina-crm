@@ -525,7 +525,10 @@ export class BookingsController {
             if (!Array.isArray(berthIds) || berthIds.length === 0) {
               return true;
             }
-            return berthIds.includes(parseInt(berthId));
+            const normalizedBerthIds = berthIds
+              .map((id: any) => Number(id))
+              .filter((id: number) => !Number.isNaN(id));
+            return normalizedBerthIds.includes(parseInt(berthId));
           };
 
           // Ищем правило REQUIRE_DEPOSIT
@@ -595,7 +598,10 @@ export class BookingsController {
             if (!Array.isArray(berthIds) || berthIds.length === 0) {
               return true;
             }
-            return berthIds.includes(parseInt(berthId));
+            const normalizedBerthIds = berthIds
+              .map((id: any) => Number(id))
+              .filter((id: number) => !Number.isNaN(id));
+            return normalizedBerthIds.includes(parseInt(berthId));
           };
 
           // Ищем правило REQUIRE_DEPOSIT

@@ -1895,7 +1895,9 @@ export default function ClubDetails() {
                       const byTariff = rule.tariffId === selectedTariff.id || rule.tariffId === null
                       if (!byTariff) return false
                       const berthIds = rule.parameters?.berthIds
-                      return !Array.isArray(berthIds) || berthIds.length === 0 || (selectedBerth ? berthIds.includes(selectedBerth.id) : false)
+                      if (!Array.isArray(berthIds) || berthIds.length === 0) return true
+                      const normalizedBerthIds = berthIds.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
+                      return selectedBerth ? normalizedBerthIds.includes(Number(selectedBerth.id)) : false
                     })
 
                     // Ищем правило REQUIRE_DEPOSIT
@@ -1909,7 +1911,9 @@ export default function ClubDetails() {
 
                     // Ищем правило REQUIRE_MEMBERSHIP_FEE
                     const membershipFeeRule = applicableRules.find(
-                      (rule: any) => rule.ruleType === 'require_membership_fee'
+                      (rule: any) =>
+                        rule.ruleType === 'require_membership_fee' ||
+                        (rule.ruleType === 'custom' && typeof rule.parameters?.membershipFeeAmount !== 'undefined')
                     )
                     const membershipFeeAmount = membershipFeeRule?.parameters?.membershipFeeAmount
                       ? parseFloat(String(membershipFeeRule.parameters.membershipFeeAmount))
