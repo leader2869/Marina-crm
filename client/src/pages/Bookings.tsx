@@ -180,6 +180,14 @@ export default function Bookings() {
     }
   }
 
+  const getManualBookingCustomerName = (booking: Booking): string | null => {
+    if (!booking.notes?.startsWith('Ручное бронирование владельцем клуба.')) {
+      return null
+    }
+    const match = booking.notes.match(/Клиент:\s*(.+?),\s*телефон:/i)
+    return match?.[1]?.trim() || null
+  }
+
   if (loading) {
     return <LoadingAnimation message="Загрузка бронирований..." />
   }
@@ -363,9 +371,10 @@ export default function Bookings() {
                                               {isClubOwner && (
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                   <div className="text-sm text-gray-900">
-                                                    {payment.payer
-                                                      ? `${payment.payer.firstName || ''} ${payment.payer.lastName || ''}`.trim() || payment.payer.phone || '—'
-                                                      : '—'}
+                                                    {getManualBookingCustomerName(booking) ||
+                                                      (payment.payer
+                                                        ? `${payment.payer.firstName || ''} ${payment.payer.lastName || ''}`.trim() || payment.payer.phone || '—'
+                                                        : '—')}
                                                   </div>
                                                 </td>
                                               )}
