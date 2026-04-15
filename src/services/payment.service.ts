@@ -63,7 +63,11 @@ export class PaymentService {
 
     // Проверяем, требуется ли членский взнос
     const membershipFeeRule = rules.find(
-      (rule) => rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE && appliesToBerth(rule)
+      (rule) =>
+        (
+          rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE ||
+          (rule.ruleType === BookingRuleType.CUSTOM && !!rule.parameters?.membershipFeeAmount)
+        ) && appliesToBerth(rule)
     );
     console.log('[PaymentService] Правило залога (depositRule):', depositRule ? {
       id: depositRule.id,

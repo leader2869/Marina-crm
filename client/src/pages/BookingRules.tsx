@@ -28,6 +28,15 @@ export interface BookingRule {
   updatedAt: string
 }
 
+const isMembershipFeeRule = (rule: BookingRule) => {
+  return (
+    rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE ||
+    (rule.ruleType === BookingRuleType.CUSTOM &&
+      !!rule.parameters &&
+      typeof rule.parameters.membershipFeeAmount !== 'undefined')
+  )
+}
+
 const ruleTypeLabels: Record<BookingRuleType, string> = {
   [BookingRuleType.REQUIRE_PAYMENT_MONTHS]: 'Требовать оплату за несколько месяцев сразу',
   [BookingRuleType.MIN_BOOKING_PERIOD]: 'Минимальный период бронирования',
@@ -66,6 +75,21 @@ export default function BookingRules() {
     selectedBerthIds: [] as number[],
   })
   const [saving, setSaving] = useState(false)
+
+  const toErrorText = (err: any): string => {
+    const value = err?.error ?? err?.message ?? err
+    if (typeof value === 'string') return value
+    if (value && typeof value === 'object') {
+      if (typeof value.message === 'string') return value.message
+      if (typeof value.code === 'string') return `Ошибка: ${value.code}`
+      try {
+        return JSON.stringify(value)
+      } catch {
+        return 'Неизвестная ошибка'
+      }
+    }
+    return 'Неизвестная ошибка'
+  }
 
   useEffect(() => {
     loadClubs()
@@ -124,7 +148,13 @@ export default function BookingRules() {
     try {
       const response = await bookingRulesService.getByClub(clubId)
       const rulesData = Array.isArray(response) ? response : (response?.data || [])
-      setRules(rulesData)
+      const normalizedRules = (rulesData as BookingRule[]).map((rule) => {
+        if (isMembershipFeeRule(rule)) {
+          return { ...rule, ruleType: BookingRuleType.REQUIRE_MEMBERSHIP_FEE }
+        }
+        return rule
+      })
+      setRules(normalizedRules)
     } catch (err: any) {
       console.error('Ошибка загрузки правил:', err)
       setRules([])
@@ -170,7 +200,7 @@ export default function BookingRules() {
     setRuleForm({
       clubId: rule.clubId.toString(),
       tariffId: rule.tariffId?.toString() || '',
-      ruleType: rule.ruleType,
+      ruleType: isMembershipFeeRule(rule) ? BookingRuleType.REQUIRE_MEMBERSHIP_FEE : rule.ruleType,
       description: rule.description,
       selectedMonths: rule.parameters?.months || [],
       minPeriod: rule.parameters?.minPeriod?.toString() || '',
@@ -205,6 +235,7 @@ export default function BookingRules() {
       setError('')
 
       let parameters: Record<string, any> | null = null
+      let ruleTypeForSave: BookingRuleType = ruleForm.ruleType
 
       switch (ruleForm.ruleType) {
         case BookingRuleType.REQUIRE_PAYMENT_MONTHS:
@@ -248,6 +279,8 @@ export default function BookingRules() {
             membershipFeeAmount: parseFloat(ruleForm.membershipFeeAmount),
             berthIds: ruleForm.selectedBerthIds,
           }
+          // Сохраняем как CUSTOM для совместимости с enum в БД
+          ruleTypeForSave = BookingRuleType.CUSTOM
           break
         default:
           parameters = null
@@ -256,7 +289,7 @@ export default function BookingRules() {
       const ruleData = {
         clubId: parseInt(ruleForm.clubId),
         tariffId: ruleForm.tariffId ? parseInt(ruleForm.tariffId) : null,
-        ruleType: ruleForm.ruleType,
+        ruleType: ruleTypeForSave,
         description: ruleForm.description,
         parameters,
       }
@@ -272,7 +305,7 @@ export default function BookingRules() {
       alert(editingRule ? 'Правило успешно обновлено!' : 'Правило успешно создано!')
     } catch (err: any) {
       console.error('Ошибка сохранения правила:', err)
-      setError(err.error || err.message || 'Ошибка сохранения правила')
+      setError(toErrorText(err))
     } finally {
       setSaving(false)
     }
@@ -292,7 +325,7 @@ export default function BookingRules() {
       alert('Правило успешно удалено!')
     } catch (err: any) {
       console.error('Ошибка удаления правила:', err)
-      alert(err.error || err.message || 'Ошибка удаления правила')
+      alert(toErrorText(err))
     }
   }
 

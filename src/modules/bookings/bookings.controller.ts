@@ -209,7 +209,7 @@ export class BookingsController {
           name: `Ручная бронь: ${String(customerFullName).trim()}`,
           type: 'manual_booking',
           length: Number(berth.length),
-          width: berth.width ? Number(berth.width) : null,
+          width: berth.width ? Number(berth.width) : undefined,
           passengerCapacity: 1,
           ownerId: req.userId,
           isActive: false,
@@ -537,9 +537,13 @@ export class BookingsController {
 
           // Ищем правило REQUIRE_MEMBERSHIP_FEE
           const membershipFeeRule = rules.find(
-            rule => rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE &&
-            (rule.tariffId === parseInt(tariffId) || rule.tariffId === null) &&
-            appliesToSelectedBerth(rule)
+            rule =>
+              (
+                rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE ||
+                (rule.ruleType === BookingRuleType.CUSTOM && !!rule.parameters?.membershipFeeAmount)
+              ) &&
+              (rule.tariffId === parseInt(tariffId) || rule.tariffId === null) &&
+              appliesToSelectedBerth(rule)
           );
 
           // Если есть правило REQUIRE_DEPOSIT, добавляем залог к общей сумме
@@ -603,9 +607,13 @@ export class BookingsController {
 
           // Ищем правило REQUIRE_MEMBERSHIP_FEE
           const membershipFeeRule = rules.find(
-            rule => rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE &&
-            (rule.tariffId === parseInt(tariffId) || rule.tariffId === null) &&
-            appliesToSelectedBerth(rule)
+            rule =>
+              (
+                rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE ||
+                (rule.ruleType === BookingRuleType.CUSTOM && !!rule.parameters?.membershipFeeAmount)
+              ) &&
+              (rule.tariffId === parseInt(tariffId) || rule.tariffId === null) &&
+              appliesToSelectedBerth(rule)
           );
 
           const clubRentalMonths = club.rentalMonths || [];
@@ -734,7 +742,7 @@ export class BookingsController {
         notes:
           isClubOwnerManualBooking
             ? `Ручное бронирование владельцем клуба. Клиент: ${String(customerFullName).trim()}, телефон: ${String(customerPhone).trim()}`
-            : null,
+            : undefined,
       });
 
       await bookingRepository.save(booking);
