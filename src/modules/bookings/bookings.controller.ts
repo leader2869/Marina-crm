@@ -10,7 +10,7 @@ import { Vessel } from '../../entities/Vessel';
 import { Payment } from '../../entities/Payment';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
-import { BookingStatus, PaymentStatus } from '../../types';
+import { BookingStatus, PaymentStatus, UserRole } from '../../types';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { differenceInDays } from 'date-fns';
 import { PaymentService } from '../../services/payment.service';
@@ -150,9 +150,17 @@ export class BookingsController {
         throw new AppError('Требуется аутентификация', 401);
       }
 
-      const { clubId, berthId, vesselId, autoRenewal, tariffId } = req.body;
+      const {
+        clubId,
+        berthId,
+        vesselId,
+        autoRenewal,
+        tariffId,
+        customerFullName,
+        customerPhone,
+      } = req.body;
 
-      if (!clubId || !berthId || !vesselId) {
+      if (!clubId || !berthId) {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
       }
 
@@ -171,14 +179,64 @@ export class BookingsController {
         throw new AppError('Место недоступно', 400);
       }
 
+      const clubRepository = AppDataSource.getRepository(Club);
+      const club = await clubRepository.findOne({
+        where: { id: parseInt(clubId) },
+      });
+
+      if (!club) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
+
+      // Владелец клуба может создавать ручные бронирования без выбора судна.
+      const isClubOwnerManualBooking =
+        req.userRole === UserRole.CLUB_OWNER && (!vesselId || String(vesselId).trim() === '');
+
+      if (req.userRole === UserRole.CLUB_OWNER && club.ownerId !== req.userId) {
+        throw new AppError('Недостаточно прав для бронирования в этом клубе', 403);
+      }
+
+      if (isClubOwnerManualBooking && (!customerFullName || !customerPhone)) {
+        throw new AppError('Для ручного бронирования укажите ФИО и номер телефона клиента', 400);
+      }
+
       // Проверка длины катера относительно максимальной длины места
       const vesselRepository = AppDataSource.getRepository(Vessel);
-      const vessel = await vesselRepository.findOne({
-        where: { id: parseInt(vesselId) },
-      });
+      let vessel: Vessel | null = null;
+
+      if (isClubOwnerManualBooking) {
+        const manualVessel = vesselRepository.create({
+          name: `Ручная бронь: ${String(customerFullName).trim()}`,
+          type: 'manual_booking',
+          length: Number(berth.length),
+          width: berth.width ? Number(berth.width) : null,
+          passengerCapacity: 1,
+          ownerId: req.userId,
+          isActive: false,
+          isValidated: true,
+          isSubmittedForValidation: true,
+          technicalSpecs: JSON.stringify({
+            source: 'club_owner_manual_booking',
+            customerFullName: String(customerFullName).trim(),
+            customerPhone: String(customerPhone).trim(),
+          }),
+        });
+        vessel = await vesselRepository.save(manualVessel);
+      } else {
+        if (!vesselId) {
+          throw new AppError('Для бронирования необходимо выбрать судно', 400);
+        }
+        vessel = await vesselRepository.findOne({
+          where: { id: parseInt(vesselId) },
+        });
+      }
 
       if (!vessel) {
         throw new AppError('Судно не найдено', 404);
+      }
+
+      if (req.userRole === UserRole.VESSEL_OWNER && vessel.ownerId !== req.userId) {
+        throw new AppError('Вы можете бронировать только свои суда', 403);
       }
 
       // Логируем загруженные данные для отладки
@@ -397,16 +455,6 @@ export class BookingsController {
       
       // Если дошли сюда - катер помещается по длине и ширине, все ОК
 
-      // Загружаем клуб с месяцами навигации
-      const clubRepository = AppDataSource.getRepository(Club);
-      const club = await clubRepository.findOne({
-        where: { id: parseInt(clubId) },
-      });
-
-      if (!club) {
-        throw new AppError('Яхт-клуб не найден', 404);
-      }
-
       // Расчет стоимости и определение дат
       let totalPrice: number;
       let selectedTariff: Tariff | null = null;
@@ -614,7 +662,7 @@ export class BookingsController {
       // Ищем активные бронирования этого судна на пересекающийся период
       const conflictingBookingsByVessel = await bookingRepository
         .createQueryBuilder('booking')
-        .where('booking.vesselId = :vesselId', { vesselId: parseInt(vesselId) })
+        .where('booking.vesselId = :vesselId', { vesselId: vessel.id })
         .andWhere('booking.status IN (:...statuses)', {
           statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
         })
@@ -631,7 +679,7 @@ export class BookingsController {
       const booking = bookingRepository.create({
         clubId: parseInt(clubId),
         berthId: parseInt(berthId),
-        vesselId: parseInt(vesselId),
+        vesselId: vessel.id,
         vesselOwnerId: req.userId,
         startDate,
         endDate,
@@ -639,6 +687,10 @@ export class BookingsController {
         autoRenewal: autoRenewal || false,
         status: BookingStatus.PENDING,
         tariffId: selectedTariff ? selectedTariff.id : null,
+        notes:
+          isClubOwnerManualBooking
+            ? `Ручное бронирование владельцем клуба. Клиент: ${String(customerFullName).trim()}, телефон: ${String(customerPhone).trim()}`
+            : null,
       });
 
       await bookingRepository.save(booking);

@@ -56,6 +56,8 @@ export default function ClubDetails() {
     vesselId: '',
     autoRenewal: false,
     tariffId: '',
+    customerFullName: '',
+    customerPhone: '',
   })
   const [creatingBooking, setCreatingBooking] = useState(false)
   const [showRegisterModal, setShowRegisterModal] = useState(false)
@@ -196,9 +198,14 @@ export default function ClubDetails() {
     setShowBookingModal(true)
     setBookingForm({
       berthId: berth.id.toString(),
-      vesselId: userVessels.length > 0 ? userVessels[0].id.toString() : '',
+      vesselId:
+        user?.role === UserRole.VESSEL_OWNER && userVessels.length > 0
+          ? userVessels[0].id.toString()
+          : '',
       autoRenewal: false,
       tariffId: '',
+      customerFullName: '',
+      customerPhone: '',
     })
     // Загружаем доступные места без дат
     loadAvailableBerths()
@@ -226,14 +233,28 @@ export default function ClubDetails() {
       vesselId: '',
       autoRenewal: false,
       tariffId: '',
+      customerFullName: '',
+      customerPhone: '',
     })
     setAvailableBerths([])
     setBookingRules([])
   }
 
   const handleCreateBooking = async () => {
-    if (!club || !bookingForm.berthId || !bookingForm.vesselId) {
+    const isClubOwnerBooking = user?.role === UserRole.CLUB_OWNER && club?.ownerId === user?.id
+
+    if (!club || !bookingForm.berthId) {
       setError('Заполните все обязательные поля')
+      return
+    }
+
+    if (!isClubOwnerBooking && !bookingForm.vesselId) {
+      setError('Выберите судно для бронирования')
+      return
+    }
+
+    if (isClubOwnerBooking && (!bookingForm.customerFullName.trim() || !bookingForm.customerPhone.trim())) {
+      setError('Укажите ФИО и телефон клиента')
       return
     }
 
@@ -254,7 +275,7 @@ export default function ClubDetails() {
     // Проверка длины и ширины катера относительно максимальных размеров места
     // ВАЖНО: Преобразуем в числа для корректного сравнения (избегаем лексикографического сравнения строк)
     const selectedVessel = userVessels.find(v => v.id.toString() === bookingForm.vesselId)
-    if (selectedVessel && berthFromClub) {
+    if (!isClubOwnerBooking && selectedVessel && berthFromClub) {
       // Проверка длины
       const vesselLength = parseFloat(String(selectedVessel.length).replace(',', '.'))
       const berthLength = parseFloat(String(berthFromClub.length).replace(',', '.'))
@@ -286,13 +307,21 @@ export default function ClubDetails() {
     setCreatingBooking(true)
 
     try {
-      await bookingsService.create({
+      const payload: any = {
         clubId: club.id,
         berthId: parseInt(bookingForm.berthId),
-        vesselId: parseInt(bookingForm.vesselId),
         autoRenewal: bookingForm.autoRenewal,
         tariffId: bookingForm.tariffId ? parseInt(bookingForm.tariffId) : null,
-      })
+      }
+
+      if (isClubOwnerBooking) {
+        payload.customerFullName = bookingForm.customerFullName.trim()
+        payload.customerPhone = bookingForm.customerPhone.trim()
+      } else {
+        payload.vesselId = parseInt(bookingForm.vesselId)
+      }
+
+      await bookingsService.create(payload)
 
       await loadClub()
       await loadBerthBookings()
@@ -1291,7 +1320,7 @@ export default function ClubDetails() {
                   
                   return (
                     <div className="mt-4 pt-4 border-t border-gray-200">
-                      {user?.role === UserRole.VESSEL_OWNER ? (
+                      {user?.role === UserRole.VESSEL_OWNER || (user?.role === UserRole.CLUB_OWNER && club.ownerId === user.id) ? (
                         hasTariffs ? (
                           <button
                             onClick={() => handleOpenBookingModalForBerth(berth)}
@@ -1673,30 +1702,61 @@ export default function ClubDetails() {
                 )}
 
                 <div className="space-y-4">
-                  <div>
-                    <label htmlFor="booking-vessel" className="block text-sm font-medium text-gray-700">
-                      Судно *
-                    </label>
-                    <select
-                      id="booking-vessel"
-                      required
-                      value={bookingForm.vesselId}
-                      onChange={(e) => setBookingForm({ ...bookingForm, vesselId: e.target.value })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                    >
-                      <option value="">Выберите судно</option>
-                      {userVessels.map((vessel) => (
-                        <option key={vessel.id} value={vessel.id}>
-                          {vessel.name} ({vessel.type}, {vessel.length} м)
-                        </option>
-                      ))}
-                    </select>
-                    {userVessels.length === 0 && (
-                      <p className="mt-1 text-sm text-gray-500">
-                        У вас нет судов. Создайте судно на странице "Судна".
-                      </p>
-                    )}
-                  </div>
+                  {user?.role === UserRole.CLUB_OWNER && club?.ownerId === user?.id ? (
+                    <>
+                      <div>
+                        <label htmlFor="booking-customer-name" className="block text-sm font-medium text-gray-700">
+                          ФИО клиента *
+                        </label>
+                        <input
+                          id="booking-customer-name"
+                          type="text"
+                          value={bookingForm.customerFullName}
+                          onChange={(e) => setBookingForm({ ...bookingForm, customerFullName: e.target.value })}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                          placeholder="Иванов Иван Иванович"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="booking-customer-phone" className="block text-sm font-medium text-gray-700">
+                          Телефон клиента *
+                        </label>
+                        <input
+                          id="booking-customer-phone"
+                          type="tel"
+                          value={bookingForm.customerPhone}
+                          onChange={(e) => setBookingForm({ ...bookingForm, customerPhone: e.target.value })}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                          placeholder="+7 900 000-00-00"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <label htmlFor="booking-vessel" className="block text-sm font-medium text-gray-700">
+                        Судно *
+                      </label>
+                      <select
+                        id="booking-vessel"
+                        required
+                        value={bookingForm.vesselId}
+                        onChange={(e) => setBookingForm({ ...bookingForm, vesselId: e.target.value })}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                      >
+                        <option value="">Выберите судно</option>
+                        {userVessels.map((vessel) => (
+                          <option key={vessel.id} value={vessel.id}>
+                            {vessel.name} ({vessel.type}, {vessel.length} м)
+                          </option>
+                        ))}
+                      </select>
+                      {userVessels.length === 0 && (
+                        <p className="mt-1 text-sm text-gray-500">
+                          У вас нет судов. Создайте судно на странице "Судна".
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div>
                     <label htmlFor="booking-berth" className="block text-sm font-medium text-gray-700">
@@ -1988,7 +2048,11 @@ export default function ClubDetails() {
                   type="button"
                   onClick={handleCreateBooking}
                   disabled={(() => {
-                    if (creatingBooking || userVessels.length === 0 || availableBerths.length === 0) {
+                    const isClubOwnerBooking = user?.role === UserRole.CLUB_OWNER && club?.ownerId === user?.id
+                    if (creatingBooking || availableBerths.length === 0) {
+                      return true
+                    }
+                    if (!isClubOwnerBooking && userVessels.length === 0) {
                       return true
                     }
                     // Проверяем наличие тарифов для места
@@ -2002,6 +2066,14 @@ export default function ClubDetails() {
                     
                     // Если есть тарифы, но тариф не выбран, кнопка заблокирована
                     if (!bookingForm.tariffId) {
+                      return true
+                    }
+
+                    if (isClubOwnerBooking) {
+                      if (!bookingForm.customerFullName.trim() || !bookingForm.customerPhone.trim()) {
+                        return true
+                      }
+                    } else if (!bookingForm.vesselId) {
                       return true
                     }
                     

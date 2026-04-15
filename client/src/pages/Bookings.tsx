@@ -1,7 +1,7 @@
 import { useEffect, useState, Fragment } from 'react'
 import { bookingsService, paymentsService } from '../services/api'
 import { Booking, UserRole, BookingStatus, Payment, PaymentStatus } from '../types'
-import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2 } from 'lucide-react'
+import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2, CheckCircle2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -67,9 +67,9 @@ export default function Bookings() {
     } else {
       newExpanded.add(bookingId)
       
-      // Для VESSEL_OWNER загружаем предстоящие платежи для активных бронирований
+      // Для VESSEL_OWNER и CLUB_OWNER загружаем платежи для активных бронирований
       const booking = bookings.find(b => b.id === bookingId)
-      if (user?.role === UserRole.VESSEL_OWNER && booking && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING)) {
+      if ((user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.CLUB_OWNER) && booking && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING)) {
         await loadUpcomingPayments(bookingId)
       }
     }
@@ -159,6 +159,24 @@ export default function Bookings() {
       alert(error.error || error.message || 'Ошибка удаления бронирования')
     } finally {
       setDeleting(null)
+    }
+  }
+
+  const handleMarkPaymentPaid = async (bookingId: number, paymentId: number) => {
+    if (!confirm('Подтвердить получение оплаты по этому платежу?')) {
+      return
+    }
+
+    try {
+      await paymentsService.updateStatus(paymentId, {
+        status: PaymentStatus.PAID,
+        paidDate: new Date().toISOString(),
+      })
+      await loadUpcomingPayments(bookingId)
+      await loadBookings()
+      alert('Оплата принята')
+    } catch (error: any) {
+      alert(error.error || error.message || 'Ошибка обновления статуса оплаты')
     }
   }
 
@@ -294,8 +312,8 @@ export default function Bookings() {
                     <tr>
                       <td colSpan={6} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-6">
-                          {/* Платежи для VESSEL_OWNER */}
-                          {isVesselOwner && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING) && (
+                          {/* Платежи для VESSEL_OWNER и CLUB_OWNER */}
+                          {(isVesselOwner || isClubOwner) && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING) && (
                             <div className="bg-white rounded-lg p-4 shadow-sm">
                               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                                 <CreditCard className="h-5 w-5 mr-2 text-primary-600" />
@@ -318,6 +336,11 @@ export default function Bookings() {
                                       <table className="min-w-full divide-y divide-gray-200">
                                         <thead className="bg-gray-50">
                                           <tr>
+                                            {isClubOwner && (
+                                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Плательщик
+                                              </th>
+                                            )}
                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                               Сумма
                                             </th>
@@ -327,11 +350,25 @@ export default function Bookings() {
                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                               Статус
                                             </th>
+                                            {isClubOwner && (
+                                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Действие
+                                              </th>
+                                            )}
                                           </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
                                           {payments.map((payment) => (
                                             <tr key={payment.id} className="hover:bg-gray-50">
+                                              {isClubOwner && (
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                  <div className="text-sm text-gray-900">
+                                                    {payment.payer
+                                                      ? `${payment.payer.firstName || ''} ${payment.payer.lastName || ''}`.trim() || payment.payer.phone || '—'
+                                                      : '—'}
+                                                  </div>
+                                                </td>
+                                              )}
                                               <td className="px-4 py-3 whitespace-nowrap">
                                                 <div className="text-sm font-semibold text-gray-900">
                                                   {payment.amount.toLocaleString('ru-RU')} {payment.currency}
@@ -371,6 +408,22 @@ export default function Bookings() {
                                                     : payment.status}
                                                 </span>
                                               </td>
+                                              {isClubOwner && (
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                  {(payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.OVERDUE) ? (
+                                                    <button
+                                                      onClick={() => handleMarkPaymentPaid(booking.id, payment.id)}
+                                                      className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700"
+                                                      title="Отметить оплату как полученную"
+                                                    >
+                                                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                                      Принять оплату
+                                                    </button>
+                                                  ) : (
+                                                    <span className="text-xs text-gray-400">—</span>
+                                                  )}
+                                                </td>
+                                              )}
                                             </tr>
                                           ))}
                                         </tbody>
@@ -415,6 +468,12 @@ export default function Bookings() {
                                         <span className="text-sm font-medium text-gray-900 ml-1">
                                           {booking.vesselOwner.phone}
                                         </span>
+                                      </div>
+                                    )}
+                                    {booking.notes?.startsWith('Ручное бронирование владельцем клуба.') && (
+                                      <div className="pt-2 border-t border-gray-100">
+                                        <span className="text-sm text-gray-600">Клиент (ручная бронь):</span>
+                                        <p className="text-sm font-medium text-gray-900 mt-1">{booking.notes}</p>
                                       </div>
                                     )}
                                   </div>
