@@ -11,6 +11,7 @@ export enum BookingRuleType {
   MIN_BOOKING_PERIOD = 'min_booking_period',
   MAX_BOOKING_PERIOD = 'max_booking_period',
   REQUIRE_DEPOSIT = 'require_deposit',
+  REQUIRE_MEMBERSHIP_FEE = 'require_membership_fee',
   CUSTOM = 'custom',
 }
 
@@ -32,6 +33,7 @@ const ruleTypeLabels: Record<BookingRuleType, string> = {
   [BookingRuleType.MIN_BOOKING_PERIOD]: 'Минимальный период бронирования',
   [BookingRuleType.MAX_BOOKING_PERIOD]: 'Максимальный период бронирования',
   [BookingRuleType.REQUIRE_DEPOSIT]: 'Требовать залог',
+  [BookingRuleType.REQUIRE_MEMBERSHIP_FEE]: 'Членский взнос',
   [BookingRuleType.CUSTOM]: 'Произвольное правило',
 }
 
@@ -47,6 +49,7 @@ export default function BookingRules() {
   const [error, setError] = useState('')
   const [selectedClub, setSelectedClub] = useState<Club | null>(null)
   const [tariffs, setTariffs] = useState<Tariff[]>([])
+  const [berths, setBerths] = useState<Array<{ id: number; number: string }>>([])
   const [rules, setRules] = useState<BookingRule[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingRule, setEditingRule] = useState<BookingRule | null>(null)
@@ -59,6 +62,8 @@ export default function BookingRules() {
     minPeriod: '',
     maxPeriod: '',
     depositAmount: '',
+    membershipFeeAmount: '',
+    selectedBerthIds: [] as number[],
   })
   const [saving, setSaving] = useState(false)
 
@@ -70,8 +75,20 @@ export default function BookingRules() {
     if (selectedClub) {
       loadTariffs(selectedClub.id)
       loadRules(selectedClub.id)
+      loadBerths(selectedClub.id)
     }
   }, [selectedClub])
+  const loadBerths = async (clubId: number) => {
+    try {
+      const clubData = (await clubsService.getById(clubId)) as unknown as Club
+      const clubBerths = (clubData.berths || []).map((berth) => ({ id: berth.id, number: berth.number }))
+      setBerths(clubBerths)
+    } catch (err: any) {
+      console.error('Ошибка загрузки мест:', err)
+      setBerths([])
+    }
+  }
+
 
   const loadClubs = async () => {
     try {
@@ -124,6 +141,8 @@ export default function BookingRules() {
       minPeriod: '',
       maxPeriod: '',
       depositAmount: '',
+      membershipFeeAmount: '',
+      selectedBerthIds: [],
     })
     setEditingRule(null)
     setShowAddModal(true)
@@ -141,6 +160,8 @@ export default function BookingRules() {
       minPeriod: '',
       maxPeriod: '',
       depositAmount: '',
+      membershipFeeAmount: '',
+      selectedBerthIds: [],
     })
   }
 
@@ -155,6 +176,8 @@ export default function BookingRules() {
       minPeriod: rule.parameters?.minPeriod?.toString() || '',
       maxPeriod: rule.parameters?.maxPeriod?.toString() || '',
       depositAmount: rule.parameters?.depositAmount?.toString() || '',
+      membershipFeeAmount: rule.parameters?.membershipFeeAmount?.toString() || '',
+      selectedBerthIds: Array.isArray(rule.parameters?.berthIds) ? rule.parameters.berthIds : [],
     })
     setShowAddModal(true)
   }
@@ -211,6 +234,20 @@ export default function BookingRules() {
             return
           }
           parameters = { depositAmount: parseFloat(ruleForm.depositAmount) }
+          break
+        case BookingRuleType.REQUIRE_MEMBERSHIP_FEE:
+          if (!ruleForm.membershipFeeAmount) {
+            alert('Укажите сумму членского взноса')
+            return
+          }
+          if (ruleForm.selectedBerthIds.length === 0) {
+            alert('Выберите хотя бы одно место, для которого применяется членский взнос')
+            return
+          }
+          parameters = {
+            membershipFeeAmount: parseFloat(ruleForm.membershipFeeAmount),
+            berthIds: ruleForm.selectedBerthIds,
+          }
           break
         default:
           parameters = null
@@ -371,6 +408,18 @@ export default function BookingRules() {
                             )}
                             {rule.ruleType === BookingRuleType.REQUIRE_DEPOSIT && (
                               <div>Сумма залога: {rule.parameters.depositAmount} ₽</div>
+                            )}
+                            {rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE && (
+                              <>
+                                <div>Сумма членского взноса: {rule.parameters.membershipFeeAmount} ₽</div>
+                                {Array.isArray(rule.parameters.berthIds) && (
+                                  <div>
+                                    Места: {rule.parameters.berthIds
+                                      .map((id: number) => berths.find((b) => b.id === id)?.number || `#${id}`)
+                                      .join(', ')}
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         )}
@@ -574,6 +623,53 @@ export default function BookingRules() {
                         className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
                       />
                     </div>
+                  )}
+
+                  {ruleForm.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE && (
+                    <>
+                      <div>
+                        <label htmlFor="rule-membership-fee" className="block text-sm font-medium text-gray-700 mb-2">
+                          Сумма членского взноса (₽) *
+                        </label>
+                        <input
+                          id="rule-membership-fee"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          required
+                          value={ruleForm.membershipFeeAmount}
+                          onChange={(e) => setRuleForm({ ...ruleForm, membershipFeeAmount: e.target.value })}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Применяется к местам *
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3">
+                          {berths.map((berth) => {
+                            const isChecked = ruleForm.selectedBerthIds.includes(berth.id)
+                            return (
+                              <label key={berth.id} className="flex items-center space-x-2 text-sm text-gray-700">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() =>
+                                    setRuleForm((prev) => ({
+                                      ...prev,
+                                      selectedBerthIds: isChecked
+                                        ? prev.selectedBerthIds.filter((id) => id !== berth.id)
+                                        : [...prev.selectedBerthIds, berth.id].sort((a, b) => a - b),
+                                    }))
+                                  }
+                                />
+                                <span>Место {berth.number}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

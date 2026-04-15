@@ -1890,10 +1890,13 @@ export default function ClubDetails() {
                       ? selectedTariff.amount 
                       : parseFloat(String(selectedTariff.amount))
 
-                    // Находим все правила для этого тарифа или общие правила для клуба
-                    const applicableRules = bookingRules.filter(
-                      (rule: any) => rule.tariffId === selectedTariff.id || rule.tariffId === null
-                    )
+                    // Находим все правила для этого тарифа/клуба и текущего места
+                    const applicableRules = bookingRules.filter((rule: any) => {
+                      const byTariff = rule.tariffId === selectedTariff.id || rule.tariffId === null
+                      if (!byTariff) return false
+                      const berthIds = rule.parameters?.berthIds
+                      return !Array.isArray(berthIds) || berthIds.length === 0 || (selectedBerth ? berthIds.includes(selectedBerth.id) : false)
+                    })
 
                     // Ищем правило REQUIRE_DEPOSIT
                     const depositRule = applicableRules.find(
@@ -1904,10 +1907,21 @@ export default function ClubDetails() {
                       appliedRules.push(depositRule)
                     }
 
+                    // Ищем правило REQUIRE_MEMBERSHIP_FEE
+                    const membershipFeeRule = applicableRules.find(
+                      (rule: any) => rule.ruleType === 'require_membership_fee'
+                    )
+                    const membershipFeeAmount = membershipFeeRule?.parameters?.membershipFeeAmount
+                      ? parseFloat(String(membershipFeeRule.parameters.membershipFeeAmount))
+                      : 0
+                    if (membershipFeeRule) {
+                      appliedRules.push(membershipFeeRule)
+                    }
+
                     if (selectedTariff.type === 'season_payment') {
                       // Оплата за весь сезон
                       basePrice = tariffAmount
-                      totalPrice = basePrice + depositAmount
+                      totalPrice = basePrice + depositAmount + membershipFeeAmount
                     } else if (selectedTariff.type === 'monthly_payment') {
                       // Помесячная оплата - проверяем правила для тарифа
                       const clubRentalMonths = club.rentalMonths || []
@@ -1958,7 +1972,7 @@ export default function ClubDetails() {
                       // Базовая стоимость - сумма за месяцы
                       basePrice = totalPrice
                       // Добавляем залог к общей сумме
-                      totalPrice = basePrice + depositAmount
+                      totalPrice = basePrice + depositAmount + membershipFeeAmount
                       
                       // Добавляем другие правила (MIN_BOOKING_PERIOD, MAX_BOOKING_PERIOD, CUSTOM)
                       const otherRules = applicableRules.filter(
@@ -2011,6 +2025,15 @@ export default function ClubDetails() {
                               <span className="text-gray-700">Залог:</span>
                               <span className="font-medium text-gray-900">
                                 {depositAmount.toLocaleString()} ₽
+                              </span>
+                            </div>
+                          )}
+
+                          {membershipFeeAmount > 0 && (
+                            <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-200">
+                              <span className="text-gray-700">Членский взнос:</span>
+                              <span className="font-medium text-gray-900">
+                                {membershipFeeAmount.toLocaleString()} ₽
                               </span>
                             </div>
                           )}

@@ -6,7 +6,6 @@ import { BookingRule, BookingRuleType } from '../entities/BookingRule';
 import { Club } from '../entities/Club';
 import { PaymentType, PaymentMethod, PaymentStatus, Currency } from '../types';
 import { subDays } from 'date-fns';
-import { IsNull } from 'typeorm';
 
 interface PaymentScheduleItem {
   type: PaymentType;
@@ -32,12 +31,12 @@ export class PaymentService {
     const payments: Payment[] = [];
 
     // Получаем правила бронирования
-    const rules = await bookingRuleRepository.find({
-      where: {
-        clubId: club.id,
-        tariffId: tariff ? tariff.id : IsNull(),
-      },
-    });
+    const rules = await bookingRuleRepository
+      .createQueryBuilder('rule')
+      .where('rule.clubId = :clubId', { clubId: club.id })
+      .andWhere(tariff ? '(rule.tariffId = :tariffId OR rule.tariffId IS NULL)' : 'rule.tariffId IS NULL', tariff ? { tariffId: tariff.id } : {})
+      .orderBy('rule.createdAt', 'DESC')
+      .getMany();
 
     console.log('[PaymentService] Найдено правил:', rules.length);
     rules.forEach(rule => {
@@ -49,9 +48,22 @@ export class PaymentService {
       });
     });
 
+    const appliesToBerth = (rule: BookingRule) => {
+      const berthIds = rule.parameters?.berthIds;
+      if (!Array.isArray(berthIds) || berthIds.length === 0) {
+        return true;
+      }
+      return berthIds.includes(booking.berthId);
+    };
+
     // Проверяем, требуется ли залог
     const depositRule = rules.find(
-      (rule) => rule.ruleType === BookingRuleType.REQUIRE_DEPOSIT
+      (rule) => rule.ruleType === BookingRuleType.REQUIRE_DEPOSIT && appliesToBerth(rule)
+    );
+
+    // Проверяем, требуется ли членский взнос
+    const membershipFeeRule = rules.find(
+      (rule) => rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE && appliesToBerth(rule)
     );
     console.log('[PaymentService] Правило залога (depositRule):', depositRule ? {
       id: depositRule.id,
@@ -86,7 +98,8 @@ export class PaymentService {
         club,
         tariff,
         depositRule,
-        paymentMonthsRule
+        paymentMonthsRule,
+        membershipFeeRule
       );
       console.log('[PaymentService] Создан график платежей:', schedule.length, 'платежей');
     } else {
@@ -95,7 +108,8 @@ export class PaymentService {
       schedule = await this.createStandardSchedule(
         booking,
         club,
-        depositRule
+        depositRule,
+        membershipFeeRule
       );
       console.log('[PaymentService] Создан стандартный график платежей:', schedule.length, 'платежей');
     }
@@ -141,7 +155,8 @@ export class PaymentService {
     club: Club,
     tariff: Tariff,
     depositRule: BookingRule | undefined,
-    paymentMonthsRule: BookingRule | undefined
+    paymentMonthsRule: BookingRule | undefined,
+    membershipFeeRule: BookingRule | undefined
   ): Promise<PaymentScheduleItem[]> {
     const schedule: PaymentScheduleItem[] = [];
     const totalPrice = parseFloat(String(booking.totalPrice));
@@ -156,6 +171,13 @@ export class PaymentService {
       depositAmount = (totalPrice * percentage) / 100;
     }
 
+    let membershipFeeAmount = 0;
+    if (membershipFeeRule && membershipFeeRule.parameters?.membershipFeeAmount) {
+      membershipFeeAmount = parseFloat(String(membershipFeeRule.parameters.membershipFeeAmount));
+    }
+
+    const immediateFeeAmount = depositAmount + membershipFeeAmount;
+
     console.log('[PaymentService] Проверка типа тарифа:', {
       tariffType: tariff.type,
       tariffTypeString: String(tariff.type),
@@ -168,13 +190,13 @@ export class PaymentService {
     if (tariff.type === TariffType.SEASON_PAYMENT || String(tariff.type) === String(TariffType.SEASON_PAYMENT)) {
       // Сезонная оплата - один платеж сразу (в течение 15 минут)
       console.log('[PaymentService] ✅ SEASON_PAYMENT тариф обнаружен! depositAmount:', depositAmount, 'totalPrice:', totalPrice);
-      if (depositAmount > 0) {
-        // Если есть залог - только залог (основной платеж не создаем)
+      if (immediateFeeAmount > 0) {
+        // Если есть залог/членский взнос - создаем единый мгновенный платеж
         const dueDate = new Date();
         console.log('[PaymentService] ✅ Создаем залог с dueDate:', dueDate.toISOString());
         schedule.push({
           type: PaymentType.DEPOSIT,
-          amount: depositAmount,
+          amount: immediateFeeAmount,
           dueDate: dueDate, // Сразу при бронировании (15 минут на оплату)
           paymentOrder: 0,
         });
@@ -203,13 +225,13 @@ export class PaymentService {
         console.log('[PaymentService] Месяцы для немедленной оплаты (из правила):', immediatePaymentMonths);
       }
 
-      if (depositAmount > 0) {
+      if (immediateFeeAmount > 0) {
         // Залог - сразу при бронировании (в течение 15 минут)
         const dueDate = new Date();
         console.log('[PaymentService] ✅ Создаем залог с dueDate:', dueDate.toISOString());
         schedule.push({
           type: PaymentType.DEPOSIT,
-          amount: depositAmount,
+          amount: immediateFeeAmount,
           dueDate: dueDate, // Сразу при бронировании (15 минут на оплату)
           paymentOrder: 0,
         });
@@ -254,7 +276,8 @@ export class PaymentService {
   private static async createStandardSchedule(
     booking: Booking,
     club: Club,
-    depositRule: BookingRule | undefined
+    depositRule: BookingRule | undefined,
+    membershipFeeRule: BookingRule | undefined
   ): Promise<PaymentScheduleItem[]> {
     const schedule: PaymentScheduleItem[] = [];
     const totalPrice = parseFloat(String(booking.totalPrice));
@@ -268,11 +291,17 @@ export class PaymentService {
       depositAmount = (totalPrice * percentage) / 100;
     }
 
-    if (depositAmount > 0) {
+    let membershipFeeAmount = 0;
+    if (membershipFeeRule && membershipFeeRule.parameters?.membershipFeeAmount) {
+      membershipFeeAmount = parseFloat(String(membershipFeeRule.parameters.membershipFeeAmount));
+    }
+    const immediateFeeAmount = depositAmount + membershipFeeAmount;
+
+    if (immediateFeeAmount > 0) {
       // Залог
       schedule.push({
         type: PaymentType.DEPOSIT,
-        amount: depositAmount,
+        amount: immediateFeeAmount,
         dueDate: new Date(),
         paymentOrder: 0,
       });
@@ -280,7 +309,7 @@ export class PaymentService {
       // Основной платеж
       schedule.push({
         type: PaymentType.FULL,
-        amount: totalPrice - depositAmount,
+        amount: totalPrice - immediateFeeAmount,
         dueDate: subDays(booking.startDate, 14),
         paymentOrder: 1,
       });

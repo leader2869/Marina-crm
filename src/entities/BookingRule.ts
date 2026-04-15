@@ -15,6 +15,7 @@ export enum BookingRuleType {
   MIN_BOOKING_PERIOD = 'min_booking_period', // Минимальный период бронирования
   MAX_BOOKING_PERIOD = 'max_booking_period', // Максимальный период бронирования
   REQUIRE_DEPOSIT = 'require_deposit', // Требовать залог
+  REQUIRE_MEMBERSHIP_FEE = 'require_membership_fee', // Требовать членский взнос
   CUSTOM = 'custom', // Произвольное правило
 }
 

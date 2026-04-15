@@ -520,16 +520,38 @@ export class BookingsController {
             .orderBy('rule.createdAt', 'DESC')
             .getMany();
 
+          const appliesToSelectedBerth = (rule: BookingRule) => {
+            const berthIds = rule.parameters?.berthIds;
+            if (!Array.isArray(berthIds) || berthIds.length === 0) {
+              return true;
+            }
+            return berthIds.includes(parseInt(berthId));
+          };
+
           // Ищем правило REQUIRE_DEPOSIT
           const depositRule = rules.find(
             rule => rule.ruleType === BookingRuleType.REQUIRE_DEPOSIT && 
-            (rule.tariffId === parseInt(tariffId) || rule.tariffId === null)
+            (rule.tariffId === parseInt(tariffId) || rule.tariffId === null) &&
+            appliesToSelectedBerth(rule)
+          );
+
+          // Ищем правило REQUIRE_MEMBERSHIP_FEE
+          const membershipFeeRule = rules.find(
+            rule => rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE &&
+            (rule.tariffId === parseInt(tariffId) || rule.tariffId === null) &&
+            appliesToSelectedBerth(rule)
           );
 
           // Если есть правило REQUIRE_DEPOSIT, добавляем залог к общей сумме
           if (depositRule && depositRule.parameters && depositRule.parameters.depositAmount) {
             const depositAmount = parseFloat(String(depositRule.parameters.depositAmount));
             totalPrice = totalPrice + depositAmount;
+          }
+
+          // Если есть правило REQUIRE_MEMBERSHIP_FEE, добавляем членский взнос
+          if (membershipFeeRule && membershipFeeRule.parameters && membershipFeeRule.parameters.membershipFeeAmount) {
+            const membershipFeeAmount = parseFloat(String(membershipFeeRule.parameters.membershipFeeAmount));
+            totalPrice = totalPrice + membershipFeeAmount;
           }
           
           // Для сезонной оплаты используем весь период навигации
@@ -564,10 +586,26 @@ export class BookingsController {
             (rule.tariffId === parseInt(tariffId) || rule.tariffId === null)
           );
 
+          const appliesToSelectedBerth = (rule: BookingRule) => {
+            const berthIds = rule.parameters?.berthIds;
+            if (!Array.isArray(berthIds) || berthIds.length === 0) {
+              return true;
+            }
+            return berthIds.includes(parseInt(berthId));
+          };
+
           // Ищем правило REQUIRE_DEPOSIT
           const depositRule = rules.find(
             rule => rule.ruleType === BookingRuleType.REQUIRE_DEPOSIT && 
-            (rule.tariffId === parseInt(tariffId) || rule.tariffId === null)
+            (rule.tariffId === parseInt(tariffId) || rule.tariffId === null) &&
+            appliesToSelectedBerth(rule)
+          );
+
+          // Ищем правило REQUIRE_MEMBERSHIP_FEE
+          const membershipFeeRule = rules.find(
+            rule => rule.ruleType === BookingRuleType.REQUIRE_MEMBERSHIP_FEE &&
+            (rule.tariffId === parseInt(tariffId) || rule.tariffId === null) &&
+            appliesToSelectedBerth(rule)
           );
 
           const clubRentalMonths = club.rentalMonths || [];
@@ -624,6 +662,12 @@ export class BookingsController {
           if (depositRule && depositRule.parameters && depositRule.parameters.depositAmount) {
             const depositAmount = parseFloat(String(depositRule.parameters.depositAmount));
             totalPrice = totalPrice + depositAmount;
+          }
+
+          // Если есть правило REQUIRE_MEMBERSHIP_FEE, добавляем членский взнос
+          if (membershipFeeRule && membershipFeeRule.parameters && membershipFeeRule.parameters.membershipFeeAmount) {
+            const membershipFeeAmount = parseFloat(String(membershipFeeRule.parameters.membershipFeeAmount));
+            totalPrice = totalPrice + membershipFeeAmount;
           }
           
           // Первый день первого месяца
