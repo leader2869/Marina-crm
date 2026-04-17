@@ -424,3 +424,31 @@ export interface AgentOrderResponse {
   updatedAt: string
 }
 
+export interface ClubPartner {
+  id: number
+  clubId: number
+  name: string
+  sharePercent: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ClubCashTransaction {
+  id: number
+  clubId: number
+  transactionType: CashTransactionType
+  amount: number
+  currency: Currency
+  paymentMethod: CashPaymentMethod
+  date: string
+  description?: string | null
+  bookingId?: number | null
+  acceptedByPartnerId?: number | null
+  paidByPartnerId?: number | null
+  acceptedByPartner?: ClubPartner | null
+  paidByPartner?: ClubPartner | null
+  createdAt: string
+  updatedAt: string
+}
+

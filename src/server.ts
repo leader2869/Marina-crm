@@ -23,6 +23,7 @@ import expenseCategoriesRoutes from './modules/incomes/expense-categories.routes
 import incomesRoutes from './modules/incomes/incomes.routes';
 import agentOrdersRoutes from './modules/agent-orders/agent-orders.routes';
 import contractFillingRoutes from './modules/contract-filling/contract-filling.routes';
+import clubFinanceRoutes from './modules/club-finance/club-finance.routes';
 
 const app: Express = express();
 
@@ -310,6 +311,7 @@ app.use('/api/agent-orders', (req, res, next) => {
   next();
 }, autoActivityLogger, agentOrdersRoutes);
 app.use('/api/contract-filling', autoActivityLogger, contractFillingRoutes);
+app.use('/api/club-finance', autoActivityLogger, clubFinanceRoutes);
 
 // Error handler
 app.use(errorHandler);

@@ -285,5 +285,24 @@ export const agentOrdersService = {
   cancel: (orderId: number) => api.post(`/agent-orders/${orderId}/cancel`),
 }
 
+export const clubFinanceService = {
+  getPartners: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/partners`),
+  createPartner: (clubId: number, data: any) => api.post(`/club-finance/clubs/${clubId}/partners`, data),
+  updatePartner: (clubId: number, partnerId: number, data: any) =>
+    api.put(`/club-finance/clubs/${clubId}/partners/${partnerId}`, data),
+  deletePartner: (clubId: number, partnerId: number) =>
+    api.delete(`/club-finance/clubs/${clubId}/partners/${partnerId}`),
+
+  getCashTransactions: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/cash-transactions`),
+  createCashTransaction: (clubId: number, data: any) =>
+    api.post(`/club-finance/clubs/${clubId}/cash-transactions`, data),
+  updateCashTransaction: (clubId: number, transactionId: number, data: any) =>
+    api.put(`/club-finance/clubs/${clubId}/cash-transactions/${transactionId}`, data),
+  deleteCashTransaction: (clubId: number, transactionId: number) =>
+    api.delete(`/club-finance/clubs/${clubId}/cash-transactions/${transactionId}`),
+
+  getSettlements: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/settlements`),
+}
+
 export default api
 

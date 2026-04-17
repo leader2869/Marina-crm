@@ -22,6 +22,9 @@ import Expenses from './pages/Expenses'
 import Payments from './pages/Payments'
 import Cash from './pages/Cash'
 import Analytics from './pages/Analytics'
+import ClubPartners from './pages/ClubPartners'
+import ClubCashDesk from './pages/ClubCashDesk'
+import ClubSettlements from './pages/ClubSettlements'
 import Users from './pages/Users'
 import UserDetails from './pages/UserDetails'
 import NewGuests from './pages/NewGuests'
@@ -169,6 +172,30 @@ function App() {
               } 
             />
             <Route path="payments" element={<Payments />} />
+            <Route
+              path="club-partners"
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                  <ClubPartners />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="club-cash"
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                  <ClubCashDesk />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="club-settlements"
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                  <ClubSettlements />
+                </RoleProtectedRoute>
+              }
+            />
             <Route 
               path="users" 
               element={
