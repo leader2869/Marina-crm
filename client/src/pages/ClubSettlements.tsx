@@ -22,6 +22,21 @@ export default function ClubSettlements() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const toErrorText = (value: unknown, fallback: string): string => {
+    if (typeof value === 'string' && value.trim()) return value
+    if (value && typeof value === 'object') {
+      const v = value as any
+      if (typeof v.message === 'string' && v.message.trim()) return v.message
+      if (typeof v.error === 'string' && v.error.trim()) return v.error
+      try {
+        return JSON.stringify(v)
+      } catch {
+        return fallback
+      }
+    }
+    return fallback
+  }
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -30,7 +45,7 @@ export default function ClubSettlements() {
         setClubs(allClubs)
         if (allClubs.length > 0) setSelectedClubId(allClubs[0].id)
       } catch (e: any) {
-        setError(e.error || e.message || 'Ошибка загрузки клубов')
+        setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки клубов'))
       } finally {
         setLoading(false)
       }
@@ -50,7 +65,7 @@ export default function ClubSettlements() {
       setTotals(data.totals || { totalIncome: 0, totalExpense: 0, netProfit: 0 })
       setSettlements(data.settlements || [])
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка загрузки взаиморасчетов')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки взаиморасчетов'))
     }
   }
 

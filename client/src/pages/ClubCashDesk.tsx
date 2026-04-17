@@ -13,6 +13,21 @@ export default function ClubCashDesk() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
+  const toErrorText = (value: unknown, fallback: string): string => {
+    if (typeof value === 'string' && value.trim()) return value
+    if (value && typeof value === 'object') {
+      const v = value as any
+      if (typeof v.message === 'string' && v.message.trim()) return v.message
+      if (typeof v.error === 'string' && v.error.trim()) return v.error
+      try {
+        return JSON.stringify(v)
+      } catch {
+        return fallback
+      }
+    }
+    return fallback
+  }
+
   const [form, setForm] = useState({
     transactionType: CashTransactionType.INCOME,
     amount: '',
@@ -33,7 +48,7 @@ export default function ClubCashDesk() {
         setClubs(allClubs)
         if (allClubs.length > 0) setSelectedClubId(allClubs[0].id)
       } catch (e: any) {
-        setError(e.error || e.message || 'Ошибка загрузки клубов')
+        setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки клубов'))
       } finally {
         setLoading(false)
       }
@@ -57,7 +72,7 @@ export default function ClubCashDesk() {
       setTransactions(Array.isArray(txRes) ? txRes : txRes.data || [])
       setPartnerManagers(Array.isArray(managersRes) ? managersRes : managersRes.data || [])
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка загрузки данных кассы')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки данных кассы'))
     }
   }
 
@@ -112,7 +127,7 @@ export default function ClubCashDesk() {
       })
       await loadData(selectedClubId)
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка создания операции')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка создания операции'))
     }
   }
 

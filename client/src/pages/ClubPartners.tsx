@@ -24,6 +24,21 @@ export default function ClubPartners() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const toErrorText = (value: unknown, fallback: string): string => {
+    if (typeof value === 'string' && value.trim()) return value
+    if (value && typeof value === 'object') {
+      const v = value as any
+      if (typeof v.message === 'string' && v.message.trim()) return v.message
+      if (typeof v.error === 'string' && v.error.trim()) return v.error
+      try {
+        return JSON.stringify(v)
+      } catch {
+        return fallback
+      }
+    }
+    return fallback
+  }
+
   const totalShare = useMemo(
     () => partners.reduce((sum, p) => sum + Number(p.sharePercent), 0),
     [partners]
@@ -39,7 +54,7 @@ export default function ClubPartners() {
           setSelectedClubId(allClubs[0].id)
         }
       } catch (e: any) {
-        setError(e.error || e.message || 'Ошибка загрузки клубов')
+        setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки клубов'))
       } finally {
         setLoading(false)
       }
@@ -54,19 +69,25 @@ export default function ClubPartners() {
 
   const loadInitialData = async (clubId: number) => {
     try {
-      const [partnersRes, usersRes, managersRes] = await Promise.all([
+      const [partnersRes, usersRes] = await Promise.all([
         clubFinanceService.getPartners(clubId),
         clubFinanceService.getClubUsers(clubId),
-        clubFinanceService.getPartnerManagers(clubId),
       ])
+      let managersData: ClubPartnerManager[] = []
+      try {
+        const managersRes = await clubFinanceService.getPartnerManagers(clubId)
+        managersData = Array.isArray(managersRes) ? managersRes : managersRes.data || []
+      } catch (managersError: any) {
+        // Не блокируем страницу партнеров, если менеджеры временно недоступны
+        setError(toErrorText(managersError?.error || managersError?.message || managersError, 'Ошибка загрузки менеджеров партнеров'))
+      }
       const partnersData = Array.isArray(partnersRes) ? partnersRes : partnersRes.data || []
       const usersData = Array.isArray(usersRes) ? usersRes : usersRes.data || []
-      const managersData = Array.isArray(managersRes) ? managersRes : managersRes.data || []
       setPartners(partnersData)
       setClubUsers(usersData)
       setPartnerManagers(managersData)
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка загрузки партнеров')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки партнеров'))
     }
   }
 
@@ -81,7 +102,7 @@ export default function ClubPartners() {
       setSharePercent('')
       await loadInitialData(selectedClubId)
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка создания партнера')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка создания партнера'))
     }
   }
 
@@ -92,7 +113,7 @@ export default function ClubPartners() {
       await clubFinanceService.deletePartner(selectedClubId, partnerId)
       await loadInitialData(selectedClubId)
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка удаления партнера')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка удаления партнера'))
     }
   }
 
@@ -108,7 +129,7 @@ export default function ClubPartners() {
       setManagerUserByPartner((prev) => ({ ...prev, [partnerId]: '' }))
       await loadInitialData(selectedClubId)
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка привязки менеджера')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка привязки менеджера'))
     }
   }
 
@@ -134,7 +155,7 @@ export default function ClubPartners() {
       setCreatingManagerForPartnerId(null)
       await loadInitialData(selectedClubId)
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка создания менеджера')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка создания менеджера'))
     }
   }
 
@@ -145,7 +166,7 @@ export default function ClubPartners() {
       await clubFinanceService.deletePartnerManager(selectedClubId, managerId)
       await loadInitialData(selectedClubId)
     } catch (e: any) {
-      setError(e.error || e.message || 'Ошибка удаления менеджера')
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка удаления менеджера'))
     }
   }
 
