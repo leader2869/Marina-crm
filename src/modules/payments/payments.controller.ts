@@ -3,9 +3,19 @@ import { AppDataSource } from '../../config/database';
 import { Payment } from '../../entities/Payment';
 import { Booking } from '../../entities/Booking';
 import { Club } from '../../entities/Club';
+import { ClubCashTransaction } from '../../entities/ClubCashTransaction';
+import { ClubPartner } from '../../entities/ClubPartner';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
-import { PaymentStatus, PaymentMethod, Currency, BookingStatus, UserRole } from '../../types';
+import {
+  PaymentStatus,
+  PaymentMethod,
+  Currency,
+  BookingStatus,
+  UserRole,
+  CashPaymentMethod,
+  CashTransactionType,
+} from '../../types';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { isAfter } from 'date-fns';
 import { PaymentService } from '../../services/payment.service';
@@ -171,7 +181,7 @@ export class PaymentsController {
   async updateStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const { status, transactionId, paidDate } = req.body;
+      const { status, transactionId, paidDate, cashPaymentMethod, acceptedByPartnerId } = req.body;
 
       const paymentRepository = AppDataSource.getRepository(Payment);
       const payment = await paymentRepository.findOne({
@@ -201,6 +211,7 @@ export class PaymentsController {
         }
       }
 
+      const previousStatus = payment.status;
       payment.status = status as PaymentStatus;
       if (transactionId) {
         payment.transactionId = transactionId;
@@ -219,6 +230,53 @@ export class PaymentsController {
       }
 
       await paymentRepository.save(payment);
+
+      // При приеме оплаты владельцем клуба автоматически фиксируем приход в кассе клуба
+      if (
+        status === PaymentStatus.PAID &&
+        previousStatus !== PaymentStatus.PAID &&
+        req.userRole === UserRole.CLUB_OWNER
+      ) {
+        const normalizedAcceptedByPartnerId = Number(acceptedByPartnerId);
+        if (!Number.isInteger(normalizedAcceptedByPartnerId) || normalizedAcceptedByPartnerId <= 0) {
+          throw new AppError('Укажите партнера, который принял оплату', 400);
+        }
+
+        if (
+          cashPaymentMethod !== CashPaymentMethod.CASH &&
+          cashPaymentMethod !== CashPaymentMethod.NON_CASH
+        ) {
+          throw new AppError('Укажите способ оплаты: наличные или безналичные', 400);
+        }
+
+        const partnerRepository = AppDataSource.getRepository(ClubPartner);
+        const acceptedPartner = await partnerRepository.findOne({
+          where: {
+            id: normalizedAcceptedByPartnerId,
+            clubId: payment.booking.clubId,
+            isActive: true,
+          },
+        });
+        if (!acceptedPartner) {
+          throw new AppError('Партнер, принявший оплату, не найден', 404);
+        }
+
+        const cashTxRepository = AppDataSource.getRepository(ClubCashTransaction);
+        const cashTx = cashTxRepository.create({
+          clubId: payment.booking.clubId,
+          bookingId: payment.bookingId,
+          transactionType: CashTransactionType.INCOME,
+          amount: Number(payment.amount),
+          currency: payment.currency || Currency.RUB,
+          paymentMethod: cashPaymentMethod as CashPaymentMethod,
+          date: payment.paidDate || new Date(),
+          description: `Поступление по бронированию #${payment.bookingId}, платеж #${payment.id}`,
+          acceptedByPartnerId: normalizedAcceptedByPartnerId,
+          paidByPartnerId: null,
+          createdById: req.userId || null,
+        });
+        await cashTxRepository.save(cashTx);
+      }
 
       // Если платеж оплачен, проверяем, нужно ли подтверждать бронирование
       if (status === PaymentStatus.PAID) {

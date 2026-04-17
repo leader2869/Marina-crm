@@ -1,6 +1,6 @@
 import { useEffect, useState, Fragment } from 'react'
-import { bookingsService, paymentsService } from '../services/api'
-import { Booking, UserRole, BookingStatus, Payment, PaymentStatus } from '../types'
+import { bookingsService, paymentsService, clubFinanceService } from '../services/api'
+import { Booking, UserRole, BookingStatus, Payment, PaymentStatus, CashPaymentMethod, ClubPartner } from '../types'
 import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2, CheckCircle2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
@@ -16,6 +16,13 @@ export default function Bookings() {
   const [deleting, setDeleting] = useState<number | null>(null)
   const [bookingPayments, setBookingPayments] = useState<Map<number, Payment[]>>(new Map())
   const [loadingPayments, setLoadingPayments] = useState<Set<number>>(new Set())
+  const [clubPartnersByClubId, setClubPartnersByClubId] = useState<Map<number, ClubPartner[]>>(new Map())
+  const [paymentModal, setPaymentModal] = useState<{ booking: Booking; payment: Payment } | null>(null)
+  const [acceptPaymentForm, setAcceptPaymentForm] = useState({
+    paymentMethod: CashPaymentMethod.CASH,
+    acceptedByPartnerId: '',
+  })
+  const [confirmingPayment, setConfirmingPayment] = useState(false)
 
   useEffect(() => {
     loadBookings()
@@ -76,8 +83,8 @@ export default function Bookings() {
     setExpandedBookings(newExpanded)
   }
 
-  const loadUpcomingPayments = async (bookingId: number) => {
-    if (loadingPayments.has(bookingId) || bookingPayments.has(bookingId)) {
+  const loadUpcomingPayments = async (bookingId: number, force = false) => {
+    if (loadingPayments.has(bookingId) || (!force && bookingPayments.has(bookingId))) {
       return // Уже загружаем или уже загружены
     }
 
@@ -110,6 +117,21 @@ export default function Bookings() {
         return newSet
       })
     }
+  }
+
+  const loadClubPartners = async (clubId: number): Promise<ClubPartner[]> => {
+    const cached = clubPartnersByClubId.get(clubId)
+    if (cached) {
+      return cached
+    }
+    const response = await clubFinanceService.getPartners(clubId)
+    const partners = Array.isArray(response) ? response : response.data || []
+    setClubPartnersByClubId((prev) => {
+      const next = new Map(prev)
+      next.set(clubId, partners)
+      return next
+    })
+    return partners
   }
 
   const isClubOwner = user?.role === UserRole.CLUB_OWNER
@@ -162,21 +184,47 @@ export default function Bookings() {
     }
   }
 
-  const handleMarkPaymentPaid = async (bookingId: number, paymentId: number) => {
-    if (!confirm('Подтвердить получение оплаты по этому платежу?')) {
+  const openAcceptPaymentModal = async (booking: Booking, payment: Payment) => {
+    try {
+      await loadClubPartners(booking.clubId)
+      setAcceptPaymentForm({
+        paymentMethod: CashPaymentMethod.CASH,
+        acceptedByPartnerId: '',
+      })
+      setPaymentModal({ booking, payment })
+    } catch (error: any) {
+      alert(error.error || error.message || 'Ошибка загрузки партнеров клуба')
+    }
+  }
+
+  const closeAcceptPaymentModal = () => {
+    if (confirmingPayment) return
+    setPaymentModal(null)
+  }
+
+  const handleConfirmPayment = async () => {
+    if (!paymentModal) return
+    if (!acceptPaymentForm.acceptedByPartnerId) {
+      alert('Выберите партнера, который принял оплату')
       return
     }
 
+    setConfirmingPayment(true)
     try {
-      await paymentsService.updateStatus(paymentId, {
+      await paymentsService.updateStatus(paymentModal.payment.id, {
         status: PaymentStatus.PAID,
         paidDate: new Date().toISOString(),
+        cashPaymentMethod: acceptPaymentForm.paymentMethod,
+        acceptedByPartnerId: Number(acceptPaymentForm.acceptedByPartnerId),
       })
-      await loadUpcomingPayments(bookingId)
+      await loadUpcomingPayments(paymentModal.booking.id, true)
       await loadBookings()
-      alert('Оплата принята')
+      setPaymentModal(null)
+      alert('Оплата принята и добавлена в кассу клуба')
     } catch (error: any) {
       alert(error.error || error.message || 'Ошибка обновления статуса оплаты')
+    } finally {
+      setConfirmingPayment(false)
     }
   }
 
@@ -421,7 +469,10 @@ export default function Bookings() {
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                   {(payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.OVERDUE) ? (
                                                     <button
-                                                      onClick={() => handleMarkPaymentPaid(booking.id, payment.id)}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        openAcceptPaymentModal(booking, payment)
+                                                      }}
                                                       className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700"
                                                       title="Отметить оплату как полученную"
                                                     >
@@ -555,6 +606,85 @@ export default function Bookings() {
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">Бронирования не найдены</p>
+        </div>
+      )}
+
+      {paymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-xl shadow-xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Принять оплату</h3>
+              <button
+                type="button"
+                onClick={closeAcceptPaymentModal}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={confirmingPayment}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="text-sm text-gray-600">
+                Сумма: <span className="font-semibold text-gray-900">{paymentModal.payment.amount.toLocaleString('ru-RU')} {paymentModal.payment.currency}</span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Как принята оплата</label>
+                <select
+                  className="w-full border rounded px-3 py-2"
+                  value={acceptPaymentForm.paymentMethod}
+                  onChange={(e) =>
+                    setAcceptPaymentForm((prev) => ({
+                      ...prev,
+                      paymentMethod: e.target.value as CashPaymentMethod,
+                    }))
+                  }
+                  disabled={confirmingPayment}
+                >
+                  <option value={CashPaymentMethod.CASH}>Наличные</option>
+                  <option value={CashPaymentMethod.NON_CASH}>Безналичные</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Кто принял оплату</label>
+                <select
+                  className="w-full border rounded px-3 py-2"
+                  value={acceptPaymentForm.acceptedByPartnerId}
+                  onChange={(e) =>
+                    setAcceptPaymentForm((prev) => ({
+                      ...prev,
+                      acceptedByPartnerId: e.target.value,
+                    }))
+                  }
+                  disabled={confirmingPayment}
+                >
+                  <option value="">Выберите партнера</option>
+                  {(clubPartnersByClubId.get(paymentModal.booking.clubId) || []).map((partner) => (
+                    <option key={partner.id} value={partner.id}>
+                      {partner.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={closeAcceptPaymentModal}
+                className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                disabled={confirmingPayment}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPayment}
+                className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+                disabled={confirmingPayment}
+              >
+                {confirmingPayment ? 'Сохранение...' : 'Подтвердить оплату'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
