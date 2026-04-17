@@ -292,6 +292,13 @@ export const clubFinanceService = {
     api.put(`/club-finance/clubs/${clubId}/partners/${partnerId}`, data),
   deletePartner: (clubId: number, partnerId: number) =>
     api.delete(`/club-finance/clubs/${clubId}/partners/${partnerId}`),
+  getClubUsers: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/club-users`),
+  getPartnerManagers: (clubId: number, params?: { partnerId?: number }) =>
+    api.get(`/club-finance/clubs/${clubId}/partner-managers`, { params }),
+  createPartnerManager: (clubId: number, data: any) =>
+    api.post(`/club-finance/clubs/${clubId}/partner-managers`, data),
+  deletePartnerManager: (clubId: number, managerId: number) =>
+    api.delete(`/club-finance/clubs/${clubId}/partner-managers/${managerId}`),
 
   getCashTransactions: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/cash-transactions`),
   createCashTransaction: (clubId: number, data: any) =>

@@ -434,6 +434,18 @@ export interface ClubPartner {
   updatedAt: string
 }
 
+export interface ClubPartnerManager {
+  id: number
+  clubId: number
+  partnerId: number
+  userId: number
+  isActive: boolean
+  partner?: ClubPartner
+  user?: User
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ClubCashTransaction {
   id: number
   clubId: number
@@ -445,8 +457,10 @@ export interface ClubCashTransaction {
   description?: string | null
   bookingId?: number | null
   acceptedByPartnerId?: number | null
+  acceptedByManagerId?: number | null
   paidByPartnerId?: number | null
   acceptedByPartner?: ClubPartner | null
+  acceptedByManager?: ClubPartnerManager | null
   paidByPartner?: ClubPartner | null
   createdAt: string
   updatedAt: string

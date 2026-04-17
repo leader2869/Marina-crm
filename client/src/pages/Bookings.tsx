@@ -1,6 +1,6 @@
 import { useEffect, useState, Fragment } from 'react'
 import { bookingsService, paymentsService, clubFinanceService } from '../services/api'
-import { Booking, UserRole, BookingStatus, Payment, PaymentStatus, CashPaymentMethod, ClubPartner } from '../types'
+import { Booking, UserRole, BookingStatus, Payment, PaymentStatus, CashPaymentMethod, ClubPartner, ClubPartnerManager } from '../types'
 import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2, CheckCircle2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,10 +17,12 @@ export default function Bookings() {
   const [bookingPayments, setBookingPayments] = useState<Map<number, Payment[]>>(new Map())
   const [loadingPayments, setLoadingPayments] = useState<Set<number>>(new Set())
   const [clubPartnersByClubId, setClubPartnersByClubId] = useState<Map<number, ClubPartner[]>>(new Map())
+  const [partnerManagersByClubId, setPartnerManagersByClubId] = useState<Map<number, ClubPartnerManager[]>>(new Map())
   const [paymentModal, setPaymentModal] = useState<{ booking: Booking; payment: Payment } | null>(null)
   const [acceptPaymentForm, setAcceptPaymentForm] = useState({
     paymentMethod: CashPaymentMethod.CASH,
     acceptedByPartnerId: '',
+    acceptedByManagerId: '',
   })
   const [confirmingPayment, setConfirmingPayment] = useState(false)
 
@@ -134,6 +136,21 @@ export default function Bookings() {
     return partners
   }
 
+  const loadPartnerManagers = async (clubId: number): Promise<ClubPartnerManager[]> => {
+    const cached = partnerManagersByClubId.get(clubId)
+    if (cached) {
+      return cached
+    }
+    const response = await clubFinanceService.getPartnerManagers(clubId)
+    const managers = Array.isArray(response) ? response : response.data || []
+    setPartnerManagersByClubId((prev) => {
+      const next = new Map(prev)
+      next.set(clubId, managers)
+      return next
+    })
+    return managers
+  }
+
   const isClubOwner = user?.role === UserRole.CLUB_OWNER
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
   const isVesselOwner = user?.role === UserRole.VESSEL_OWNER
@@ -187,9 +204,11 @@ export default function Bookings() {
   const openAcceptPaymentModal = async (booking: Booking, payment: Payment) => {
     try {
       await loadClubPartners(booking.clubId)
+      await loadPartnerManagers(booking.clubId)
       setAcceptPaymentForm({
         paymentMethod: CashPaymentMethod.CASH,
         acceptedByPartnerId: '',
+        acceptedByManagerId: '',
       })
       setPaymentModal({ booking, payment })
     } catch (error: any) {
@@ -208,6 +227,10 @@ export default function Bookings() {
       alert('Выберите партнера, который принял оплату')
       return
     }
+    if (!acceptPaymentForm.acceptedByManagerId) {
+      alert('Выберите менеджера, который принял оплату')
+      return
+    }
 
     setConfirmingPayment(true)
     try {
@@ -216,6 +239,7 @@ export default function Bookings() {
         paidDate: new Date().toISOString(),
         cashPaymentMethod: acceptPaymentForm.paymentMethod,
         acceptedByPartnerId: Number(acceptPaymentForm.acceptedByPartnerId),
+        acceptedByManagerId: Number(acceptPaymentForm.acceptedByManagerId),
       })
       await loadUpcomingPayments(paymentModal.booking.id, true)
       await loadBookings()
@@ -653,6 +677,7 @@ export default function Bookings() {
                     setAcceptPaymentForm((prev) => ({
                       ...prev,
                       acceptedByPartnerId: e.target.value,
+                      acceptedByManagerId: '',
                     }))
                   }
                   disabled={confirmingPayment}
@@ -663,6 +688,31 @@ export default function Bookings() {
                       {partner.name}
                     </option>
                   ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Какой менеджер принял оплату</label>
+                <select
+                  className="w-full border rounded px-3 py-2"
+                  value={acceptPaymentForm.acceptedByManagerId}
+                  onChange={(e) =>
+                    setAcceptPaymentForm((prev) => ({
+                      ...prev,
+                      acceptedByManagerId: e.target.value,
+                    }))
+                  }
+                  disabled={confirmingPayment || !acceptPaymentForm.acceptedByPartnerId}
+                >
+                  <option value="">Выберите менеджера</option>
+                  {(partnerManagersByClubId.get(paymentModal.booking.clubId) || [])
+                    .filter((manager) => String(manager.partnerId) === acceptPaymentForm.acceptedByPartnerId)
+                    .map((manager) => (
+                      <option key={manager.id} value={manager.id}>
+                        {manager.user
+                          ? `${manager.user.lastName || ''} ${manager.user.firstName || ''}`.trim() || manager.user.email
+                          : `Менеджер #${manager.id}`}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>

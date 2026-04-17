@@ -9,6 +9,10 @@ router.get('/clubs/:clubId/partners', authenticate, controller.getPartners.bind(
 router.post('/clubs/:clubId/partners', authenticate, controller.createPartner.bind(controller));
 router.put('/clubs/:clubId/partners/:partnerId', authenticate, controller.updatePartner.bind(controller));
 router.delete('/clubs/:clubId/partners/:partnerId', authenticate, controller.deletePartner.bind(controller));
+router.get('/clubs/:clubId/club-users', authenticate, controller.getClubUsers.bind(controller));
+router.get('/clubs/:clubId/partner-managers', authenticate, controller.getPartnerManagers.bind(controller));
+router.post('/clubs/:clubId/partner-managers', authenticate, controller.createPartnerManager.bind(controller));
+router.delete('/clubs/:clubId/partner-managers/:managerId', authenticate, controller.deletePartnerManager.bind(controller));
 
 router.get('/clubs/:clubId/cash-transactions', authenticate, controller.getCashTransactions.bind(controller));
 router.post('/clubs/:clubId/cash-transactions', authenticate, controller.createCashTransaction.bind(controller));

@@ -10,6 +10,7 @@ import {
 import { Club } from './Club';
 import { ClubPartner } from './ClubPartner';
 import { User } from './User';
+import { ClubPartnerManager } from './ClubPartnerManager';
 import { CashTransactionType, CashPaymentMethod, Currency } from '../types';
 
 @Entity('club_cash_transactions')
@@ -77,6 +78,13 @@ export class ClubCashTransaction {
 
   @Column({ type: 'integer', nullable: true })
   createdById: number | null;
+
+  @ManyToOne(() => ClubPartnerManager, { nullable: true })
+  @JoinColumn({ name: 'acceptedByManagerId' })
+  acceptedByManager: ClubPartnerManager | null;
+
+  @Column({ type: 'integer', nullable: true })
+  acceptedByManagerId: number | null;
 
   @CreateDateColumn()
   createdAt: Date;

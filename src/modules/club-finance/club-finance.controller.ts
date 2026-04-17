@@ -5,7 +5,11 @@ import { AppError } from '../../middleware/errorHandler';
 import { Club } from '../../entities/Club';
 import { ClubPartner } from '../../entities/ClubPartner';
 import { ClubCashTransaction } from '../../entities/ClubCashTransaction';
+import { ClubPartnerManager } from '../../entities/ClubPartnerManager';
+import { User } from '../../entities/User';
+import { UserClub } from '../../entities/UserClub';
 import { CashPaymentMethod, CashTransactionType, Currency, UserRole } from '../../types';
+import { hashPassword } from '../../utils/password';
 
 export class ClubFinanceController {
   private async ensureClubAccess(req: AuthRequest, clubId: number): Promise<Club> {
@@ -25,6 +29,36 @@ export class ClubFinanceController {
     }
 
     return club;
+  }
+
+  private async ensurePartnerInClub(clubId: number, partnerId: number): Promise<ClubPartner> {
+    const partnerRepository = AppDataSource.getRepository(ClubPartner);
+    const partner = await partnerRepository.findOne({ where: { id: partnerId, clubId, isActive: true } });
+    if (!partner) {
+      throw new AppError('Партнер не найден в выбранном клубе', 404);
+    }
+    return partner;
+  }
+
+  private async ensureManagerInClubPartner(
+    clubId: number,
+    partnerId: number,
+    managerId: number
+  ): Promise<ClubPartnerManager> {
+    const managerRepository = AppDataSource.getRepository(ClubPartnerManager);
+    const manager = await managerRepository.findOne({
+      where: {
+        id: managerId,
+        clubId,
+        partnerId,
+        isActive: true,
+      },
+      relations: ['user'],
+    });
+    if (!manager) {
+      throw new AppError('Менеджер не найден у выбранного партнера', 404);
+    }
+    return manager;
   }
 
   async getPartners(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -135,6 +169,188 @@ export class ClubFinanceController {
     }
   }
 
+  async getClubUsers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      await this.ensureClubAccess(req, clubId);
+
+      const userRepository = AppDataSource.getRepository(User);
+      const userClubRepository = AppDataSource.getRepository(UserClub);
+
+      const directUsers = await userRepository.find({
+        where: { managedClubId: clubId, isActive: true },
+        select: ['id', 'firstName', 'lastName', 'email', 'phone', 'role'],
+      });
+
+      const linkedUsers = await userClubRepository.find({
+        where: { clubId },
+        relations: ['user'],
+      });
+
+      const allUsersMap = new Map<number, any>();
+      directUsers.forEach((u) => allUsersMap.set(u.id, u));
+      linkedUsers.forEach((uc) => {
+        if (uc.user?.isActive) {
+          allUsersMap.set(uc.user.id, uc.user);
+        }
+      });
+
+      const users = Array.from(allUsersMap.values()).sort((a, b) =>
+        `${a.lastName || ''} ${a.firstName || ''}`.localeCompare(`${b.lastName || ''} ${b.firstName || ''}`)
+      );
+
+      res.json(users);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPartnerManagers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      await this.ensureClubAccess(req, clubId);
+
+      const partnerId = req.query.partnerId ? parseInt(String(req.query.partnerId)) : undefined;
+      if (partnerId) {
+        await this.ensurePartnerInClub(clubId, partnerId);
+      }
+
+      const managerRepository = AppDataSource.getRepository(ClubPartnerManager);
+      const managers = await managerRepository.find({
+        where: {
+          clubId,
+          ...(partnerId ? { partnerId } : {}),
+          isActive: true,
+        },
+        relations: ['partner', 'user'],
+        order: { createdAt: 'ASC' },
+      });
+
+      res.json(managers);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createPartnerManager(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      await this.ensureClubAccess(req, clubId);
+
+      const { partnerId, userId, userData } = req.body;
+      if (!partnerId) {
+        throw new AppError('Укажите партнера', 400);
+      }
+      const normalizedPartnerId = Number(partnerId);
+      if (!Number.isInteger(normalizedPartnerId) || normalizedPartnerId <= 0) {
+        throw new AppError('Некорректный партнер', 400);
+      }
+      await this.ensurePartnerInClub(clubId, normalizedPartnerId);
+
+      const userRepository = AppDataSource.getRepository(User);
+      const userClubRepository = AppDataSource.getRepository(UserClub);
+      const managerRepository = AppDataSource.getRepository(ClubPartnerManager);
+      let resolvedUserId: number;
+
+      if (userId) {
+        const normalizedUserId = Number(userId);
+        const existingUser = await userRepository.findOne({ where: { id: normalizedUserId, isActive: true } });
+        if (!existingUser) {
+          throw new AppError('Пользователь не найден', 404);
+        }
+        resolvedUserId = existingUser.id;
+      } else if (userData) {
+        const {
+          email,
+          password,
+          firstName,
+          lastName,
+          phone,
+          role,
+        } = userData;
+        if (!email || !password || !firstName || !lastName) {
+          throw new AppError('Для нового менеджера заполните email, пароль, имя и фамилию', 400);
+        }
+        const existingByEmail = await userRepository.findOne({ where: { email: String(email).trim() } });
+        if (existingByEmail) {
+          throw new AppError('Пользователь с таким email уже существует', 400);
+        }
+        const hashedPassword = await hashPassword(String(password));
+        const createdUser = userRepository.create({
+          email: String(email).trim().toLowerCase(),
+          password: hashedPassword,
+          firstName: String(firstName).trim(),
+          lastName: String(lastName).trim(),
+          phone: phone ? String(phone).trim() : undefined,
+          role: role || UserRole.AGENT,
+          isActive: true,
+          isValidated: true,
+          emailVerified: true,
+          managedClubId: clubId,
+        });
+        const savedUser = await userRepository.save(createdUser);
+        resolvedUserId = savedUser.id;
+      } else {
+        throw new AppError('Укажите существующего пользователя или данные нового менеджера', 400);
+      }
+
+      const existingUserClub = await userClubRepository.findOne({
+        where: { userId: resolvedUserId, clubId },
+      });
+      if (!existingUserClub) {
+        const uc = userClubRepository.create({ userId: resolvedUserId, clubId });
+        await userClubRepository.save(uc);
+      }
+
+      let manager = await managerRepository.findOne({
+        where: {
+          clubId,
+          partnerId: normalizedPartnerId,
+          userId: resolvedUserId,
+        },
+      });
+
+      if (manager) {
+        manager.isActive = true;
+      } else {
+        manager = managerRepository.create({
+          clubId,
+          partnerId: normalizedPartnerId,
+          userId: resolvedUserId,
+          isActive: true,
+        });
+      }
+
+      await managerRepository.save(manager);
+      const saved = await managerRepository.findOne({
+        where: { id: manager.id },
+        relations: ['partner', 'user'],
+      });
+      res.status(201).json(saved);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deletePartnerManager(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      const managerId = parseInt(req.params.managerId);
+      await this.ensureClubAccess(req, clubId);
+
+      const managerRepository = AppDataSource.getRepository(ClubPartnerManager);
+      const manager = await managerRepository.findOne({ where: { id: managerId, clubId } });
+      if (!manager) {
+        throw new AppError('Менеджер партнера не найден', 404);
+      }
+      manager.isActive = false;
+      await managerRepository.save(manager);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getCashTransactions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
@@ -143,7 +359,7 @@ export class ClubFinanceController {
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
       const transactions = await txRepository.find({
         where: { clubId },
-        relations: ['acceptedByPartner', 'paidByPartner', 'createdBy'],
+        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'createdBy'],
         order: { date: 'DESC', createdAt: 'DESC' },
       });
 
@@ -166,6 +382,7 @@ export class ClubFinanceController {
         description,
         bookingId,
         acceptedByPartnerId,
+        acceptedByManagerId,
         paidByPartnerId,
       } = req.body;
 
@@ -175,6 +392,10 @@ export class ClubFinanceController {
 
       if (transactionType === CashTransactionType.INCOME && !acceptedByPartnerId) {
         throw new AppError('Для прихода укажите, кто принял деньги', 400);
+      }
+
+      if (transactionType === CashTransactionType.INCOME && !acceptedByManagerId) {
+        throw new AppError('Для прихода укажите менеджера, который принял деньги', 400);
       }
 
       if (transactionType === CashTransactionType.EXPENSE && !paidByPartnerId) {
@@ -189,6 +410,14 @@ export class ClubFinanceController {
           where: { id: parseInt(String(acceptedByPartnerId)), clubId, isActive: true },
         });
         if (!partner) throw new AppError('Партнер, принявший деньги, не найден', 404);
+      }
+
+      if (acceptedByManagerId) {
+        await this.ensureManagerInClubPartner(
+          clubId,
+          Number(acceptedByPartnerId),
+          Number(acceptedByManagerId)
+        );
       }
 
       if (paidByPartnerId) {
@@ -208,6 +437,7 @@ export class ClubFinanceController {
         description: description ? String(description) : null,
         bookingId: bookingId ? Number(bookingId) : null,
         acceptedByPartnerId: acceptedByPartnerId ? Number(acceptedByPartnerId) : null,
+        acceptedByManagerId: acceptedByManagerId ? Number(acceptedByManagerId) : null,
         paidByPartnerId: paidByPartnerId ? Number(paidByPartnerId) : null,
         createdById: req.userId || null,
       });
@@ -216,7 +446,7 @@ export class ClubFinanceController {
 
       const savedTx = await txRepository.findOne({
         where: { id: tx.id },
-        relations: ['acceptedByPartner', 'paidByPartner', 'createdBy'],
+        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'createdBy'],
       });
 
       res.status(201).json(savedTx);
@@ -246,6 +476,7 @@ export class ClubFinanceController {
         description,
         bookingId,
         acceptedByPartnerId,
+        acceptedByManagerId,
         paidByPartnerId,
       } = req.body;
 
@@ -257,19 +488,27 @@ export class ClubFinanceController {
       if (typeof description !== 'undefined') tx.description = description ? String(description) : null;
       if (typeof bookingId !== 'undefined') tx.bookingId = bookingId ? Number(bookingId) : null;
       if (typeof acceptedByPartnerId !== 'undefined') tx.acceptedByPartnerId = acceptedByPartnerId ? Number(acceptedByPartnerId) : null;
+      if (typeof acceptedByManagerId !== 'undefined') tx.acceptedByManagerId = acceptedByManagerId ? Number(acceptedByManagerId) : null;
       if (typeof paidByPartnerId !== 'undefined') tx.paidByPartnerId = paidByPartnerId ? Number(paidByPartnerId) : null;
 
       if (tx.transactionType === CashTransactionType.INCOME && !tx.acceptedByPartnerId) {
         throw new AppError('Для прихода укажите, кто принял деньги', 400);
       }
+      if (tx.transactionType === CashTransactionType.INCOME && !tx.acceptedByManagerId) {
+        throw new AppError('Для прихода укажите менеджера, который принял деньги', 400);
+      }
       if (tx.transactionType === CashTransactionType.EXPENSE && !tx.paidByPartnerId) {
         throw new AppError('Для расхода укажите, кто оплатил из своего кармана', 400);
+      }
+
+      if (tx.transactionType === CashTransactionType.INCOME && tx.acceptedByPartnerId && tx.acceptedByManagerId) {
+        await this.ensureManagerInClubPartner(clubId, tx.acceptedByPartnerId, tx.acceptedByManagerId);
       }
 
       await txRepository.save(tx);
       const updated = await txRepository.findOne({
         where: { id: tx.id },
-        relations: ['acceptedByPartner', 'paidByPartner', 'createdBy'],
+        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'createdBy'],
       });
       res.json(updated);
     } catch (error) {

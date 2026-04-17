@@ -24,6 +24,7 @@ import { AgentOrderResponse } from '../entities/AgentOrderResponse';
 import { Contragent } from '../entities/Contragent';
 import { ClubPartner } from '../entities/ClubPartner';
 import { ClubCashTransaction } from '../entities/ClubCashTransaction';
+import { ClubPartnerManager } from '../entities/ClubPartnerManager';
 
 // Загружаем переменные окружения из .env файла
 dotenv.config();
@@ -109,6 +110,7 @@ export const AppDataSource = new DataSource({
     AgentOrderResponse,
     ClubPartner,
     ClubCashTransaction,
+    ClubPartnerManager,
     // Contragent - временно исключена для диагностики ошибки 500
     // Раскомментируйте после исправления проблемы
     // Contragent,

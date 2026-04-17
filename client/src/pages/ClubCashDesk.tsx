@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { clubsService, clubFinanceService } from '../services/api'
-import { CashPaymentMethod, CashTransactionType, Club, ClubCashTransaction, ClubPartner } from '../types'
+import { CashPaymentMethod, CashTransactionType, Club, ClubCashTransaction, ClubPartner, ClubPartnerManager } from '../types'
 import BackButton from '../components/BackButton'
 
 export default function ClubCashDesk() {
   const [clubs, setClubs] = useState<Club[]>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [partners, setPartners] = useState<ClubPartner[]>([])
+  const [partnerManagers, setPartnerManagers] = useState<ClubPartnerManager[]>([])
   const [transactions, setTransactions] = useState<ClubCashTransaction[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -19,6 +20,7 @@ export default function ClubCashDesk() {
     date: new Date().toISOString().split('T')[0],
     description: '',
     acceptedByPartnerId: '',
+    acceptedByManagerId: '',
     paidByPartnerId: '',
     bookingId: '',
   })
@@ -50,8 +52,10 @@ export default function ClubCashDesk() {
         clubFinanceService.getPartners(clubId),
         clubFinanceService.getCashTransactions(clubId),
       ])
+      const managersRes = await clubFinanceService.getPartnerManagers(clubId)
       setPartners(Array.isArray(partnersRes) ? partnersRes : partnersRes.data || [])
       setTransactions(Array.isArray(txRes) ? txRes : txRes.data || [])
+      setPartnerManagers(Array.isArray(managersRes) ? managersRes : managersRes.data || [])
     } catch (e: any) {
       setError(e.error || e.message || 'Ошибка загрузки данных кассы')
     }
@@ -86,6 +90,10 @@ export default function ClubCashDesk() {
           form.transactionType === CashTransactionType.INCOME && form.acceptedByPartnerId
             ? Number(form.acceptedByPartnerId)
             : null,
+        acceptedByManagerId:
+          form.transactionType === CashTransactionType.INCOME && form.acceptedByManagerId
+            ? Number(form.acceptedByManagerId)
+            : null,
         paidByPartnerId:
           form.transactionType === CashTransactionType.EXPENSE && form.paidByPartnerId
             ? Number(form.paidByPartnerId)
@@ -98,6 +106,7 @@ export default function ClubCashDesk() {
         date: new Date().toISOString().split('T')[0],
         description: '',
         acceptedByPartnerId: '',
+        acceptedByManagerId: '',
         paidByPartnerId: '',
         bookingId: '',
       })
@@ -166,12 +175,12 @@ export default function ClubCashDesk() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {form.transactionType === CashTransactionType.INCOME ? (
             <select
               className="border rounded px-3 py-2"
               value={form.acceptedByPartnerId}
-              onChange={(e) => setForm({ ...form, acceptedByPartnerId: e.target.value })}
+              onChange={(e) => setForm({ ...form, acceptedByPartnerId: e.target.value, acceptedByManagerId: '' })}
             >
               <option value="">Кто принял деньги</option>
               {partners.map((p) => (
@@ -180,6 +189,7 @@ export default function ClubCashDesk() {
                 </option>
               ))}
             </select>
+            
           ) : (
             <select
               className="border rounded px-3 py-2"
@@ -193,6 +203,29 @@ export default function ClubCashDesk() {
                 </option>
               ))}
             </select>
+          )}
+          {form.transactionType === CashTransactionType.INCOME ? (
+            <select
+              className="border rounded px-3 py-2"
+              value={form.acceptedByManagerId}
+              onChange={(e) => setForm({ ...form, acceptedByManagerId: e.target.value })}
+              disabled={!form.acceptedByPartnerId}
+            >
+              <option value="">Какой менеджер принял деньги</option>
+              {partnerManagers
+                .filter((m) => String(m.partnerId) === form.acceptedByPartnerId)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.user
+                      ? `${m.user.lastName || ''} ${m.user.firstName || ''}`.trim() || m.user.email
+                      : `Менеджер #${m.id}`}
+                  </option>
+                ))}
+            </select>
+          ) : (
+            <div className="border rounded px-3 py-2 text-sm text-gray-400 flex items-center">
+              Для расхода менеджер не требуется
+            </div>
           )}
           <input
             className="border rounded px-3 py-2"
@@ -241,6 +274,7 @@ export default function ClubCashDesk() {
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Сумма</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Метод</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Партнер</th>
+              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Менеджер</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Бронирование</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Описание</th>
             </tr>
@@ -256,6 +290,12 @@ export default function ClubCashDesk() {
                   {tx.transactionType === CashTransactionType.INCOME
                     ? tx.acceptedByPartner?.name || '—'
                     : tx.paidByPartner?.name || '—'}
+                </td>
+                <td className="px-4 py-3">
+                  {tx.acceptedByManager?.user
+                    ? `${tx.acceptedByManager.user.lastName || ''} ${tx.acceptedByManager.user.firstName || ''}`.trim() ||
+                      tx.acceptedByManager.user.email
+                    : '—'}
                 </td>
                 <td className="px-4 py-3">
                   {tx.bookingId ? (

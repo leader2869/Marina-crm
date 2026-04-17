@@ -5,6 +5,7 @@ import { Booking } from '../../entities/Booking';
 import { Club } from '../../entities/Club';
 import { ClubCashTransaction } from '../../entities/ClubCashTransaction';
 import { ClubPartner } from '../../entities/ClubPartner';
+import { ClubPartnerManager } from '../../entities/ClubPartnerManager';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import {
@@ -181,7 +182,7 @@ export class PaymentsController {
   async updateStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const { status, transactionId, paidDate, cashPaymentMethod, acceptedByPartnerId } = req.body;
+      const { status, transactionId, paidDate, cashPaymentMethod, acceptedByPartnerId, acceptedByManagerId } = req.body;
 
       const paymentRepository = AppDataSource.getRepository(Payment);
       const payment = await paymentRepository.findOne({
@@ -261,6 +262,24 @@ export class PaymentsController {
           throw new AppError('Партнер, принявший оплату, не найден', 404);
         }
 
+        const normalizedAcceptedByManagerId = Number(acceptedByManagerId);
+        if (!Number.isInteger(normalizedAcceptedByManagerId) || normalizedAcceptedByManagerId <= 0) {
+          throw new AppError('Укажите менеджера, который принял оплату', 400);
+        }
+
+        const managerRepository = AppDataSource.getRepository(ClubPartnerManager);
+        const acceptedManager = await managerRepository.findOne({
+          where: {
+            id: normalizedAcceptedByManagerId,
+            clubId: payment.booking.clubId,
+            partnerId: normalizedAcceptedByPartnerId,
+            isActive: true,
+          },
+        });
+        if (!acceptedManager) {
+          throw new AppError('Менеджер не найден у выбранного партнера', 404);
+        }
+
         const cashTxRepository = AppDataSource.getRepository(ClubCashTransaction);
         const cashTx = cashTxRepository.create({
           clubId: payment.booking.clubId,
@@ -272,6 +291,7 @@ export class PaymentsController {
           date: payment.paidDate || new Date(),
           description: `Поступление по бронированию #${payment.bookingId}, платеж #${payment.id}`,
           acceptedByPartnerId: normalizedAcceptedByPartnerId,
+          acceptedByManagerId: normalizedAcceptedByManagerId,
           paidByPartnerId: null,
           createdById: req.userId || null,
         });

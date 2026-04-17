@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { clubsService, clubFinanceService } from '../services/api'
-import { Club, ClubPartner } from '../types'
+import { Club, ClubPartner, ClubPartnerManager, User, UserRole } from '../types'
 import { Plus, Trash2 } from 'lucide-react'
 import BackButton from '../components/BackButton'
 
@@ -8,6 +8,17 @@ export default function ClubPartners() {
   const [clubs, setClubs] = useState<Club[]>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [partners, setPartners] = useState<ClubPartner[]>([])
+  const [clubUsers, setClubUsers] = useState<User[]>([])
+  const [partnerManagers, setPartnerManagers] = useState<ClubPartnerManager[]>([])
+  const [managerUserByPartner, setManagerUserByPartner] = useState<Record<number, string>>({})
+  const [creatingManagerForPartnerId, setCreatingManagerForPartnerId] = useState<number | null>(null)
+  const [newManagerByPartner, setNewManagerByPartner] = useState<Record<number, {
+    email: string
+    password: string
+    firstName: string
+    lastName: string
+    phone: string
+  }>>({})
   const [name, setName] = useState('')
   const [sharePercent, setSharePercent] = useState('')
   const [loading, setLoading] = useState(true)
@@ -38,14 +49,22 @@ export default function ClubPartners() {
 
   useEffect(() => {
     if (!selectedClubId) return
-    loadPartners(selectedClubId)
+    loadInitialData(selectedClubId)
   }, [selectedClubId])
 
-  const loadPartners = async (clubId: number) => {
+  const loadInitialData = async (clubId: number) => {
     try {
-      const response = await clubFinanceService.getPartners(clubId)
-      const data = Array.isArray(response) ? response : response.data || []
-      setPartners(data)
+      const [partnersRes, usersRes, managersRes] = await Promise.all([
+        clubFinanceService.getPartners(clubId),
+        clubFinanceService.getClubUsers(clubId),
+        clubFinanceService.getPartnerManagers(clubId),
+      ])
+      const partnersData = Array.isArray(partnersRes) ? partnersRes : partnersRes.data || []
+      const usersData = Array.isArray(usersRes) ? usersRes : usersRes.data || []
+      const managersData = Array.isArray(managersRes) ? managersRes : managersRes.data || []
+      setPartners(partnersData)
+      setClubUsers(usersData)
+      setPartnerManagers(managersData)
     } catch (e: any) {
       setError(e.error || e.message || 'Ошибка загрузки партнеров')
     }
@@ -60,7 +79,7 @@ export default function ClubPartners() {
       })
       setName('')
       setSharePercent('')
-      await loadPartners(selectedClubId)
+      await loadInitialData(selectedClubId)
     } catch (e: any) {
       setError(e.error || e.message || 'Ошибка создания партнера')
     }
@@ -71,11 +90,67 @@ export default function ClubPartners() {
     if (!confirm('Удалить партнера?')) return
     try {
       await clubFinanceService.deletePartner(selectedClubId, partnerId)
-      await loadPartners(selectedClubId)
+      await loadInitialData(selectedClubId)
     } catch (e: any) {
       setError(e.error || e.message || 'Ошибка удаления партнера')
     }
   }
+
+  const handleAssignExistingManager = async (partnerId: number) => {
+    if (!selectedClubId) return
+    const userId = managerUserByPartner[partnerId]
+    if (!userId) return
+    try {
+      await clubFinanceService.createPartnerManager(selectedClubId, {
+        partnerId,
+        userId: Number(userId),
+      })
+      setManagerUserByPartner((prev) => ({ ...prev, [partnerId]: '' }))
+      await loadInitialData(selectedClubId)
+    } catch (e: any) {
+      setError(e.error || e.message || 'Ошибка привязки менеджера')
+    }
+  }
+
+  const handleCreateManagerAccount = async (partnerId: number) => {
+    if (!selectedClubId) return
+    const managerData = newManagerByPartner[partnerId]
+    if (!managerData?.email || !managerData?.password || !managerData?.firstName || !managerData?.lastName) {
+      setError('Для нового менеджера заполните email, пароль, имя и фамилию')
+      return
+    }
+    try {
+      await clubFinanceService.createPartnerManager(selectedClubId, {
+        partnerId,
+        userData: {
+          ...managerData,
+          role: UserRole.AGENT,
+        },
+      })
+      setNewManagerByPartner((prev) => ({
+        ...prev,
+        [partnerId]: { email: '', password: '', firstName: '', lastName: '', phone: '' },
+      }))
+      setCreatingManagerForPartnerId(null)
+      await loadInitialData(selectedClubId)
+    } catch (e: any) {
+      setError(e.error || e.message || 'Ошибка создания менеджера')
+    }
+  }
+
+  const handleDeleteManager = async (managerId: number) => {
+    if (!selectedClubId) return
+    if (!confirm('Отвязать менеджера от партнера?')) return
+    try {
+      await clubFinanceService.deletePartnerManager(selectedClubId, managerId)
+      await loadInitialData(selectedClubId)
+    } catch (e: any) {
+      setError(e.error || e.message || 'Ошибка удаления менеджера')
+    }
+  }
+
+  const getManagersForPartner = (partnerId: number) =>
+    partnerManagers.filter((manager) => manager.partnerId === partnerId)
 
   if (loading) return <div className="p-6">Загрузка...</div>
 
@@ -146,6 +221,7 @@ export default function ClubPartners() {
             <tr>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Партнер</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Доля</th>
+              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Менеджеры партнера</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Действия</th>
             </tr>
           </thead>
@@ -154,6 +230,132 @@ export default function ClubPartners() {
               <tr key={partner.id}>
                 <td className="px-4 py-3">{partner.name}</td>
                 <td className="px-4 py-3">{Number(partner.sharePercent).toFixed(2)}%</td>
+                <td className="px-4 py-3">
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      {getManagersForPartner(partner.id).length === 0 ? (
+                        <div className="text-sm text-gray-400">Менеджеры не добавлены</div>
+                      ) : (
+                        getManagersForPartner(partner.id).map((manager) => (
+                          <div key={manager.id} className="flex items-center justify-between text-sm border rounded px-2 py-1">
+                            <span>
+                              {manager.user
+                                ? `${manager.user.lastName || ''} ${manager.user.firstName || ''}`.trim() || manager.user.email
+                                : `Менеджер #${manager.id}`}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteManager(manager.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              Удалить
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <select
+                        className="border rounded px-2 py-1 text-sm flex-1"
+                        value={managerUserByPartner[partner.id] || ''}
+                        onChange={(e) =>
+                          setManagerUserByPartner((prev) => ({ ...prev, [partner.id]: e.target.value }))
+                        }
+                      >
+                        <option value="">Выбрать существующий аккаунт</option>
+                        {clubUsers.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {`${u.lastName || ''} ${u.firstName || ''}`.trim() || u.email}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleAssignExistingManager(partner.id)}
+                        className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm"
+                      >
+                        Привязать
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setCreatingManagerForPartnerId(
+                          creatingManagerForPartnerId === partner.id ? null : partner.id
+                        )
+                      }
+                      className="text-sm text-primary-600 hover:text-primary-700"
+                    >
+                      {creatingManagerForPartnerId === partner.id ? 'Скрыть форму нового менеджера' : 'Создать новый аккаунт менеджера'}
+                    </button>
+
+                    {creatingManagerForPartnerId === partner.id && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-gray-50 p-2 rounded">
+                        <input
+                          className="border rounded px-2 py-1 text-sm"
+                          placeholder="Имя"
+                          value={newManagerByPartner[partner.id]?.firstName || ''}
+                          onChange={(e) =>
+                            setNewManagerByPartner((prev) => ({
+                              ...prev,
+                              [partner.id]: { ...(prev[partner.id] || { email: '', password: '', firstName: '', lastName: '', phone: '' }), firstName: e.target.value },
+                            }))
+                          }
+                        />
+                        <input
+                          className="border rounded px-2 py-1 text-sm"
+                          placeholder="Фамилия"
+                          value={newManagerByPartner[partner.id]?.lastName || ''}
+                          onChange={(e) =>
+                            setNewManagerByPartner((prev) => ({
+                              ...prev,
+                              [partner.id]: { ...(prev[partner.id] || { email: '', password: '', firstName: '', lastName: '', phone: '' }), lastName: e.target.value },
+                            }))
+                          }
+                        />
+                        <input
+                          className="border rounded px-2 py-1 text-sm"
+                          placeholder="Email"
+                          value={newManagerByPartner[partner.id]?.email || ''}
+                          onChange={(e) =>
+                            setNewManagerByPartner((prev) => ({
+                              ...prev,
+                              [partner.id]: { ...(prev[partner.id] || { email: '', password: '', firstName: '', lastName: '', phone: '' }), email: e.target.value },
+                            }))
+                          }
+                        />
+                        <input
+                          className="border rounded px-2 py-1 text-sm"
+                          placeholder="Телефон"
+                          value={newManagerByPartner[partner.id]?.phone || ''}
+                          onChange={(e) =>
+                            setNewManagerByPartner((prev) => ({
+                              ...prev,
+                              [partner.id]: { ...(prev[partner.id] || { email: '', password: '', firstName: '', lastName: '', phone: '' }), phone: e.target.value },
+                            }))
+                          }
+                        />
+                        <input
+                          type="password"
+                          className="border rounded px-2 py-1 text-sm md:col-span-2"
+                          placeholder="Пароль"
+                          value={newManagerByPartner[partner.id]?.password || ''}
+                          onChange={(e) =>
+                            setNewManagerByPartner((prev) => ({
+                              ...prev,
+                              [partner.id]: { ...(prev[partner.id] || { email: '', password: '', firstName: '', lastName: '', phone: '' }), password: e.target.value },
+                            }))
+                          }
+                        />
+                        <button
+                          onClick={() => handleCreateManagerAccount(partner.id)}
+                          className="px-2 py-1 rounded bg-primary-600 text-white hover:bg-primary-700 text-sm md:col-span-2"
+                        >
+                          Создать и привязать менеджера
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <button
                     onClick={() => handleDeletePartner(partner.id)}
@@ -167,7 +369,7 @@ export default function ClubPartners() {
             ))}
             {partners.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
                   Партнеры не добавлены
                 </td>
               </tr>

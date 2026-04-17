@@ -23,7 +23,7 @@ const createClubFinanceTables = async (): Promise<void> => {
     const queryRunner = dataSource.createQueryRunner();
     await queryRunner.connect();
 
-    console.log('📝 Выполняем миграцию: создание таблиц club_partners и club_cash_transactions...');
+    console.log('📝 Выполняем миграцию: создание таблиц club_partners, club_partner_managers и club_cash_transactions...');
 
     const sqlScript = `
 -- 0) Создание enum-типов при необходимости
@@ -63,7 +63,37 @@ CREATE TABLE IF NOT EXISTS club_partners (
 CREATE INDEX IF NOT EXISTS idx_club_partners_club_id ON club_partners("clubId");
 CREATE INDEX IF NOT EXISTS idx_club_partners_active ON club_partners("isActive");
 
--- 2) Таблица кассовых операций яхт-клуба
+-- 2) Таблица менеджеров партнеров
+CREATE TABLE IF NOT EXISTS club_partner_managers (
+  id SERIAL PRIMARY KEY,
+  "clubId" INTEGER NOT NULL,
+  "partnerId" INTEGER NOT NULL,
+  "userId" INTEGER NOT NULL,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_club_partner_manager_club
+    FOREIGN KEY ("clubId")
+    REFERENCES clubs(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_club_partner_manager_partner
+    FOREIGN KEY ("partnerId")
+    REFERENCES club_partners(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_club_partner_manager_user
+    FOREIGN KEY ("userId")
+    REFERENCES users(id)
+    ON DELETE CASCADE,
+  CONSTRAINT uq_club_partner_manager_unique
+    UNIQUE ("clubId", "partnerId", "userId")
+);
+
+CREATE INDEX IF NOT EXISTS idx_club_partner_managers_club_id ON club_partner_managers("clubId");
+CREATE INDEX IF NOT EXISTS idx_club_partner_managers_partner_id ON club_partner_managers("partnerId");
+CREATE INDEX IF NOT EXISTS idx_club_partner_managers_user_id ON club_partner_managers("userId");
+CREATE INDEX IF NOT EXISTS idx_club_partner_managers_active ON club_partner_managers("isActive");
+
+-- 3) Таблица кассовых операций яхт-клуба
 CREATE TABLE IF NOT EXISTS club_cash_transactions (
   id SERIAL PRIMARY KEY,
   "transactionType" cash_transaction_type_enum NOT NULL,
@@ -75,6 +105,7 @@ CREATE TABLE IF NOT EXISTS club_cash_transactions (
   "bookingId" INTEGER,
   "clubId" INTEGER NOT NULL,
   "acceptedByPartnerId" INTEGER,
+  "acceptedByManagerId" INTEGER,
   "paidByPartnerId" INTEGER,
   "createdById" INTEGER,
   "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -91,6 +122,10 @@ CREATE TABLE IF NOT EXISTS club_cash_transactions (
     FOREIGN KEY ("paidByPartnerId")
     REFERENCES club_partners(id)
     ON DELETE SET NULL,
+  CONSTRAINT fk_club_cash_tx_accepted_manager
+    FOREIGN KEY ("acceptedByManagerId")
+    REFERENCES club_partner_managers(id)
+    ON DELETE SET NULL,
   CONSTRAINT fk_club_cash_tx_created_by
     FOREIGN KEY ("createdById")
     REFERENCES users(id)
@@ -105,12 +140,26 @@ CREATE INDEX IF NOT EXISTS idx_club_cash_tx_club_id ON club_cash_transactions("c
 CREATE INDEX IF NOT EXISTS idx_club_cash_tx_date ON club_cash_transactions(date);
 CREATE INDEX IF NOT EXISTS idx_club_cash_tx_type ON club_cash_transactions("transactionType");
 CREATE INDEX IF NOT EXISTS idx_club_cash_tx_accepted_partner ON club_cash_transactions("acceptedByPartnerId");
+CREATE INDEX IF NOT EXISTS idx_club_cash_tx_accepted_manager ON club_cash_transactions("acceptedByManagerId");
 CREATE INDEX IF NOT EXISTS idx_club_cash_tx_paid_partner ON club_cash_transactions("paidByPartnerId");
+
+ALTER TABLE club_cash_transactions
+  ADD COLUMN IF NOT EXISTS "acceptedByManagerId" INTEGER;
+
+DO $$ BEGIN
+  ALTER TABLE club_cash_transactions
+    ADD CONSTRAINT fk_club_cash_tx_accepted_manager
+      FOREIGN KEY ("acceptedByManagerId")
+      REFERENCES club_partner_managers(id)
+      ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
     `;
 
     await queryRunner.query(sqlScript);
 
-    console.log('✅ Таблицы club_partners и club_cash_transactions созданы/обновлены');
+    console.log('✅ Таблицы club_partners, club_partner_managers и club_cash_transactions созданы/обновлены');
 
     await queryRunner.release();
     await dataSource.destroy();
