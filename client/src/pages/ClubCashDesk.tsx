@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { clubsService, clubFinanceService } from '../services/api'
 import { CashPaymentMethod, CashTransactionType, Club, ClubCashTransaction, ClubPartner } from '../types'
 import BackButton from '../components/BackButton'
@@ -240,6 +241,7 @@ export default function ClubCashDesk() {
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Сумма</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Метод</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Партнер</th>
+              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Бронирование</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Описание</th>
             </tr>
           </thead>
@@ -254,6 +256,19 @@ export default function ClubCashDesk() {
                   {tx.transactionType === CashTransactionType.INCOME
                     ? tx.acceptedByPartner?.name || '—'
                     : tx.paidByPartner?.name || '—'}
+                </td>
+                <td className="px-4 py-3">
+                  {tx.bookingId ? (
+                    <Link
+                      to="/bookings"
+                      className="text-primary-600 hover:text-primary-700 underline-offset-2 hover:underline"
+                      title={`Открыть бронирование #${tx.bookingId} в разделе бронирований`}
+                    >
+                      #{tx.bookingId}
+                    </Link>
+                  ) : (
+                    '—'
+                  )}
                 </td>
                 <td className="px-4 py-3">{tx.description || '—'}</td>
               </tr>
