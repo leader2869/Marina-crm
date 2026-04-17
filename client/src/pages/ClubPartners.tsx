@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { clubsService, clubFinanceService } from '../services/api'
 import { Club, ClubPartner } from '../types'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import BackButton from '../components/BackButton'
 
 export default function ClubPartners() {
