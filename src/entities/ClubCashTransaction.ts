@@ -45,7 +45,7 @@ export class ClubCashTransaction {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'integer', nullable: true })
   bookingId: number | null;
 
   @ManyToOne(() => Club)
@@ -60,7 +60,7 @@ export class ClubCashTransaction {
   @JoinColumn({ name: 'acceptedByPartnerId' })
   acceptedByPartner: ClubPartner | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'integer', nullable: true })
   acceptedByPartnerId: number | null;
 
   // Кто оплатил из своего кармана (для expense)
@@ -68,14 +68,14 @@ export class ClubCashTransaction {
   @JoinColumn({ name: 'paidByPartnerId' })
   paidByPartner: ClubPartner | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'integer', nullable: true })
   paidByPartnerId: number | null;
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'createdById' })
   createdBy: User | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'integer', nullable: true })
   createdById: number | null;
 
   @CreateDateColumn()
