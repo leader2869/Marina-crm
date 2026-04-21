@@ -28,10 +28,34 @@ const addNewUserRoles = async (): Promise<void> => {
     const queryRunner = dataSource.createQueryRunner();
     await queryRunner.connect();
 
+    // Находим фактический enum, привязанный к users.role
+    const enumTypeRows = await queryRunner.query(`
+      SELECT t.typname AS enum_name
+      FROM pg_attribute a
+      JOIN pg_class c ON c.oid = a.attrelid
+      JOIN pg_type t ON t.oid = a.atttypid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = 'users'
+        AND a.attname = 'role'
+        AND t.typtype = 'e'
+      LIMIT 1;
+    `);
+
+    if (!enumTypeRows.length || !enumTypeRows[0].enum_name) {
+      throw new Error('Не найден enum-тип для поля users.role');
+    }
+
+    const enumName = String(enumTypeRows[0].enum_name);
+    console.log(`Найден enum для users.role: ${enumName}`);
+
     // Проверяем текущие значения enum
     const enumValues = await queryRunner.query(`
-      SELECT unnest(enum_range(NULL::user_role_enum))::text as role;
-    `);
+      SELECT e.enumlabel AS role
+      FROM pg_enum e
+      JOIN pg_type t ON t.oid = e.enumtypid
+      WHERE t.typname = $1
+      ORDER BY e.enumsortorder;
+    `, [enumName]);
 
     console.log('Текущие роли в enum:', enumValues.map((r: any) => r.role));
 
@@ -50,7 +74,7 @@ const addNewUserRoles = async (): Promise<void> => {
     for (const role of rolesToAdd) {
       try {
         await queryRunner.query(`
-          ALTER TYPE user_role_enum ADD VALUE IF NOT EXISTS '${role}';
+          ALTER TYPE "${enumName}" ADD VALUE IF NOT EXISTS '${role}';
         `);
         console.log(`✅ Роль '${role}' добавлена в enum`);
       } catch (error: any) {

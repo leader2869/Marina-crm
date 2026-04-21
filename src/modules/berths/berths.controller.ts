@@ -5,7 +5,7 @@ import { Club } from '../../entities/Club';
 import { Booking } from '../../entities/Booking';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
-import { UserRole, BookingStatus } from '../../types';
+import { UserRole, BookingStatus, PaymentStatus } from '../../types';
 
 export class BerthsController {
   // Получить все места клуба
@@ -337,9 +337,21 @@ export class BerthsController {
         const conflictingBookings = await bookingRepository
           .createQueryBuilder('booking')
           .where('booking.clubId = :clubId', { clubId: club.id })
-          .andWhere('booking.status IN (:...statuses)', {
-            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
-          })
+          .andWhere(
+            `(
+              booking.status IN (:...statuses)
+              OR EXISTS (
+                SELECT 1
+                FROM payments p
+                WHERE p."bookingId" = booking.id
+                  AND p.status IN (:...blockingPaymentStatuses)
+              )
+            )`,
+            {
+              statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+              blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+            }
+          )
           .andWhere(
             '(booking.startDate <= :endDate AND booking.endDate >= :startDate)',
             { startDate: start, endDate: end }
@@ -363,9 +375,21 @@ export class BerthsController {
         const activeBookings = await bookingRepository
           .createQueryBuilder('booking')
           .where('booking.clubId = :clubId', { clubId: club.id })
-          .andWhere('booking.status IN (:...statuses)', {
-            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
-          })
+          .andWhere(
+            `(
+              booking.status IN (:...statuses)
+              OR EXISTS (
+                SELECT 1
+                FROM payments p
+                WHERE p."bookingId" = booking.id
+                  AND p.status IN (:...blockingPaymentStatuses)
+              )
+            )`,
+            {
+              statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+              blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+            }
+          )
           .getMany();
 
         const occupiedBerthIds = new Set(activeBookings.map((booking) => booking.berthId));
