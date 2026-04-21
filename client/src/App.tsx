@@ -27,6 +27,8 @@ import ClubCashDesk from './pages/ClubCashDesk'
 import ClubSettlements from './pages/ClubSettlements'
 import ClubExpectedIncomes from './pages/ClubExpectedIncomes'
 import Reports from './pages/Reports'
+import ReportsFinance from './pages/ReportsFinance'
+import ReportsTenants from './pages/ReportsTenants'
 import Users from './pages/Users'
 import UserDetails from './pages/UserDetails'
 import NewGuests from './pages/NewGuests'
@@ -211,6 +213,22 @@ function App() {
               element={
                 <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
                   <Reports />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="reports/finance"
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                  <ReportsFinance />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="reports/tenants"
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                  <ReportsTenants />
                 </RoleProtectedRoute>
               }
             />
