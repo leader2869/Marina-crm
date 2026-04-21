@@ -435,6 +435,9 @@ export class ClubFinanceController {
         if (!acceptedByPartnerId || !paidByPartnerId) {
           throw new AppError('Для перевода укажите партнера-отправителя и партнера-получателя', 400);
         }
+        if (!acceptedByManagerId) {
+          throw new AppError('Для перевода укажите менеджера, который принимает перевод', 400);
+        }
         if (Number(acceptedByPartnerId) === Number(paidByPartnerId)) {
           throw new AppError('Для перевода партнер-отправитель и партнер-получатель должны отличаться', 400);
         }
@@ -450,7 +453,10 @@ export class ClubFinanceController {
         if (!partner) throw new AppError('Партнер, принявший деньги, не найден', 404);
       }
 
-      if (acceptedByManagerId && transactionType === CashTransactionType.INCOME) {
+      if (
+        acceptedByManagerId &&
+        (transactionType === CashTransactionType.INCOME || transactionType === CashTransactionType.TRANSFER)
+      ) {
         await this.ensureManagerInClubPartner(
           clubId,
           Number(acceptedByPartnerId),
@@ -542,12 +548,19 @@ export class ClubFinanceController {
         if (!tx.acceptedByPartnerId || !tx.paidByPartnerId) {
           throw new AppError('Для перевода укажите партнера-отправителя и партнера-получателя', 400);
         }
+        if (!tx.acceptedByManagerId) {
+          throw new AppError('Для перевода укажите менеджера, который принимает перевод', 400);
+        }
         if (tx.acceptedByPartnerId === tx.paidByPartnerId) {
           throw new AppError('Для перевода партнер-отправитель и партнер-получатель должны отличаться', 400);
         }
       }
 
-      if (tx.transactionType === CashTransactionType.INCOME && tx.acceptedByPartnerId && tx.acceptedByManagerId) {
+      if (
+        (tx.transactionType === CashTransactionType.INCOME || tx.transactionType === CashTransactionType.TRANSFER) &&
+        tx.acceptedByPartnerId &&
+        tx.acceptedByManagerId
+      ) {
         await this.ensureManagerInClubPartner(clubId, tx.acceptedByPartnerId, tx.acceptedByManagerId);
       }
 

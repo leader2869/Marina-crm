@@ -113,7 +113,7 @@ export default function ClubCashDesk() {
             ? Number(form.acceptedByPartnerId)
             : null,
         acceptedByManagerId:
-          form.transactionType === CashTransactionType.INCOME && form.acceptedByManagerId
+          (form.transactionType === CashTransactionType.INCOME || form.transactionType === CashTransactionType.TRANSFER) && form.acceptedByManagerId
             ? Number(form.acceptedByManagerId)
             : null,
         paidByPartnerId:
@@ -241,14 +241,18 @@ export default function ClubCashDesk() {
               ))}
             </select>
           )}
-          {form.transactionType === CashTransactionType.INCOME ? (
+          {form.transactionType === CashTransactionType.INCOME || form.transactionType === CashTransactionType.TRANSFER ? (
             <select
               className="border rounded px-3 py-2"
               value={form.acceptedByManagerId}
               onChange={(e) => setForm({ ...form, acceptedByManagerId: e.target.value })}
               disabled={!form.acceptedByPartnerId}
             >
-              <option value="">Какой менеджер принял деньги</option>
+              <option value="">
+                {form.transactionType === CashTransactionType.TRANSFER
+                  ? 'Какой менеджер принимает перевод'
+                  : 'Какой менеджер принял деньги'}
+              </option>
               {partnerManagers
                 .filter((m) => String(m.partnerId) === form.acceptedByPartnerId)
                 .map((m) => (
@@ -261,7 +265,7 @@ export default function ClubCashDesk() {
             </select>
           ) : (
             <div className="border rounded px-3 py-2 text-sm text-gray-400 flex items-center">
-              Для расхода/перевода менеджер не требуется
+              Для расхода менеджер не требуется
             </div>
           )}
           {form.transactionType === CashTransactionType.TRANSFER && (
