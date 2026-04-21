@@ -39,7 +39,8 @@
     "add-budget-from-to-to-agent-orders": "ts-node src/database/add-budget-from-to-to-agent-orders.ts",
     "add-monthly-amounts-to-tariffs": "ts-node src/database/add-monthly-amounts-to-tariffs.ts",
     "add-tariff-dates": "ts-node src/database/add-tariff-dates.ts",
-    "create-club-finance-tables": "ts-node src/database/create-club-finance-tables.ts"
+    "create-club-finance-tables": "ts-node src/database/create-club-finance-tables.ts",
+    "add-cash-transfer-type": "ts-node src/database/add-cash-transfer-type.ts"
   },
   "keywords": [
     "crm",

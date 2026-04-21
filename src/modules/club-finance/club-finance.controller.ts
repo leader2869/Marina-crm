@@ -427,6 +427,14 @@ export class ClubFinanceController {
       if (transactionType === CashTransactionType.EXPENSE && !paidByPartnerId) {
         throw new AppError('Для расхода укажите, кто оплатил из своего кармана', 400);
       }
+      if (transactionType === CashTransactionType.TRANSFER) {
+        if (!acceptedByPartnerId || !paidByPartnerId) {
+          throw new AppError('Для перевода укажите партнера-отправителя и партнера-получателя', 400);
+        }
+        if (Number(acceptedByPartnerId) === Number(paidByPartnerId)) {
+          throw new AppError('Для перевода партнер-отправитель и партнер-получатель должны отличаться', 400);
+        }
+      }
 
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
       const partnerRepository = AppDataSource.getRepository(ClubPartner);
@@ -438,7 +446,7 @@ export class ClubFinanceController {
         if (!partner) throw new AppError('Партнер, принявший деньги, не найден', 404);
       }
 
-      if (acceptedByManagerId) {
+      if (acceptedByManagerId && transactionType === CashTransactionType.INCOME) {
         await this.ensureManagerInClubPartner(
           clubId,
           Number(acceptedByPartnerId),
@@ -526,6 +534,14 @@ export class ClubFinanceController {
       if (tx.transactionType === CashTransactionType.EXPENSE && !tx.paidByPartnerId) {
         throw new AppError('Для расхода укажите, кто оплатил из своего кармана', 400);
       }
+      if (tx.transactionType === CashTransactionType.TRANSFER) {
+        if (!tx.acceptedByPartnerId || !tx.paidByPartnerId) {
+          throw new AppError('Для перевода укажите партнера-отправителя и партнера-получателя', 400);
+        }
+        if (tx.acceptedByPartnerId === tx.paidByPartnerId) {
+          throw new AppError('Для перевода партнер-отправитель и партнер-получатель должны отличаться', 400);
+        }
+      }
 
       if (tx.transactionType === CashTransactionType.INCOME && tx.acceptedByPartnerId && tx.acceptedByManagerId) {
         await this.ensureManagerInClubPartner(clubId, tx.acceptedByPartnerId, tx.acceptedByManagerId);
@@ -596,8 +612,24 @@ export class ClubFinanceController {
           )
           .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
+        const transferredIn = transactions
+          .filter(
+            (tx) =>
+              tx.transactionType === CashTransactionType.TRANSFER &&
+              tx.acceptedByPartnerId === partner.id
+          )
+          .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+        const transferredOut = transactions
+          .filter(
+            (tx) =>
+              tx.transactionType === CashTransactionType.TRANSFER &&
+              tx.paidByPartnerId === partner.id
+          )
+          .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
         const entitled = (netProfit * Number(partner.sharePercent)) / 100;
-        const actualPosition = incomeAccepted - expensesPaid;
+        const actualPosition = incomeAccepted + transferredIn - expensesPaid - transferredOut;
         const settlementAmount = entitled - actualPosition;
 
         return {
@@ -606,6 +638,8 @@ export class ClubFinanceController {
           sharePercent: Number(partner.sharePercent),
           incomeAccepted,
           expensesPaid,
+          transferredIn,
+          transferredOut,
           entitled,
           actualPosition,
           settlementAmount,

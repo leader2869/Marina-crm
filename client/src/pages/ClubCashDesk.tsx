@@ -109,7 +109,7 @@ export default function ClubCashDesk() {
         description: form.description || null,
         bookingId: form.bookingId ? Number(form.bookingId) : null,
         acceptedByPartnerId:
-          form.transactionType === CashTransactionType.INCOME && form.acceptedByPartnerId
+          (form.transactionType === CashTransactionType.INCOME || form.transactionType === CashTransactionType.TRANSFER) && form.acceptedByPartnerId
             ? Number(form.acceptedByPartnerId)
             : null,
         acceptedByManagerId:
@@ -117,7 +117,7 @@ export default function ClubCashDesk() {
             ? Number(form.acceptedByManagerId)
             : null,
         paidByPartnerId:
-          form.transactionType === CashTransactionType.EXPENSE && form.paidByPartnerId
+          (form.transactionType === CashTransactionType.EXPENSE || form.transactionType === CashTransactionType.TRANSFER) && form.paidByPartnerId
             ? Number(form.paidByPartnerId)
             : null,
       })
@@ -181,6 +181,7 @@ export default function ClubCashDesk() {
           >
             <option value={CashTransactionType.INCOME}>Приход</option>
             <option value={CashTransactionType.EXPENSE}>Расход</option>
+            <option value={CashTransactionType.TRANSFER}>Перевод между партнерами</option>
           </select>
           <input
             type="number"
@@ -206,13 +207,17 @@ export default function ClubCashDesk() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {form.transactionType === CashTransactionType.INCOME ? (
+          {form.transactionType === CashTransactionType.INCOME || form.transactionType === CashTransactionType.TRANSFER ? (
             <select
               className="border rounded px-3 py-2"
               value={form.acceptedByPartnerId}
               onChange={(e) => setForm({ ...form, acceptedByPartnerId: e.target.value, acceptedByManagerId: '' })}
             >
-              <option value="">Кто принял деньги</option>
+              <option value="">
+                {form.transactionType === CashTransactionType.TRANSFER
+                  ? 'Кому перевели'
+                  : 'Кто принял деньги'}
+              </option>
               {partners.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -226,7 +231,9 @@ export default function ClubCashDesk() {
               value={form.paidByPartnerId}
               onChange={(e) => setForm({ ...form, paidByPartnerId: e.target.value })}
             >
-              <option value="">Кто оплатил из своего кармана</option>
+              <option value="">
+                Кто оплатил из своего кармана
+              </option>
               {partners.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -254,7 +261,7 @@ export default function ClubCashDesk() {
             </select>
           ) : (
             <div className="border rounded px-3 py-2 text-sm text-gray-400 flex items-center">
-              Для расхода менеджер не требуется
+              Для расхода/перевода менеджер не требуется
             </div>
           )}
           <input
@@ -315,13 +322,21 @@ export default function ClubCashDesk() {
             {transactions.map((tx) => (
               <tr key={tx.id}>
                 <td className="px-4 py-3">{new Date(tx.date).toLocaleDateString('ru-RU')}</td>
-                <td className="px-4 py-3">{tx.transactionType === CashTransactionType.INCOME ? 'Приход' : 'Расход'}</td>
+                <td className="px-4 py-3">
+                  {tx.transactionType === CashTransactionType.INCOME
+                    ? 'Приход'
+                    : tx.transactionType === CashTransactionType.EXPENSE
+                    ? 'Расход'
+                    : 'Перевод'}
+                </td>
                 <td className="px-4 py-3">{Number(tx.amount).toLocaleString('ru-RU')} ₽</td>
                 <td className="px-4 py-3">{tx.paymentMethod === CashPaymentMethod.CASH ? 'Нал' : 'Безнал'}</td>
                 <td className="px-4 py-3">
                   {tx.transactionType === CashTransactionType.INCOME
                     ? tx.acceptedByPartner?.name || '—'
-                    : tx.paidByPartner?.name || '—'}
+                    : tx.transactionType === CashTransactionType.EXPENSE
+                    ? tx.paidByPartner?.name || '—'
+                    : `${tx.paidByPartner?.name || '—'} -> ${tx.acceptedByPartner?.name || '—'}`}
                 </td>
                 <td className="px-4 py-3">
                   {tx.acceptedByManager?.user

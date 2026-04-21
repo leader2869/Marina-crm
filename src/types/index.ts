@@ -90,6 +90,7 @@ export enum Currency {
 export enum CashTransactionType {
   INCOME = 'income',   // Приход
   EXPENSE = 'expense', // Расход
+  TRANSFER = 'transfer', // Перевод между партнерами
 }
 
 export enum CashPaymentMethod {
