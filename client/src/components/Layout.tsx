@@ -90,6 +90,7 @@ export default function Layout() {
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Заполнение договоров', href: '/contract-filling', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.AGENT] },
+      { name: 'Отчеты', href: '/reports', icon: FileText, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_STAFF] },
       { name: 'Обслуживание катеров', href: '/vessel-maintenance', icon: Wrench, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Агентские заказы', href: '/agent-orders', icon: ShoppingCart, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.AGENT, UserRole.CAPTAIN, UserRole.MECHANIC, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
@@ -144,7 +145,8 @@ export default function Layout() {
         '/contract-filling': 5,
         '/bookings': 6,
         '/finances': 7,
-        '/payments': 8,
+        '/reports': 8,
+        '/payments': 9,
       }
       
       filteredItems.sort((a, b) => {
