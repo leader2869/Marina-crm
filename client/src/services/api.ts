@@ -303,6 +303,7 @@ export const clubFinanceService = {
 
   getCashTransactions: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/cash-transactions`),
   getExpectedIncomes: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/expected-incomes`),
+  getTenantReport: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/tenant-report`),
   createCashTransaction: (clubId: number, data: any) =>
     api.post(`/club-finance/clubs/${clubId}/cash-transactions`, data),
   updateCashTransaction: (clubId: number, transactionId: number, data: any) =>

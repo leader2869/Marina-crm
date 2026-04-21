@@ -16,6 +16,7 @@ router.delete('/clubs/:clubId/partner-managers/:managerId', authenticate, contro
 
 router.get('/clubs/:clubId/cash-transactions', authenticate, controller.getCashTransactions.bind(controller));
 router.get('/clubs/:clubId/expected-incomes', authenticate, controller.getExpectedIncomes.bind(controller));
+router.get('/clubs/:clubId/tenant-report', authenticate, controller.getTenantReport.bind(controller));
 router.get('/dashboard-summary', authenticate, controller.getDashboardSummary.bind(controller));
 router.post('/clubs/:clubId/cash-transactions', authenticate, controller.createCashTransaction.bind(controller));
 router.put('/clubs/:clubId/cash-transactions/:transactionId', authenticate, controller.updateCashTransaction.bind(controller));

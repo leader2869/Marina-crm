@@ -469,6 +469,109 @@ export class ClubFinanceController {
     }
   }
 
+  async getTenantReport(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      await this.ensureClubAccess(req, clubId);
+
+      const berthRepository = AppDataSource.getRepository(Berth);
+      const bookingRepository = AppDataSource.getRepository(Booking);
+      const paymentRepository = AppDataSource.getRepository(Payment);
+
+      const allBerths = await berthRepository.find({
+        where: { clubId, isAvailable: true },
+        order: { number: 'ASC' },
+      });
+
+      const occupiedBookings = await bookingRepository
+        .createQueryBuilder('booking')
+        .leftJoinAndSelect('booking.berth', 'berth')
+        .leftJoinAndSelect('booking.vesselOwner', 'vesselOwner')
+        .where('booking.clubId = :clubId', { clubId })
+        .andWhere(
+          `(
+            booking.status IN (:...statuses)
+            OR EXISTS (
+              SELECT 1
+              FROM payments p
+              WHERE p."bookingId" = booking.id
+                AND p.status IN (:...blockingPaymentStatuses)
+            )
+          )`,
+          {
+            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+            blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+          }
+        )
+        .orderBy('berth.number', 'ASC')
+        .addOrderBy('booking.createdAt', 'DESC')
+        .getMany();
+
+      const occupiedByBerth = new Map<number, Booking>();
+      for (const booking of occupiedBookings) {
+        if (!occupiedByBerth.has(booking.berthId)) {
+          occupiedByBerth.set(booking.berthId, booking);
+        }
+      }
+
+      const occupiedBerthIds = Array.from(occupiedByBerth.keys());
+      const payments = occupiedBerthIds.length
+        ? await paymentRepository.find({
+            where: {
+              bookingId: In(Array.from(occupiedByBerth.values()).map((booking) => booking.id)),
+            },
+          })
+        : [];
+
+      const paymentsByBookingId = new Map<number, Payment[]>();
+      payments.forEach((payment) => {
+        const current = paymentsByBookingId.get(payment.bookingId) || [];
+        current.push(payment);
+        paymentsByBookingId.set(payment.bookingId, current);
+      });
+
+      const occupiedItems = Array.from(occupiedByBerth.values()).map((booking) => {
+        const bookingPayments = paymentsByBookingId.get(booking.id) || [];
+        const acceptedAmount = bookingPayments
+          .filter((payment) => payment.status === PaymentStatus.PAID)
+          .reduce((sum, payment) => sum + Number(payment.amount), 0);
+        const expectedAmount = bookingPayments
+          .filter(
+            (payment) =>
+              payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.OVERDUE
+          )
+          .reduce((sum, payment) => sum + Number(payment.amount), 0);
+
+        const renterFullName = booking.vesselOwner
+          ? `${booking.vesselOwner.lastName || ''} ${booking.vesselOwner.firstName || ''}`.trim()
+          : '';
+        const renterPhone = booking.vesselOwner?.phone || null;
+
+        return {
+          berthId: booking.berthId,
+          berthNumber: booking.berth?.number || '—',
+          bookingId: booking.id,
+          renterFullName: renterFullName || '—',
+          renterPhone: renterPhone || '—',
+          acceptedAmount,
+          expectedAmount,
+        };
+      });
+
+      const freeBerthsCount = Math.max(0, allBerths.length - occupiedBerthIds.length);
+
+      res.json({
+        clubId,
+        totalBerths: allBerths.length,
+        freeBerthsCount,
+        occupiedBerthsCount: occupiedBerthIds.length,
+        occupiedItems,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getDashboardSummary(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.userId || !req.userRole) {

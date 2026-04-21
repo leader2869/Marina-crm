@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import BackButton from '../components/BackButton'
 import { clubsService, clubFinanceService } from '../services/api'
-import { CashTransactionType, Club, ClubCashTransaction } from '../types'
+import { CashTransactionType, Club, ClubCashTransaction, ClubTenantReportResponse } from '../types'
 
 type ReportType = 'all' | CashTransactionType.INCOME | CashTransactionType.EXPENSE
 
@@ -14,6 +14,7 @@ export default function Reports() {
   const [reportType, setReportType] = useState<ReportType>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [tenantReport, setTenantReport] = useState<ClubTenantReportResponse | null>(null)
 
   useEffect(() => {
     const loadClubs = async () => {
@@ -38,11 +39,17 @@ export default function Reports() {
       if (!selectedClubId) return
       try {
         setLoading(true)
-        const response = await clubFinanceService.getCashTransactions(selectedClubId)
-        const items = Array.isArray(response) ? response : response.data || []
+        const [cashResponse, tenantReportResponse] = await Promise.all([
+          clubFinanceService.getCashTransactions(selectedClubId),
+          clubFinanceService.getTenantReport(selectedClubId),
+        ])
+        const items = Array.isArray(cashResponse) ? cashResponse : cashResponse.data || []
         setTransactions(items)
+        const tenantData = tenantReportResponse as unknown as ClubTenantReportResponse
+        setTenantReport(tenantData)
       } catch (e: any) {
         setError(e?.error || e?.message || 'Ошибка загрузки операций')
+        setTenantReport(null)
       } finally {
         setLoading(false)
       }
@@ -175,6 +182,67 @@ export default function Reports() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-4 space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">Отчет по арендаторам</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gray-50 rounded p-3">
+            <p className="text-sm text-gray-500">Свободных мест</p>
+            <p className="text-xl font-semibold text-green-700">
+              {Number(tenantReport?.freeBerthsCount || 0).toLocaleString('ru-RU')}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded p-3">
+            <p className="text-sm text-gray-500">Занятых мест</p>
+            <p className="text-xl font-semibold text-blue-700">
+              {Number(tenantReport?.occupiedBerthsCount || 0).toLocaleString('ru-RU')}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded p-3">
+            <p className="text-sm text-gray-500">Всего мест</p>
+            <p className="text-xl font-semibold text-gray-900">
+              {Number(tenantReport?.totalBerths || 0).toLocaleString('ru-RU')}
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Место</th>
+                <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">ФИО</th>
+                <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Телефон</th>
+                <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Принято</th>
+                <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Ожидается</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {(tenantReport?.occupiedItems || []).map((item) => (
+                <tr key={item.bookingId}>
+                  <td className="px-4 py-3">{item.berthNumber}</td>
+                  <td className="px-4 py-3">{item.renterFullName}</td>
+                  <td className="px-4 py-3">{item.renterPhone}</td>
+                  <td className="px-4 py-3 text-green-700 font-medium">
+                    {Number(item.acceptedAmount).toLocaleString('ru-RU')} ₽
+                  </td>
+                  <td className="px-4 py-3 text-amber-700 font-medium">
+                    {Number(item.expectedAmount).toLocaleString('ru-RU')} ₽
+                  </td>
+                </tr>
+              ))}
+              {(tenantReport?.occupiedItems || []).length === 0 && (
+                <tr>
+                  <td className="px-4 py-6 text-center text-gray-500" colSpan={5}>
+                    Нет данных по занятым местам
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

@@ -510,3 +510,21 @@ export interface ClubDashboardSummary {
   clubsCount: number
 }
 
+export interface ClubTenantReportItem {
+  berthId: number
+  berthNumber: string
+  bookingId: number
+  renterFullName: string
+  renterPhone: string
+  acceptedAmount: number
+  expectedAmount: number
+}
+
+export interface ClubTenantReportResponse {
+  clubId: number
+  totalBerths: number
+  freeBerthsCount: number
+  occupiedBerthsCount: number
+  occupiedItems: ClubTenantReportItem[]
+}
+
