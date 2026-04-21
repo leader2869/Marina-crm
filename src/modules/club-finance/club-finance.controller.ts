@@ -575,10 +575,21 @@ export class ClubFinanceController {
         .createQueryBuilder('booking')
         .select('booking.berthId', 'berthId')
         .where('booking.clubId IN (:...clubIds)', { clubIds })
-        .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
-        .andWhere(':today BETWEEN booking.startDate AND booking.endDate', {
-          today: today.toISOString().slice(0, 10),
-        })
+        .andWhere(
+          `(
+            booking.status IN (:...statuses)
+            OR EXISTS (
+              SELECT 1
+              FROM payments p
+              WHERE p."bookingId" = booking.id
+                AND p.status IN (:...blockingPaymentStatuses)
+            )
+          )`,
+          {
+            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+            blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+          }
+        )
         .groupBy('booking.berthId')
         .getRawMany();
 

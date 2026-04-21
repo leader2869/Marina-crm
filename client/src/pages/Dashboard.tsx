@@ -213,13 +213,6 @@ export default function Dashboard() {
   }, [selectedClubId])
 
   const statCards = [
-    {
-      name: 'Яхт-клубы',
-      value: stats.clubs,
-      icon: Anchor,
-      color: 'bg-blue-500',
-      href: '/clubs',
-    },
     // Катера не показываем для владельца яхт-клуба
     ...(user?.role !== UserRole.CLUB_OWNER ? [{
       name: 'Катера',
@@ -228,27 +221,6 @@ export default function Dashboard() {
       color: 'bg-green-500',
       href: '/vessels',
     }] : []),
-    {
-      name: 'Брони',
-      value: stats.bookings,
-      icon: Calendar,
-      color: 'bg-yellow-500',
-      href: '/bookings',
-    },
-    {
-      name: 'Все приходы',
-      value: `${stats.totalIncome.toLocaleString()} ₽`,
-      icon: TrendingUp,
-      color: 'bg-emerald-500',
-      href: '/finances',
-    },
-    {
-      name: 'Все расходы',
-      value: `${stats.totalExpense.toLocaleString()} ₽`,
-      icon: TrendingDown,
-      color: 'bg-red-500',
-      href: '/finances',
-    },
   ]
 
   const clubFinanceCards = [
@@ -286,6 +258,13 @@ export default function Dashboard() {
       icon: Anchor,
       color: 'bg-blue-500',
       href: '/clubs',
+    },
+    {
+      name: 'Брони',
+      value: Number(stats.bookings || 0).toLocaleString('ru-RU'),
+      icon: Calendar,
+      color: 'bg-yellow-500',
+      href: '/bookings',
     },
   ]
 
@@ -469,42 +448,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Быстрые действия</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <a
-            href="/clubs"
-            className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Anchor className="h-6 w-6 text-primary-600 mb-2" />
-            <p className="font-medium text-gray-900">Управление клубами</p>
-          </a>
-          {/* Мои катера не показываем для владельца яхт-клуба */}
-          {user?.role !== UserRole.CLUB_OWNER && (
-            <a
-              href="/vessels"
-              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Ship className="h-6 w-6 text-primary-600 mb-2" />
-              <p className="font-medium text-gray-900">Мои катера</p>
-            </a>
-          )}
-          <a
-            href="/bookings"
-            className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Calendar className="h-6 w-6 text-primary-600 mb-2" />
-            <p className="font-medium text-gray-900">Брони</p>
-          </a>
-          <a
-            href="/finances"
-            className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <DollarSign className="h-6 w-6 text-primary-600 mb-2" />
-            <p className="font-medium text-gray-900">Финансы</p>
-          </a>
-        </div>
-      </div>
     </div>
   )
 }
