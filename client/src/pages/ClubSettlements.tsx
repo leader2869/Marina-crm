@@ -9,9 +9,13 @@ type SettlementItem = {
   sharePercent: number
   incomeAccepted: number
   expensesPaid: number
+  transferredIn?: number
+  transferredOut?: number
   entitled: number
   actualPosition: number
+  previousSeasonBalance: number
   settlementAmount: number
+  settlementWithPreviousSeason: number
 }
 
 export default function ClubSettlements() {
@@ -19,6 +23,7 @@ export default function ClubSettlements() {
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [totals, setTotals] = useState({ totalIncome: 0, totalExpense: 0, netProfit: 0 })
   const [settlements, setSettlements] = useState<SettlementItem[]>([])
+  const [savingPartnerId, setSavingPartnerId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -66,6 +71,27 @@ export default function ClubSettlements() {
       setSettlements(data.settlements || [])
     } catch (e: any) {
       setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки взаиморасчетов'))
+    }
+  }
+
+  const updatePreviousSeasonBalance = async (partnerId: number, value: string) => {
+    if (!selectedClubId) return
+    const parsed = Number(value || 0)
+    if (!Number.isFinite(parsed)) {
+      setError('Некорректное значение баланса прошлого сезона')
+      return
+    }
+    setSavingPartnerId(partnerId)
+    setError('')
+    try {
+      await clubFinanceService.updatePartner(selectedClubId, partnerId, {
+        previousSeasonBalance: parsed,
+      })
+      await loadSettlements(selectedClubId)
+    } catch (e: any) {
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка сохранения баланса прошлого сезона'))
+    } finally {
+      setSavingPartnerId(null)
     }
   }
 
@@ -119,7 +145,9 @@ export default function ClubSettlements() {
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Принял приходов</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Оплатил расходов</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Должно быть по доле</th>
-              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Итог взаиморасчета</th>
+              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Баланс прошлого сезона</th>
+              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Итог (текущий сезон)</th>
+              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Итог с учетом прошлого сезона</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -131,15 +159,30 @@ export default function ClubSettlements() {
                 <td className="px-4 py-3">{Number(item.expensesPaid).toLocaleString('ru-RU')} ₽</td>
                 <td className="px-4 py-3">{Number(item.entitled).toLocaleString('ru-RU')} ₽</td>
                 <td className="px-4 py-3">
+                  <input
+                    type="number"
+                    step="0.01"
+                    defaultValue={Number(item.previousSeasonBalance || 0)}
+                    className="w-40 border rounded px-2 py-1"
+                    onBlur={(e) => updatePreviousSeasonBalance(item.partnerId, e.target.value)}
+                    disabled={savingPartnerId === item.partnerId}
+                  />
+                </td>
+                <td className="px-4 py-3">
                   <span className={item.settlementAmount >= 0 ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>
                     {Number(item.settlementAmount).toLocaleString('ru-RU')} ₽
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={item.settlementWithPreviousSeason >= 0 ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>
+                    {Number(item.settlementWithPreviousSeason).toLocaleString('ru-RU')} ₽
                   </span>
                 </td>
               </tr>
             ))}
             {settlements.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
                   Нет данных для взаиморасчетов
                 </td>
               </tr>

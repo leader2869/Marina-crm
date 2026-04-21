@@ -206,7 +206,7 @@ export default function ClubCashDesk() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className={`grid grid-cols-1 ${form.transactionType === CashTransactionType.TRANSFER ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3`}>
           {form.transactionType === CashTransactionType.INCOME || form.transactionType === CashTransactionType.TRANSFER ? (
             <select
               className="border rounded px-3 py-2"
@@ -263,6 +263,20 @@ export default function ClubCashDesk() {
             <div className="border rounded px-3 py-2 text-sm text-gray-400 flex items-center">
               Для расхода/перевода менеджер не требуется
             </div>
+          )}
+          {form.transactionType === CashTransactionType.TRANSFER && (
+            <select
+              className="border rounded px-3 py-2"
+              value={form.paidByPartnerId}
+              onChange={(e) => setForm({ ...form, paidByPartnerId: e.target.value })}
+            >
+              <option value="">С кого списать</option>
+              {partners.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           )}
           <input
             className="border rounded px-3 py-2"

@@ -109,7 +109,7 @@ export class ClubFinanceController {
     try {
       const clubId = parseInt(req.params.clubId);
       await this.ensureClubOwnerOrAdmin(req, clubId);
-      const { name, sharePercent } = req.body;
+      const { name, sharePercent, previousSeasonBalance } = req.body;
 
       if (!name || !sharePercent) {
         throw new AppError('Укажите имя партнера и долю', 400);
@@ -128,6 +128,7 @@ export class ClubFinanceController {
         clubId,
         name: String(name).trim(),
         sharePercent: newShare,
+        previousSeasonBalance: Number(previousSeasonBalance || 0),
         isActive: true,
       });
       await partnerRepository.save(partner);
@@ -144,7 +145,7 @@ export class ClubFinanceController {
       const partnerId = parseInt(req.params.partnerId);
       await this.ensureClubOwnerOrAdmin(req, clubId);
 
-      const { name, sharePercent, isActive } = req.body;
+      const { name, sharePercent, isActive, previousSeasonBalance } = req.body;
       const partnerRepository = AppDataSource.getRepository(ClubPartner);
       const partner = await partnerRepository.findOne({ where: { id: partnerId, clubId } });
       if (!partner) {
@@ -167,6 +168,9 @@ export class ClubFinanceController {
       }
       if (typeof isActive !== 'undefined') {
         partner.isActive = Boolean(isActive);
+      }
+      if (typeof previousSeasonBalance !== 'undefined') {
+        partner.previousSeasonBalance = Number(previousSeasonBalance || 0);
       }
 
       await partnerRepository.save(partner);
@@ -631,6 +635,8 @@ export class ClubFinanceController {
         const entitled = (netProfit * Number(partner.sharePercent)) / 100;
         const actualPosition = incomeAccepted + transferredIn - expensesPaid - transferredOut;
         const settlementAmount = entitled - actualPosition;
+        const previousSeasonBalance = Number(partner.previousSeasonBalance || 0);
+        const settlementWithPreviousSeason = settlementAmount + previousSeasonBalance;
 
         return {
           partnerId: partner.id,
@@ -642,7 +648,9 @@ export class ClubFinanceController {
           transferredOut,
           entitled,
           actualPosition,
+          previousSeasonBalance,
           settlementAmount,
+          settlementWithPreviousSeason,
         };
       });
 

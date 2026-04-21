@@ -432,6 +432,7 @@ export interface ClubPartner {
   clubId: number
   name: string
   sharePercent: number
+  previousSeasonBalance?: number
   isActive: boolean
   createdAt: string
   updatedAt: string

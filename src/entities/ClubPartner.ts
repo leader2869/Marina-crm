@@ -22,6 +22,9 @@ export class ClubPartner {
   @Column({ type: 'decimal', precision: 5, scale: 2 })
   sharePercent: number; // доля в процентах
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  previousSeasonBalance: number; // баланс прошлого сезона (+ партнеру должны, - партнер должен)
+
   @Column({ default: true })
   isActive: boolean;
 
