@@ -63,10 +63,12 @@ export default function ClubDetails() {
   const [showRegisterModal, setShowRegisterModal] = useState(false)
   const [berthBookings, setBerthBookings] = useState<Map<number, any[]>>(new Map())
   const [bookingRules, setBookingRules] = useState<any[]>([])
+  const availableBerthIds = new Set(availableBerths.map((b) => b.id))
 
   useEffect(() => {
     if (id) {
       loadClub()
+      loadAvailableBerths()
     }
   }, [id])
 
@@ -161,6 +163,10 @@ export default function ClubDetails() {
   }
 
   const getBerthStatus = (berth: Berth) => {
+    if (!availableBerthIds.has(berth.id)) {
+      return { status: 'booked', text: 'Недоступен', color: 'text-red-600' }
+    }
+
     const bookings = berthBookings.get(berth.id)
     if (!bookings || bookings.length === 0) {
       return { status: 'available', text: 'Доступен', color: 'text-green-600' }
@@ -185,10 +191,9 @@ export default function ClubDetails() {
   }
 
   const isBerthBookable = (berth: Berth) => {
-    // Для PENDING_VALIDATION показываем все места, но только доступные можно бронировать
-    if (!berth.isAvailable) return false
-    const berthStatus = getBerthStatus(berth)
-    return berthStatus.status === 'available'
+    // Источник истины по доступности — backend endpoint /berths/club/:id/available
+    // (учитывает статусы брони и блокирующие статусы оплат).
+    return berth.isAvailable && availableBerthIds.has(berth.id)
   }
   
   // Для всех ролей (кроме гостя, который фильтруется на backend) показываем все места
