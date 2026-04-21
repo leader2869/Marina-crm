@@ -241,7 +241,6 @@ export default function ClubDetails() {
       customerFullName: '',
       customerPhone: '',
     })
-    setAvailableBerths([])
     setBookingRules([])
   }
 
@@ -330,6 +329,7 @@ export default function ClubDetails() {
 
       await loadClub()
       await loadBerthBookings()
+      await loadAvailableBerths()
       handleCloseBookingModal()
       alert('Бронирование успешно создано!')
     } catch (err: any) {

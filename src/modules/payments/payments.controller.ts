@@ -221,7 +221,7 @@ export class PaymentsController {
   async updateStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const { status, transactionId, paidDate, cashPaymentMethod, acceptedByPartnerId, acceptedByManagerId } = req.body;
+      const { status, transactionId, paidDate, paidAmount, cashPaymentMethod, acceptedByPartnerId, acceptedByManagerId } = req.body;
 
       const paymentRepository = AppDataSource.getRepository(Payment);
       const payment = await paymentRepository.findOne({
@@ -257,12 +257,65 @@ export class PaymentsController {
       }
 
       const previousStatus = payment.status;
-      payment.status = status as PaymentStatus;
-      if (transactionId) {
-        payment.transactionId = transactionId;
-      }
-      if (paidDate) {
-        payment.paidDate = new Date(paidDate);
+      let paymentForCashTx = payment;
+
+      const normalizedPaidAmount = paidAmount !== undefined && paidAmount !== null
+        ? Number(paidAmount)
+        : Number(payment.amount);
+
+      if (
+        status === PaymentStatus.PAID &&
+        previousStatus !== PaymentStatus.PAID &&
+        Number.isFinite(normalizedPaidAmount) &&
+        normalizedPaidAmount > 0 &&
+        normalizedPaidAmount < Number(payment.amount)
+      ) {
+        // Частичная оплата: текущий платеж оставляем в PENDING на остаток,
+        // а оплаченную часть фиксируем отдельным платежом.
+        const paidPart = paymentRepository.create({
+          bookingId: payment.bookingId,
+          payerId: payment.payerId,
+          amount: normalizedPaidAmount,
+          currency: payment.currency,
+          method: payment.method,
+          dueDate: payment.dueDate,
+          status: PaymentStatus.PAID,
+          paidDate: paidDate ? new Date(paidDate) : new Date(),
+          transactionId: transactionId || null,
+          notes: payment.notes,
+          penalty: 0,
+          paymentType: payment.paymentType,
+          paymentOrder: payment.paymentOrder,
+          paymentMonth: payment.paymentMonth,
+          refundedPaymentId: null,
+          externalTransactionId: null,
+        });
+        const savedPaidPart = await paymentRepository.save(paidPart);
+
+        payment.amount = Number(payment.amount) - normalizedPaidAmount;
+        payment.status = PaymentStatus.PENDING;
+        payment.paidDate = undefined as any;
+        payment.transactionId = undefined as any;
+        payment.penalty = 0;
+        await paymentRepository.save(payment);
+
+        paymentForCashTx = savedPaidPart;
+      } else {
+        if (
+          status === PaymentStatus.PAID &&
+          (!Number.isFinite(normalizedPaidAmount) || normalizedPaidAmount <= 0 || normalizedPaidAmount > Number(payment.amount))
+        ) {
+          throw new AppError('Некорректная сумма принятой оплаты', 400);
+        }
+
+        payment.status = status as PaymentStatus;
+        if (transactionId) {
+          payment.transactionId = transactionId;
+        }
+        if (paidDate) {
+          payment.paidDate = new Date(paidDate);
+        }
+        await paymentRepository.save(payment);
       }
 
       // Начисление пени за просрочку
@@ -273,8 +326,6 @@ export class PaymentsController {
         // Пример: 0.5% за каждый день просрочки
         payment.penalty = payment.amount * 0.005 * daysOverdue;
       }
-
-      await paymentRepository.save(payment);
 
       // При приеме оплаты владельцем клуба автоматически фиксируем приход в кассе клуба
       if (
@@ -330,13 +381,13 @@ export class PaymentsController {
         const cashTxRepository = AppDataSource.getRepository(ClubCashTransaction);
         const cashTx = cashTxRepository.create({
           clubId: payment.booking.clubId,
-          bookingId: payment.bookingId,
+          bookingId: paymentForCashTx.bookingId,
           transactionType: CashTransactionType.INCOME,
-          amount: Number(payment.amount),
-          currency: payment.currency || Currency.RUB,
+          amount: Number(paymentForCashTx.amount),
+          currency: paymentForCashTx.currency || Currency.RUB,
           paymentMethod: cashPaymentMethod as CashPaymentMethod,
-          date: payment.paidDate || new Date(),
-          description: `Поступление по бронированию #${payment.bookingId}, платеж #${payment.id}`,
+          date: paymentForCashTx.paidDate || new Date(),
+          description: `Поступление по бронированию #${paymentForCashTx.bookingId}, платеж #${paymentForCashTx.id}`,
           acceptedByPartnerId: normalizedAcceptedByPartnerId,
           acceptedByManagerId: normalizedAcceptedByManagerId,
           paidByPartnerId: null,

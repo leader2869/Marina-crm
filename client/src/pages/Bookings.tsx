@@ -23,6 +23,7 @@ export default function Bookings() {
     paymentMethod: CashPaymentMethod.CASH,
     acceptedByPartnerId: '',
     acceptedByManagerId: '',
+    paidAmount: '',
   })
   const [confirmingPayment, setConfirmingPayment] = useState(false)
 
@@ -211,6 +212,7 @@ export default function Bookings() {
         paymentMethod: CashPaymentMethod.CASH,
         acceptedByPartnerId: '',
         acceptedByManagerId: '',
+        paidAmount: String(payment.amount),
       })
       setPaymentModal({ booking, payment })
     } catch (error: any) {
@@ -233,12 +235,23 @@ export default function Bookings() {
       alert('Выберите менеджера, который принял оплату')
       return
     }
+    const paidAmount = Number(acceptPaymentForm.paidAmount)
+    const maxAmount = Number(paymentModal.payment.amount)
+    if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+      alert('Укажите сумму принятой оплаты')
+      return
+    }
+    if (paidAmount > maxAmount) {
+      alert('Сумма принятой оплаты не может превышать сумму платежа')
+      return
+    }
 
     setConfirmingPayment(true)
     try {
       await paymentsService.updateStatus(paymentModal.payment.id, {
         status: PaymentStatus.PAID,
         paidDate: new Date().toISOString(),
+        paidAmount,
         cashPaymentMethod: acceptPaymentForm.paymentMethod,
         acceptedByPartnerId: Number(acceptPaymentForm.acceptedByPartnerId),
         acceptedByManagerId: Number(acceptPaymentForm.acceptedByManagerId),
@@ -652,6 +665,27 @@ export default function Bookings() {
             <div className="px-5 py-4 space-y-4">
               <div className="text-sm text-gray-600">
                 Сумма: <span className="font-semibold text-gray-900">{paymentModal.payment.amount.toLocaleString('ru-RU')} {paymentModal.payment.currency}</span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Принятая сумма</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  max={Number(paymentModal.payment.amount)}
+                  className="w-full border rounded px-3 py-2"
+                  value={acceptPaymentForm.paidAmount}
+                  onChange={(e) =>
+                    setAcceptPaymentForm((prev) => ({
+                      ...prev,
+                      paidAmount: e.target.value,
+                    }))
+                  }
+                  disabled={confirmingPayment}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Если сумма меньше полной, остаток будет создан отдельным платежом в статусе "Ожидает оплаты".
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Как принята оплата</label>
