@@ -17,6 +17,12 @@ export default function ClubCashDesk() {
   const [partners, setPartners] = useState<ClubPartner[]>([])
   const [partnerManagers, setPartnerManagers] = useState<ClubPartnerManager[]>([])
   const [transactions, setTransactions] = useState<ClubCashTransaction[]>([])
+  const [filters, setFilters] = useState({
+    transactionType: 'all',
+    partnerId: 'all',
+    dateFrom: '',
+    dateTo: '',
+  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -98,6 +104,43 @@ export default function ClubCashDesk() {
         .reduce((sum, tx) => sum + Number(tx.amount), 0),
     [transactions]
   )
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((tx) => {
+      if (filters.transactionType !== 'all' && tx.transactionType !== filters.transactionType) {
+        return false
+      }
+
+      if (filters.partnerId !== 'all') {
+        const selectedPartnerId = Number(filters.partnerId)
+        const isMatchedByPartner =
+          tx.acceptedByPartnerId === selectedPartnerId || tx.paidByPartnerId === selectedPartnerId
+        if (!isMatchedByPartner) {
+          return false
+        }
+      }
+
+      if (filters.dateFrom) {
+        const txDate = new Date(tx.date)
+        const fromDate = new Date(filters.dateFrom)
+        fromDate.setHours(0, 0, 0, 0)
+        if (txDate < fromDate) {
+          return false
+        }
+      }
+
+      if (filters.dateTo) {
+        const txDate = new Date(tx.date)
+        const toDate = new Date(filters.dateTo)
+        toDate.setHours(23, 59, 59, 999)
+        if (txDate > toDate) {
+          return false
+        }
+      }
+
+      return true
+    })
+  }, [filters, transactions])
 
   const handleCreate = async () => {
     if (!selectedClubId) return
@@ -348,6 +391,48 @@ export default function ClubCashDesk() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <select
+              className="border rounded px-3 py-2"
+              value={filters.transactionType}
+              onChange={(e) => setFilters((prev) => ({ ...prev, transactionType: e.target.value }))}
+            >
+              <option value="all">Все типы</option>
+              <option value={CashTransactionType.INCOME}>Приход</option>
+              <option value={CashTransactionType.EXPENSE}>Расход</option>
+              <option value={CashTransactionType.TRANSFER}>Перевод</option>
+            </select>
+
+            <select
+              className="border rounded px-3 py-2"
+              value={filters.partnerId}
+              onChange={(e) => setFilters((prev) => ({ ...prev, partnerId: e.target.value }))}
+            >
+              <option value="all">Все партнеры</option>
+              {partners.map((partner) => (
+                <option key={partner.id} value={partner.id}>
+                  {partner.name}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              className="border rounded px-3 py-2"
+              value={filters.dateFrom}
+              onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
+            />
+
+            <input
+              type="date"
+              className="border rounded px-3 py-2"
+              value={filters.dateTo}
+              onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
+            />
+          </div>
+        </div>
+
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -362,7 +447,7 @@ export default function ClubCashDesk() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {transactions.map((tx) => (
+            {filteredTransactions.map((tx) => (
               <tr key={tx.id}>
                 <td className="px-4 py-3">{new Date(tx.date).toLocaleDateString('ru-RU')}</td>
                 <td className="px-4 py-3">
@@ -413,6 +498,13 @@ export default function ClubCashDesk() {
                 <td className="px-4 py-3">{tx.description || '—'}</td>
               </tr>
             ))}
+            {filteredTransactions.length === 0 && (
+              <tr>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={8}>
+                  По выбранным фильтрам операции не найдены
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
