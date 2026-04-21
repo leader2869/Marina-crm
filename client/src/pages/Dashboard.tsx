@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { clubsService, bookingsService, vesselsService, vesselOwnerCashesService } from '../services/api'
-import { UserRole, BookingStatus, Vessel } from '../types'
-import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet } from 'lucide-react'
+import { clubsService, bookingsService, clubFinanceService, vesselsService, vesselOwnerCashesService } from '../services/api'
+import { ClubDashboardSummary, UserRole, BookingStatus, Vessel } from '../types'
+import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet, Receipt, Users } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 
@@ -17,6 +17,7 @@ export default function Dashboard() {
     totalIncome: 0,
     totalExpense: 0,
   })
+  const [clubDashboard, setClubDashboard] = useState<ClubDashboardSummary | null>(null)
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
@@ -153,6 +154,21 @@ export default function Dashboard() {
           totalIncome,
           totalExpense,
         })
+
+        if (
+          user?.role === UserRole.CLUB_OWNER ||
+          user?.role === UserRole.CLUB_STAFF ||
+          user?.role === UserRole.SUPER_ADMIN ||
+          user?.role === UserRole.ADMIN
+        ) {
+          try {
+            const summary = await clubFinanceService.getDashboardSummary()
+            setClubDashboard(summary as unknown as ClubDashboardSummary)
+          } catch (error) {
+            console.error('Ошибка загрузки клубной сводки дашборда:', error)
+            setClubDashboard(null)
+          }
+        }
       } catch (error) {
         console.error('Ошибка загрузки статистики:', error)
       } finally {
@@ -168,6 +184,7 @@ export default function Dashboard() {
       value: stats.clubs,
       icon: Anchor,
       color: 'bg-blue-500',
+      href: '/clubs',
     },
     // Катера не показываем для владельца яхт-клуба
     ...(user?.role !== UserRole.CLUB_OWNER ? [{
@@ -175,24 +192,59 @@ export default function Dashboard() {
       value: stats.vessels,
       icon: Ship,
       color: 'bg-green-500',
+      href: '/vessels',
     }] : []),
     {
       name: 'Брони',
       value: stats.bookings,
       icon: Calendar,
       color: 'bg-yellow-500',
+      href: '/bookings',
     },
     {
       name: 'Все приходы',
       value: `${stats.totalIncome.toLocaleString()} ₽`,
       icon: TrendingUp,
       color: 'bg-emerald-500',
+      href: '/finances',
     },
     {
       name: 'Все расходы',
       value: `${stats.totalExpense.toLocaleString()} ₽`,
       icon: TrendingDown,
       color: 'bg-red-500',
+      href: '/finances',
+    },
+  ]
+
+  const clubFinanceCards = [
+    {
+      name: 'Общий приход',
+      value: `${Number(clubDashboard?.totalIncome || 0).toLocaleString('ru-RU')} ₽`,
+      icon: TrendingUp,
+      color: 'bg-emerald-500',
+      href: '/club-cash',
+    },
+    {
+      name: 'Дебиторка',
+      value: `${Number(clubDashboard?.receivablesAmount || 0).toLocaleString('ru-RU')} ₽`,
+      icon: Receipt,
+      color: 'bg-red-500',
+      href: '/club-expected-incomes',
+    },
+    {
+      name: 'Ожидаемый приход',
+      value: `${Number(clubDashboard?.expectedIncomeAmount || 0).toLocaleString('ru-RU')} ₽`,
+      icon: DollarSign,
+      color: 'bg-indigo-500',
+      href: '/club-expected-incomes',
+    },
+    {
+      name: 'Свободные места',
+      value: Number(clubDashboard?.freeBerthsCount || 0).toLocaleString('ru-RU'),
+      icon: Anchor,
+      color: 'bg-blue-500',
+      href: '/clubs',
     },
   ]
 
@@ -216,7 +268,11 @@ export default function Dashboard() {
         {statCards.map((stat) => {
           const Icon = stat.icon
           return (
-            <div key={stat.name} className="bg-white rounded-lg shadow p-6">
+            <button
+              key={stat.name}
+              onClick={() => navigate(stat.href)}
+              className="bg-white rounded-lg shadow p-6 w-full text-left hover:shadow-md transition-shadow"
+            >
               <div className="flex items-center">
                 <div className={`${stat.color} p-3 rounded-lg`}>
                   <Icon className="h-6 w-6 text-white" />
@@ -226,10 +282,64 @@ export default function Dashboard() {
                   <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                 </div>
               </div>
-            </div>
+            </button>
           )
         })}
       </div>
+
+      {(user?.role === UserRole.CLUB_OWNER ||
+        user?.role === UserRole.CLUB_STAFF ||
+        user?.role === UserRole.SUPER_ADMIN ||
+        user?.role === UserRole.ADMIN) && (
+        <>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {clubFinanceCards.map((stat) => {
+              const Icon = stat.icon
+              return (
+                <button
+                  key={stat.name}
+                  onClick={() => navigate(stat.href)}
+                  className="bg-white rounded-lg shadow p-6 w-full text-left hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center">
+                    <div className={`${stat.color} p-3 rounded-lg`}>
+                      <Icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">{stat.name}</p>
+                      <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+              <Users className="h-6 w-6 text-primary-600 mr-2" />
+              Доход каждого партнера
+            </h2>
+            <div className="space-y-3">
+              {(clubDashboard?.partnerIncomes || []).map((partner) => (
+                <div
+                  key={partner.partnerId}
+                  onClick={() => navigate('/club-partners')}
+                  className="flex items-center justify-between border border-gray-100 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50"
+                >
+                  <span className="text-gray-800 font-medium">{partner.partnerName}</span>
+                  <span className="text-emerald-700 font-semibold">
+                    {Number(partner.incomeAmount).toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+              ))}
+              {(clubDashboard?.partnerIncomes || []).length === 0 && (
+                <p className="text-gray-500">Нет данных по доходу партнеров</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Балансы катеров для судовладельца */}
       {user?.role === UserRole.VESSEL_OWNER && vessels.length > 0 && (

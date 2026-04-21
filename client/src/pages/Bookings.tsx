@@ -1,4 +1,4 @@
-import { useEffect, useState, Fragment } from 'react'
+import { useEffect, useMemo, useState, Fragment } from 'react'
 import { bookingsService, paymentsService, clubFinanceService } from '../services/api'
 import { Booking, UserRole, BookingStatus, Payment, PaymentStatus, CashPaymentMethod, ClubPartner, ClubPartnerManager } from '../types'
 import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2, CheckCircle2 } from 'lucide-react'
@@ -275,6 +275,24 @@ export default function Bookings() {
     return match?.[1]?.trim() || null
   }
 
+  const extractBerthSortNumber = (berthNumber: string | undefined): number => {
+    if (!berthNumber) return Number.MAX_SAFE_INTEGER
+    const match = berthNumber.match(/\d+/)
+    return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER
+  }
+
+  const sortedBookings = useMemo(() => {
+    return [...bookings].sort((a, b) => {
+      const berthA = a.berth?.number || ''
+      const berthB = b.berth?.number || ''
+      const numA = extractBerthSortNumber(berthA)
+      const numB = extractBerthSortNumber(berthB)
+
+      if (numA !== numB) return numA - numB
+      return berthA.localeCompare(berthB, 'ru')
+    })
+  }, [bookings])
+
   if (loading) {
     return <LoadingAnimation message="Загрузка бронирований..." />
   }
@@ -316,7 +334,7 @@ export default function Bookings() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {bookings.map((booking) => {
+            {sortedBookings.map((booking) => {
               const isExpanded = expandedBookings.has(booking.id)
               return (
                 <Fragment key={booking.id}>

@@ -286,6 +286,7 @@ export const agentOrdersService = {
 }
 
 export const clubFinanceService = {
+  getDashboardSummary: () => api.get('/club-finance/dashboard-summary'),
   getPartners: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/partners`),
   createPartner: (clubId: number, data: any) => api.post(`/club-finance/clubs/${clubId}/partners`, data),
   updatePartner: (clubId: number, partnerId: number, data: any) =>

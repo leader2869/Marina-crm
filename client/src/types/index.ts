@@ -493,3 +493,19 @@ export interface ClubExpectedIncomesResponse {
   items: ClubExpectedIncomeItem[]
 }
 
+export interface ClubPartnerIncomeSummary {
+  partnerId: number
+  partnerName: string
+  clubId: number
+  incomeAmount: number
+}
+
+export interface ClubDashboardSummary {
+  totalIncome: number
+  partnerIncomes: ClubPartnerIncomeSummary[]
+  receivablesAmount: number
+  expectedIncomeAmount: number
+  freeBerthsCount: number
+  clubsCount: number
+}
+

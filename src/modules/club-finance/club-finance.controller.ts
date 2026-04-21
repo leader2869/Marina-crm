@@ -1,5 +1,6 @@
 import { NextFunction, Response } from 'express';
 import { AppDataSource } from '../../config/database';
+import { In } from 'typeorm';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { Club } from '../../entities/Club';
@@ -8,10 +9,12 @@ import { ClubCashTransaction } from '../../entities/ClubCashTransaction';
 import { ClubPartnerManager } from '../../entities/ClubPartnerManager';
 import { User } from '../../entities/User';
 import { UserClub } from '../../entities/UserClub';
+import { Berth } from '../../entities/Berth';
+import { Booking } from '../../entities/Booking';
 import { Payment } from '../../entities/Payment';
 import { BookingStatus, CashPaymentMethod, CashTransactionType, Currency, PaymentStatus, UserRole } from '../../types';
 import { hashPassword } from '../../utils/password';
-import { userHasAccessToClub } from '../../utils/clubStaffAccess';
+import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
 
 export class ClubFinanceController {
   private async ensureClubAccess(req: AuthRequest, clubId: number): Promise<Club> {
@@ -460,6 +463,131 @@ export class ClubFinanceController {
         totalExpectedAmount,
         overdueAmount,
         items,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDashboardSummary(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.userId || !req.userRole) {
+        throw new AppError('Требуется аутентификация', 401);
+      }
+
+      const clubRepository = AppDataSource.getRepository(Club);
+      let clubIds: number[] = [];
+
+      if (req.userRole === UserRole.SUPER_ADMIN || req.userRole === UserRole.ADMIN) {
+        const clubs = await clubRepository.find({ select: ['id'] });
+        clubIds = clubs.map((club) => club.id);
+      } else if (req.userRole === UserRole.CLUB_OWNER) {
+        const clubs = await clubRepository.find({ where: { ownerId: req.userId }, select: ['id'] });
+        clubIds = clubs.map((club) => club.id);
+      } else if (req.userRole === UserRole.CLUB_STAFF) {
+        clubIds = await getClubIdsForStaffUser(req.userId);
+      } else {
+        throw new AppError('Доступ запрещен', 403);
+      }
+
+      if (clubIds.length === 0) {
+        res.json({
+          totalIncome: 0,
+          partnerIncomes: [],
+          receivablesAmount: 0,
+          expectedIncomeAmount: 0,
+          freeBerthsCount: 0,
+          clubsCount: 0,
+        });
+        return;
+      }
+
+      const txRepository = AppDataSource.getRepository(ClubCashTransaction);
+      const partnerRepository = AppDataSource.getRepository(ClubPartner);
+      const paymentRepository = AppDataSource.getRepository(Payment);
+      const berthRepository = AppDataSource.getRepository(Berth);
+      const bookingRepository = AppDataSource.getRepository(Booking);
+
+      const transactions = await txRepository.find({
+        where: { clubId: In(clubIds) },
+      });
+      const partners = await partnerRepository.find({
+        where: { clubId: In(clubIds), isActive: true },
+      });
+
+      const totalIncome = transactions
+        .filter((tx) => tx.transactionType === CashTransactionType.INCOME)
+        .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+      const partnerIncomes = partners
+        .map((partner) => {
+          const incomeAmount = transactions
+            .filter(
+              (tx) =>
+                tx.transactionType === CashTransactionType.INCOME &&
+                tx.acceptedByPartnerId === partner.id
+            )
+            .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+          return {
+            partnerId: partner.id,
+            partnerName: partner.name,
+            clubId: partner.clubId,
+            incomeAmount,
+          };
+        })
+        .sort((a, b) => b.incomeAmount - a.incomeAmount);
+
+      const expectedPayments = await paymentRepository
+        .createQueryBuilder('payment')
+        .leftJoin('payment.booking', 'booking')
+        .where('booking.clubId IN (:...clubIds)', { clubIds })
+        .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
+        .andWhere('payment.status IN (:...paymentStatuses)', {
+          paymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+        })
+        .getMany();
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const expectedIncomeAmount = expectedPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+      const receivablesAmount = expectedPayments
+        .filter((payment) => {
+          const dueDate = new Date(payment.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
+          return payment.status === PaymentStatus.OVERDUE || dueDate < today;
+        })
+        .reduce((sum, payment) => sum + Number(payment.amount), 0);
+
+      const availableBerths = await berthRepository.count({
+        where: {
+          clubId: In(clubIds),
+          isAvailable: true,
+        },
+      });
+
+      const occupiedBerthRows = await bookingRepository
+        .createQueryBuilder('booking')
+        .select('booking.berthId', 'berthId')
+        .where('booking.clubId IN (:...clubIds)', { clubIds })
+        .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
+        .andWhere(':today BETWEEN booking.startDate AND booking.endDate', {
+          today: today.toISOString().slice(0, 10),
+        })
+        .groupBy('booking.berthId')
+        .getRawMany();
+
+      const occupiedBerthsCount = occupiedBerthRows.length;
+      const freeBerthsCount = Math.max(0, availableBerths - occupiedBerthsCount);
+
+      res.json({
+        totalIncome,
+        partnerIncomes,
+        receivablesAmount,
+        expectedIncomeAmount,
+        freeBerthsCount,
+        clubsCount: clubIds.length,
       });
     } catch (error) {
       next(error);
