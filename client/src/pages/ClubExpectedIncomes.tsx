@@ -7,10 +7,9 @@ export default function ClubExpectedIncomes() {
   const [clubs, setClubs] = useState<Club[]>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [items, setItems] = useState<ClubExpectedIncomeItem[]>([])
-  const [totalExpectedAmount, setTotalExpectedAmount] = useState<number>(0)
-  const [overdueAmount, setOverdueAmount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>('all')
 
   const formatAmount = (amount: number) =>
     Number(amount).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -37,13 +36,9 @@ export default function ClubExpectedIncomes() {
       setError('')
       const response = (await clubFinanceService.getExpectedIncomes(clubId)) as unknown as ClubExpectedIncomesResponse
       setItems(response.items || [])
-      setTotalExpectedAmount(Number(response.totalExpectedAmount || 0))
-      setOverdueAmount(Number(response.overdueAmount || 0))
     } catch (e: any) {
       setError(e?.error || e?.message || 'Ошибка загрузки ожидаемых приходов')
       setItems([])
-      setTotalExpectedAmount(0)
-      setOverdueAmount(0)
     } finally {
       setLoading(false)
     }
@@ -55,12 +50,53 @@ export default function ClubExpectedIncomes() {
 
   useEffect(() => {
     if (!selectedClubId) return
+    setSelectedMonthKey('all')
     loadExpectedIncomes(selectedClubId)
   }, [selectedClubId])
 
+  const monthOptions = useMemo(() => {
+    const monthMap = new Map<string, string>()
+    items.forEach((item) => {
+      const date = new Date(item.dueDate)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      if (!monthMap.has(monthKey)) {
+        monthMap.set(
+          monthKey,
+          date.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+        )
+      }
+    })
+
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => (a > b ? 1 : -1))
+      .map(([key, label]) => ({ key, label }))
+  }, [items])
+
+  const visibleItems = useMemo(() => {
+    if (selectedMonthKey === 'all') return items
+    return items.filter((item) => {
+      const date = new Date(item.dueDate)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      return monthKey === selectedMonthKey
+    })
+  }, [items, selectedMonthKey])
+
+  const visibleTotalAmount = useMemo(
+    () => visibleItems.reduce((sum, item) => sum + Number(item.amount), 0),
+    [visibleItems]
+  )
+
+  const visibleOverdueAmount = useMemo(
+    () =>
+      visibleItems
+        .filter((item) => item.isOverdue || item.status === PaymentStatus.OVERDUE)
+        .reduce((sum, item) => sum + Number(item.amount), 0),
+    [visibleItems]
+  )
+
   const notOverdueAmount = useMemo(
-    () => items.filter((item) => !item.isOverdue).reduce((sum, item) => sum + Number(item.amount), 0),
-    [items]
+    () => visibleItems.filter((item) => !item.isOverdue).reduce((sum, item) => sum + Number(item.amount), 0),
+    [visibleItems]
   )
 
   if (loading && clubs.length === 0) return <div className="p-6">Загрузка...</div>
@@ -95,11 +131,11 @@ export default function ClubExpectedIncomes() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-gray-500 text-sm">Всего ожидаем</p>
-          <p className="text-2xl font-semibold text-primary-700">{formatAmount(totalExpectedAmount)} ₽</p>
+          <p className="text-2xl font-semibold text-primary-700">{formatAmount(visibleTotalAmount)} ₽</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-gray-500 text-sm">Просрочено</p>
-          <p className="text-2xl font-semibold text-red-700">{formatAmount(overdueAmount)} ₽</p>
+          <p className="text-2xl font-semibold text-red-700">{formatAmount(visibleOverdueAmount)} ₽</p>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-gray-500 text-sm">Ожидается в срок</p>
@@ -108,6 +144,33 @@ export default function ClubExpectedIncomes() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedMonthKey('all')}
+            className={`px-3 py-1.5 rounded text-sm ${
+              selectedMonthKey === 'all'
+                ? 'bg-primary-600 text-white'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            Все месяцы
+          </button>
+          {monthOptions.map((month) => (
+            <button
+              key={month.key}
+              type="button"
+              onClick={() => setSelectedMonthKey(month.key)}
+              className={`px-3 py-1.5 rounded text-sm capitalize ${
+                selectedMonthKey === month.key
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              {month.label}
+            </button>
+          ))}
+        </div>
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -121,7 +184,7 @@ export default function ClubExpectedIncomes() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <tr key={item.paymentId}>
                 <td className="px-4 py-3">{new Date(item.dueDate).toLocaleDateString('ru-RU')}</td>
                 <td className="px-4 py-3">
@@ -138,7 +201,7 @@ export default function ClubExpectedIncomes() {
                 <td className="px-4 py-3">#{item.bookingId}</td>
               </tr>
             ))}
-            {items.length === 0 && (
+            {visibleItems.length === 0 && (
               <tr>
                 <td className="px-4 py-6 text-center text-gray-500" colSpan={7}>
                   Нет ожидаемых приходов
