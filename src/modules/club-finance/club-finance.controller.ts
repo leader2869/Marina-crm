@@ -486,6 +486,7 @@ export class ClubFinanceController {
       const occupiedBookings = await bookingRepository
         .createQueryBuilder('booking')
         .leftJoinAndSelect('booking.berth', 'berth')
+        .leftJoinAndSelect('booking.vessel', 'vessel')
         .leftJoinAndSelect('booking.vesselOwner', 'vesselOwner')
         .where('booking.clubId = :clubId', { clubId })
         .andWhere(
@@ -542,10 +543,28 @@ export class ClubFinanceController {
           )
           .reduce((sum, payment) => sum + Number(payment.amount), 0);
 
-        const renterFullName = booking.vesselOwner
+        let renterFullName = booking.vesselOwner
           ? `${booking.vesselOwner.lastName || ''} ${booking.vesselOwner.firstName || ''}`.trim()
           : '';
-        const renterPhone = booking.vesselOwner?.phone || null;
+        let renterPhone = booking.vesselOwner?.phone || null;
+
+        // Для ручной брони владельцем клуба показываем ФИО/телефон клиента из технических данных судна.
+        if (booking.vessel?.type === 'manual_booking' && booking.vessel.technicalSpecs) {
+          try {
+            const technicalSpecs = JSON.parse(booking.vessel.technicalSpecs) as {
+              source?: string;
+              customerFullName?: string;
+              customerPhone?: string;
+            };
+
+            if (technicalSpecs.source === 'club_owner_manual_booking') {
+              renterFullName = technicalSpecs.customerFullName?.trim() || renterFullName;
+              renterPhone = technicalSpecs.customerPhone?.trim() || renterPhone;
+            }
+          } catch {
+            // Игнорируем ошибки разбора JSON, используем fallback на владельца судна.
+          }
+        }
 
         return {
           berthId: booking.berthId,
