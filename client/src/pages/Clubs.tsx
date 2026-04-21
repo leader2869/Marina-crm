@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { clubsService, bookingsService } from '../services/api'
+import { clubsService, bookingsService, berthsService } from '../services/api'
 import { Club, UserRole, Booking } from '../types'
 import { Anchor, MapPin, Phone, Mail, Globe, Plus, Trash2, Download, X, EyeOff, Eye, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -23,6 +23,20 @@ function FreeBerthsCount({ club, user }: { club: Club; user: any }) {
       }
 
       try {
+        // Источник истины по доступным местам — backend endpoint /berths/club/:id/available
+        // (учитывает занятые брони и блокировки по неоплаченным платежам).
+        try {
+          const availableBerthsRes = await berthsService.getAvailableByClub(club.id)
+          const availableBerths = (availableBerthsRes as any)?.data || availableBerthsRes || []
+          if (Array.isArray(availableBerths)) {
+            setCount(availableBerths.length)
+            return
+          }
+        } catch (availableError) {
+          // Если endpoint временно недоступен, используем текущий fallback ниже.
+          console.error(`Ошибка загрузки доступных мест для клуба ${club.id}:`, availableError)
+        }
+
         let clubBookings: Booking[] = []
         
         // Для гостя, VESSEL_OWNER и PENDING_VALIDATION загружаем бронирования клуба через getByClub
