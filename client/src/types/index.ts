@@ -502,6 +502,7 @@ export interface ClubPartnerIncomeSummary {
 
 export interface ClubDashboardSummary {
   totalIncome: number
+  totalExpense: number
   partnerIncomes: ClubPartnerIncomeSummary[]
   receivablesAmount: number
   expectedIncomeAmount: number

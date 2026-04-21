@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { clubsService, bookingsService, clubFinanceService, vesselsService, vesselOwnerCashesService } from '../services/api'
 import { ClubDashboardSummary, UserRole, BookingStatus, Vessel } from '../types'
-import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet, Receipt, Users } from 'lucide-react'
+import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet, Receipt } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 
@@ -18,6 +18,9 @@ export default function Dashboard() {
     totalExpense: 0,
   })
   const [clubDashboard, setClubDashboard] = useState<ClubDashboardSummary | null>(null)
+  const [clubList, setClubList] = useState<Array<{ id: number; name: string }>>([])
+  const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
+  const [clubSettlements, setClubSettlements] = useState<any[]>([])
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
@@ -58,12 +61,28 @@ export default function Dashboard() {
         // Для суперадмина и администратора загружаем все опубликованные клубы
         // Для остальных ролей загружаем с минимальным лимитом (нужен только total)
         const isSuperAdminOrAdmin = user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN
-        const clubsParams = isSuperAdminOrAdmin ? { limit: 1000 } : { limit: 1 }
+        const isClubRole =
+          user?.role === UserRole.CLUB_OWNER ||
+          user?.role === UserRole.CLUB_STAFF ||
+          isSuperAdminOrAdmin
+        const clubsParams = isClubRole ? { limit: 200 } : isSuperAdminOrAdmin ? { limit: 1000 } : { limit: 1 }
         
         const [clubsRes, bookingsRes] = await Promise.all([
           clubsService.getAll(clubsParams),
           bookingsService.getAll({ limit: 1000 }), // Загружаем все бронирования для подсчета уникальных клубов
         ])
+
+        if (isClubRole) {
+          const allClubs = (clubsRes as any)?.data || []
+          const mapped = (Array.isArray(allClubs) ? allClubs : []).map((c: any) => ({ id: c.id, name: c.name }))
+          setClubList(mapped)
+          if (mapped.length > 0) {
+            setSelectedClubId((prev) => prev ?? mapped[0].id)
+          }
+        } else {
+          setClubList([])
+          setSelectedClubId(null)
+        }
 
         // Для супер-администратора загружаем все судна, для остальных - только свои
         let vesselsCount = 0
@@ -178,6 +197,21 @@ export default function Dashboard() {
     loadStats()
   }, [user])
 
+  useEffect(() => {
+    const loadSettlements = async () => {
+      if (!selectedClubId) return
+      try {
+        const response = await clubFinanceService.getSettlements(selectedClubId)
+        const data = response as any
+        setClubSettlements(data?.settlements || [])
+      } catch (error) {
+        console.error('Ошибка загрузки взаиморасчетов для дашборда:', error)
+        setClubSettlements([])
+      }
+    }
+    loadSettlements()
+  }, [selectedClubId])
+
   const statCards = [
     {
       name: 'Яхт-клубы',
@@ -219,10 +253,17 @@ export default function Dashboard() {
 
   const clubFinanceCards = [
     {
-      name: 'Общий приход',
+      name: 'Собрано денег',
       value: `${Number(clubDashboard?.totalIncome || 0).toLocaleString('ru-RU')} ₽`,
       icon: TrendingUp,
       color: 'bg-emerald-500',
+      href: '/club-cash',
+    },
+    {
+      name: 'Расходы всего',
+      value: `${Number((clubDashboard as any)?.totalExpense || 0).toLocaleString('ru-RU')} ₽`,
+      icon: TrendingDown,
+      color: 'bg-orange-500',
       href: '/club-cash',
     },
     {
@@ -292,7 +333,7 @@ export default function Dashboard() {
         user?.role === UserRole.SUPER_ADMIN ||
         user?.role === UserRole.ADMIN) && (
         <>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
             {clubFinanceCards.map((stat) => {
               const Icon = stat.icon
               return (
@@ -316,26 +357,67 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <Users className="h-6 w-6 text-primary-600 mr-2" />
-              Доход каждого партнера
-            </h2>
-            <div className="space-y-3">
-              {(clubDashboard?.partnerIncomes || []).map((partner) => (
-                <div
-                  key={partner.partnerId}
-                  onClick={() => navigate('/club-partners')}
-                  className="flex items-center justify-between border border-gray-100 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50"
+            <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+              <h2 className="text-xl font-semibold text-gray-900">Взаиморасчеты партнеров</h2>
+              {clubList.length > 0 && (
+                <select
+                  className="border rounded px-3 py-2"
+                  value={selectedClubId || ''}
+                  onChange={(e) => setSelectedClubId(Number(e.target.value))}
                 >
-                  <span className="text-gray-800 font-medium">{partner.partnerName}</span>
-                  <span className="text-emerald-700 font-semibold">
-                    {Number(partner.incomeAmount).toLocaleString('ru-RU')} ₽
-                  </span>
-                </div>
-              ))}
-              {(clubDashboard?.partnerIncomes || []).length === 0 && (
-                <p className="text-gray-500">Нет данных по доходу партнеров</p>
+                  {clubList.map((club) => (
+                    <option key={club.id} value={club.id}>
+                      {club.name}
+                    </option>
+                  ))}
+                </select>
               )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Партнер</th>
+                    <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Доля</th>
+                    <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Принял приходов</th>
+                    <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Оплатил расходов</th>
+                    <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Должно быть по доле</th>
+                    <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Баланс прошлого сезона</th>
+                    <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Итог (сезон)</th>
+                    <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Итог (с учетом прошлого)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {clubSettlements.map((item: any) => (
+                    <tr key={item.partnerId}>
+                      <td className="px-4 py-3">{item.partnerName}</td>
+                      <td className="px-4 py-3">{Number(item.sharePercent).toFixed(2)}%</td>
+                      <td className="px-4 py-3">{Number(item.incomeAccepted).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-4 py-3">{Number(item.expensesPaid).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-4 py-3">{Number(item.entitled).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-4 py-3">{Number(item.previousSeasonBalance || 0).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-4 py-3">
+                        <span className={Number(item.settlementAmount) >= 0 ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>
+                          {Number(item.settlementAmount).toLocaleString('ru-RU')} ₽
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={Number(item.settlementWithPreviousSeason) >= 0 ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>
+                          {Number(item.settlementWithPreviousSeason).toLocaleString('ru-RU')} ₽
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {clubSettlements.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
+                        Нет данных для взаиморасчетов
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </>

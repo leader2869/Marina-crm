@@ -519,6 +519,10 @@ export class ClubFinanceController {
         .filter((tx) => tx.transactionType === CashTransactionType.INCOME)
         .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
+      const totalExpense = transactions
+        .filter((tx) => tx.transactionType === CashTransactionType.EXPENSE)
+        .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
       const partnerIncomes = partners
         .map((partner) => {
           const incomeAmount = transactions
@@ -583,6 +587,7 @@ export class ClubFinanceController {
 
       res.json({
         totalIncome,
+        totalExpense,
         partnerIncomes,
         receivablesAmount,
         expectedIncomeAmount,
