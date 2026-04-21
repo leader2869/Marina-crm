@@ -301,6 +301,7 @@ export const clubFinanceService = {
     api.delete(`/club-finance/clubs/${clubId}/partner-managers/${managerId}`),
 
   getCashTransactions: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/cash-transactions`),
+  getExpectedIncomes: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/expected-incomes`),
   createCashTransaction: (clubId: number, data: any) =>
     api.post(`/club-finance/clubs/${clubId}/cash-transactions`, data),
   updateCashTransaction: (clubId: number, transactionId: number, data: any) =>

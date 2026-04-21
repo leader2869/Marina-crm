@@ -472,3 +472,24 @@ export interface ClubCashTransaction {
   updatedAt: string
 }
 
+export interface ClubExpectedIncomeItem {
+  paymentId: number
+  bookingId: number
+  amount: number
+  status: PaymentStatus
+  dueDate: string
+  paymentType?: string | null
+  vesselName?: string | null
+  berthNumber?: string | null
+  vesselOwnerName?: string | null
+  isOverdue: boolean
+  daysUntilDue: number
+}
+
+export interface ClubExpectedIncomesResponse {
+  clubId: number
+  totalExpectedAmount: number
+  overdueAmount: number
+  items: ClubExpectedIncomeItem[]
+}
+

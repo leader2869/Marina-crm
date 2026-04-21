@@ -8,7 +8,8 @@ import { ClubCashTransaction } from '../../entities/ClubCashTransaction';
 import { ClubPartnerManager } from '../../entities/ClubPartnerManager';
 import { User } from '../../entities/User';
 import { UserClub } from '../../entities/UserClub';
-import { CashPaymentMethod, CashTransactionType, Currency, UserRole } from '../../types';
+import { Payment } from '../../entities/Payment';
+import { BookingStatus, CashPaymentMethod, CashTransactionType, Currency, PaymentStatus, UserRole } from '../../types';
 import { hashPassword } from '../../utils/password';
 import { userHasAccessToClub } from '../../utils/clubStaffAccess';
 
@@ -394,6 +395,72 @@ export class ClubFinanceController {
       });
 
       res.json(transactions);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getExpectedIncomes(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      await this.ensureClubAccess(req, clubId);
+
+      const paymentRepository = AppDataSource.getRepository(Payment);
+      const payments = await paymentRepository
+        .createQueryBuilder('payment')
+        .leftJoinAndSelect('payment.booking', 'booking')
+        .leftJoinAndSelect('booking.berth', 'berth')
+        .leftJoinAndSelect('booking.vessel', 'vessel')
+        .leftJoinAndSelect('booking.vesselOwner', 'vesselOwner')
+        .where('booking.clubId = :clubId', { clubId })
+        .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
+        .andWhere('payment.status IN (:...paymentStatuses)', {
+          paymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+        })
+        .orderBy('payment.dueDate', 'ASC')
+        .addOrderBy('payment.createdAt', 'ASC')
+        .getMany();
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const items = payments.map((payment) => {
+        const dueDate = new Date(payment.dueDate);
+        dueDate.setHours(0, 0, 0, 0);
+        const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const isOverdue = daysUntilDue < 0;
+
+        return {
+          paymentId: payment.id,
+          bookingId: payment.bookingId,
+          amount: Number(payment.amount),
+          status: payment.status,
+          dueDate: payment.dueDate,
+          paymentType: payment.paymentType,
+          vesselName: payment.booking?.vessel?.name || null,
+          berthNumber: payment.booking?.berth?.number || null,
+          vesselOwnerName:
+            payment.booking?.vesselOwner
+              ? `${payment.booking.vesselOwner.lastName || ''} ${payment.booking.vesselOwner.firstName || ''}`.trim() ||
+                payment.booking.vesselOwner.email ||
+                null
+              : null,
+          isOverdue,
+          daysUntilDue,
+        };
+      });
+
+      const totalExpectedAmount = items.reduce((sum, item) => sum + Number(item.amount), 0);
+      const overdueAmount = items
+        .filter((item) => item.isOverdue || item.status === PaymentStatus.OVERDUE)
+        .reduce((sum, item) => sum + Number(item.amount), 0);
+
+      res.json({
+        clubId,
+        totalExpectedAmount,
+        overdueAmount,
+        items,
+      });
     } catch (error) {
       next(error);
     }

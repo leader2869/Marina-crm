@@ -63,6 +63,14 @@ export default function Finances() {
       availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
     },
     {
+      name: 'Ожидаемые приходы',
+      href: '/club-expected-incomes',
+      icon: TrendingUp,
+      description: 'Ожидаемые оплаты по текущим бронированиям',
+      color: 'bg-emerald-500',
+      availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    },
+    {
       name: 'Взаиморасчеты',
       href: '/club-settlements',
       icon: TrendingDown,
