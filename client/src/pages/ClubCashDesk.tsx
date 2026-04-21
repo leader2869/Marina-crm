@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { clubsService, clubFinanceService } from '../services/api'
-import { CashPaymentMethod, CashTransactionType, Club, ClubCashTransaction, ClubPartner, ClubPartnerManager } from '../types'
+import { CashPaymentMethod, CashTransactionType, Club, ClubCashTransaction, ClubPartner, ClubPartnerManager, UserRole } from '../types'
 import BackButton from '../components/BackButton'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function ClubCashDesk() {
+  const { user } = useAuth()
+  const canEditCash =
+    !!user &&
+    (user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.CLUB_OWNER)
   const [clubs, setClubs] = useState<Club[]>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [partners, setPartners] = useState<ClubPartner[]>([])
@@ -142,6 +149,12 @@ export default function ClubCashDesk() {
 
       {error && <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200">{error}</div>}
 
+      {!canEditCash && (
+        <div className="p-3 rounded bg-blue-50 text-blue-800 border border-blue-200 text-sm">
+          Режим просмотра: добавлять и менять операции вручную может только владелец клуба или администратор. Приём оплат по бронированиям доступен в разделе «Бронирования».
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow p-4 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Клуб</label>
@@ -158,6 +171,8 @@ export default function ClubCashDesk() {
           </select>
         </div>
 
+        {canEditCash && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <select
             className="border rounded px-3 py-2"
@@ -263,6 +278,8 @@ export default function ClubCashDesk() {
         >
           Добавить операцию
         </button>
+        </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

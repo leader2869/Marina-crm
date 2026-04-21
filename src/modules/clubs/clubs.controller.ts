@@ -19,6 +19,7 @@ import { UserRole, BookingStatus } from '../../types';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
+import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
 
 export class ClubsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -39,11 +40,19 @@ export class ClubsController {
       // Проверяем userRole (может быть undefined, если запрос без аутентификации)
       const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
       const isClubOwner = req.userRole === UserRole.CLUB_OWNER;
-      
+      let staffClubIds: number[] | null = null;
+
       // Для владельца клуба показываем только его клубы (включая невалидированные)
       if (isClubOwner && req.userId) {
         queryBuilder.where('club.ownerId = :ownerId', { ownerId: req.userId });
         console.log('Владелец клуба запросил свои клубы, userId:', req.userId);
+      } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+        staffClubIds = await getClubIdsForStaffUser(req.userId);
+        if (staffClubIds.length === 0) {
+          res.json(createPaginatedResponse([], 0, page, limit));
+          return;
+        }
+        queryBuilder.where('club.id IN (:...staffClubIds)', { staffClubIds });
       } else if (showHidden === 'true' && isSuperAdmin) {
         // Суперадмин может видеть все клубы, включая скрытые и невалидированные
         console.log('Суперадмин запросил скрытые клубы, userRole:', req.userRole);
@@ -93,6 +102,8 @@ export class ClubsController {
       if (isClubOwner && req.userId) {
         // Для владельца клуба показываем только его клубы (включая скрытые и невалидированные)
         filteredClubs = clubs.filter((club) => club.ownerId === req.userId);
+      } else if (staffClubIds !== null) {
+        filteredClubs = clubs;
       } else if (showHidden !== 'true' || !isSuperAdmin) {
         // Дополнительная фильтрация на случай, если фильтр не сработал
         // Показываем только активные И валидированные И отправленные на валидацию клубы

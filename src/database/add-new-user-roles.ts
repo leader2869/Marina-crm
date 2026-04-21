@@ -36,13 +36,13 @@ const addNewUserRoles = async (): Promise<void> => {
     console.log('Текущие роли в enum:', enumValues.map((r: any) => r.role));
 
     const existingRoles = enumValues.map((r: any) => r.role);
-    const newRoles = ['agent', 'captain', 'mechanic'];
+    const newRoles = ['agent', 'captain', 'mechanic', 'club_staff'];
     const rolesToAdd = newRoles.filter(role => !existingRoles.includes(role));
 
     if (rolesToAdd.length === 0) {
       console.log('ℹ️  Все новые роли уже существуют в enum');
       await queryRunner.release();
-      await AppDataSource.destroy();
+      await dataSource.destroy();
       return;
     }
 

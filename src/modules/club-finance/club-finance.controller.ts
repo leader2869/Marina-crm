@@ -10,6 +10,7 @@ import { User } from '../../entities/User';
 import { UserClub } from '../../entities/UserClub';
 import { CashPaymentMethod, CashTransactionType, Currency, UserRole } from '../../types';
 import { hashPassword } from '../../utils/password';
+import { userHasAccessToClub } from '../../utils/clubStaffAccess';
 
 export class ClubFinanceController {
   private async ensureClubAccess(req: AuthRequest, clubId: number): Promise<Club> {
@@ -24,11 +25,37 @@ export class ClubFinanceController {
     }
 
     const isAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === UserRole.ADMIN;
-    if (!isAdmin && club.ownerId !== req.userId) {
-      throw new AppError('Доступ запрещен', 403);
+    if (isAdmin) {
+      return club;
+    }
+    if (club.ownerId === req.userId) {
+      return club;
+    }
+    if (req.userRole === UserRole.CLUB_STAFF && (await userHasAccessToClub(req.userId, clubId))) {
+      return club;
     }
 
-    return club;
+    throw new AppError('Доступ запрещен', 403);
+  }
+
+  /** Только владелец клуба или админ (настройка партнёров, кассовые операции вручную) */
+  private async ensureClubOwnerOrAdmin(req: AuthRequest, clubId: number): Promise<Club> {
+    if (!req.userId) {
+      throw new AppError('Требуется аутентификация', 401);
+    }
+
+    const clubRepository = AppDataSource.getRepository(Club);
+    const club = await clubRepository.findOne({ where: { id: clubId } });
+    if (!club) {
+      throw new AppError('Яхт-клуб не найден', 404);
+    }
+
+    const isAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === UserRole.ADMIN;
+    if (isAdmin || club.ownerId === req.userId) {
+      return club;
+    }
+
+    throw new AppError('Доступ запрещен', 403);
   }
 
   private async ensurePartnerInClub(clubId: number, partnerId: number): Promise<ClubPartner> {
@@ -81,7 +108,7 @@ export class ClubFinanceController {
   async createPartner(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
       const { name, sharePercent } = req.body;
 
       if (!name || !sharePercent) {
@@ -115,7 +142,7 @@ export class ClubFinanceController {
     try {
       const clubId = parseInt(req.params.clubId);
       const partnerId = parseInt(req.params.partnerId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
 
       const { name, sharePercent, isActive } = req.body;
       const partnerRepository = AppDataSource.getRepository(ClubPartner);
@@ -235,7 +262,7 @@ export class ClubFinanceController {
   async createPartnerManager(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
 
       const { partnerId, userId, userData } = req.body;
       if (!partnerId) {
@@ -266,7 +293,6 @@ export class ClubFinanceController {
           firstName,
           lastName,
           phone,
-          role,
         } = userData;
         if (!email || !password || !firstName || !lastName) {
           throw new AppError('Для нового менеджера заполните email, пароль, имя и фамилию', 400);
@@ -282,7 +308,7 @@ export class ClubFinanceController {
           firstName: String(firstName).trim(),
           lastName: String(lastName).trim(),
           phone: phone ? String(phone).trim() : undefined,
-          role: role || UserRole.AGENT,
+          role: UserRole.CLUB_STAFF,
           isActive: true,
           isValidated: true,
           emailVerified: true,
@@ -336,7 +362,7 @@ export class ClubFinanceController {
     try {
       const clubId = parseInt(req.params.clubId);
       const managerId = parseInt(req.params.managerId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
 
       const managerRepository = AppDataSource.getRepository(ClubPartnerManager);
       const manager = await managerRepository.findOne({ where: { id: managerId, clubId } });
@@ -372,7 +398,7 @@ export class ClubFinanceController {
   async createCashTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
       const {
         transactionType,
         amount,
@@ -459,7 +485,7 @@ export class ClubFinanceController {
     try {
       const clubId = parseInt(req.params.clubId);
       const transactionId = parseInt(req.params.transactionId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
 
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
       const tx = await txRepository.findOne({ where: { id: transactionId, clubId } });
@@ -520,7 +546,7 @@ export class ClubFinanceController {
     try {
       const clubId = parseInt(req.params.clubId);
       const transactionId = parseInt(req.params.transactionId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
 
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
       const tx = await txRepository.findOne({ where: { id: transactionId, clubId } });

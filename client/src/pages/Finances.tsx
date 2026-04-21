@@ -44,7 +44,7 @@ export default function Finances() {
       icon: CreditCard,
       description: 'Управление платежами и оплатами',
       color: 'bg-blue-500',
-      availableFor: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER],
+      availableFor: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
     },
     {
       name: 'Партнеры',
@@ -52,7 +52,7 @@ export default function Finances() {
       icon: BarChart,
       description: 'Настройка партнеров и долей участия',
       color: 'bg-indigo-500',
-      availableFor: [UserRole.CLUB_OWNER],
+      availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
     },
     {
       name: 'Касса клуба',
@@ -60,7 +60,7 @@ export default function Finances() {
       icon: Wallet,
       description: 'Приходы/расходы, кто принял и кто оплатил',
       color: 'bg-purple-500',
-      availableFor: [UserRole.CLUB_OWNER],
+      availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
     },
     {
       name: 'Взаиморасчеты',
@@ -68,7 +68,7 @@ export default function Finances() {
       icon: TrendingDown,
       description: 'Расчет между партнерами с учетом долей',
       color: 'bg-red-500',
-      availableFor: [UserRole.CLUB_OWNER],
+      availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
     },
     {
       name: 'Платежи за яхт клуб',

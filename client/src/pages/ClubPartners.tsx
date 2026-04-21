@@ -3,8 +3,15 @@ import { clubsService, clubFinanceService } from '../services/api'
 import { Club, ClubPartner, ClubPartnerManager, User, UserRole } from '../types'
 import { Plus, Trash2 } from 'lucide-react'
 import BackButton from '../components/BackButton'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function ClubPartners() {
+  const { user } = useAuth()
+  const canEditPartners =
+    !!user &&
+    (user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.CLUB_OWNER)
   const [clubs, setClubs] = useState<Club[]>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [partners, setPartners] = useState<ClubPartner[]>([])
@@ -145,7 +152,7 @@ export default function ClubPartners() {
         partnerId,
         userData: {
           ...managerData,
-          role: UserRole.AGENT,
+          role: UserRole.CLUB_STAFF,
         },
       })
       setNewManagerByPartner((prev) => ({
@@ -184,6 +191,12 @@ export default function ClubPartners() {
 
       {error && <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200">{error}</div>}
 
+      {!canEditPartners && (
+        <div className="p-3 rounded bg-blue-50 text-blue-800 border border-blue-200 text-sm">
+          Режим просмотра: настройку партнёров и менеджеров может менять только владелец клуба или администратор.
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow p-4 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Клуб</label>
@@ -200,36 +213,38 @@ export default function ClubPartners() {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Имя партнера</label>
-            <input
-              className="w-full border rounded px-3 py-2"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Например, Партнер 1"
-            />
+        {canEditPartners && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Имя партнера</label>
+              <input
+                className="w-full border rounded px-3 py-2"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Например, Партнер 1"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Доля (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                className="w-full border rounded px-3 py-2"
+                value={sharePercent}
+                onChange={(e) => setSharePercent(e.target.value)}
+              />
+            </div>
+            <button
+              onClick={handleAddPartner}
+              className="inline-flex items-center justify-center px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Добавить
+            </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Доля (%)</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              className="w-full border rounded px-3 py-2"
-              value={sharePercent}
-              onChange={(e) => setSharePercent(e.target.value)}
-            />
-          </div>
-          <button
-            onClick={handleAddPartner}
-            className="inline-flex items-center justify-center px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Добавить
-          </button>
-        </div>
+        )}
 
         <div className="text-sm text-gray-600">
           Сумма долей: <span className="font-semibold">{totalShare.toFixed(2)}%</span>
@@ -243,7 +258,9 @@ export default function ClubPartners() {
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Партнер</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Доля</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Менеджеры партнера</th>
-              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Действия</th>
+              {canEditPartners && (
+                <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Действия</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -264,17 +281,20 @@ export default function ClubPartners() {
                                 ? `${manager.user.lastName || ''} ${manager.user.firstName || ''}`.trim() || manager.user.email
                                 : `Менеджер #${manager.id}`}
                             </span>
-                            <button
-                              onClick={() => handleDeleteManager(manager.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              Удалить
-                            </button>
+                            {canEditPartners && (
+                              <button
+                                onClick={() => handleDeleteManager(manager.id)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                Удалить
+                              </button>
+                            )}
                           </div>
                         ))
                       )}
                     </div>
 
+                    {canEditPartners && (
                     <div className="flex gap-2">
                       <select
                         className="border rounded px-2 py-1 text-sm flex-1"
@@ -297,7 +317,9 @@ export default function ClubPartners() {
                         Привязать
                       </button>
                     </div>
+                    )}
 
+                    {canEditPartners && (
                     <button
                       onClick={() =>
                         setCreatingManagerForPartnerId(
@@ -308,8 +330,9 @@ export default function ClubPartners() {
                     >
                       {creatingManagerForPartnerId === partner.id ? 'Скрыть форму нового менеджера' : 'Создать новый аккаунт менеджера'}
                     </button>
+                    )}
 
-                    {creatingManagerForPartnerId === partner.id && (
+                    {canEditPartners && creatingManagerForPartnerId === partner.id && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-gray-50 p-2 rounded">
                         <input
                           className="border rounded px-2 py-1 text-sm"
@@ -377,6 +400,7 @@ export default function ClubPartners() {
                     )}
                   </div>
                 </td>
+                {canEditPartners && (
                 <td className="px-4 py-3">
                   <button
                     onClick={() => handleDeletePartner(partner.id)}
@@ -386,11 +410,12 @@ export default function ClubPartners() {
                     Удалить
                   </button>
                 </td>
+                )}
               </tr>
             ))}
             {partners.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={canEditPartners ? 4 : 3} className="px-4 py-6 text-center text-gray-500">
                   Партнеры не добавлены
                 </td>
               </tr>

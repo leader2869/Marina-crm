@@ -195,10 +195,10 @@ export class PaymentService {
     });
 
     if (tariff.type === TariffType.SEASON_PAYMENT || String(tariff.type) === String(TariffType.SEASON_PAYMENT)) {
-      // Сезонная оплата - один платеж сразу (в течение 15 минут)
+      // Сезонная оплата: если есть залог/взнос, создаем 2 платежа (залог + остаток сезона)
       console.log('[PaymentService] ✅ SEASON_PAYMENT тариф обнаружен! depositAmount:', depositAmount, 'totalPrice:', totalPrice);
       if (immediateFeeAmount > 0) {
-        // Если есть залог/членский взнос - создаем единый мгновенный платеж
+        // 1) Мгновенный платеж залога/взноса
         const dueDate = new Date();
         console.log('[PaymentService] ✅ Создаем залог с dueDate:', dueDate.toISOString());
         schedule.push({
@@ -207,6 +207,19 @@ export class PaymentService {
           dueDate: dueDate, // Сразу при бронировании (15 минут на оплату)
           paymentOrder: 0,
         });
+
+        // 2) Основной платеж за сезон — берём базовую сумму тарифа
+        // (чтобы не зависеть от возможных ошибок в booking.totalPrice).
+        const seasonBaseAmount = parseFloat(String(tariff.amount));
+        const remainingAmount = Number.isNaN(seasonBaseAmount) ? totalPrice - immediateFeeAmount : seasonBaseAmount;
+        if (remainingAmount > 0) {
+          schedule.push({
+            type: PaymentType.FULL,
+            amount: remainingAmount,
+            dueDate: dueDate, // Тоже сразу при бронировании
+            paymentOrder: 1,
+          });
+        }
       } else {
         // Один платеж на всю сумму
         const dueDate = new Date();

@@ -78,7 +78,7 @@ export default function Bookings() {
       
       // Для VESSEL_OWNER и CLUB_OWNER загружаем платежи для активных бронирований
       const booking = bookings.find(b => b.id === bookingId)
-      if ((user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.CLUB_OWNER) && booking && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING)) {
+      if ((user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.CLUB_OWNER || user?.role === UserRole.CLUB_STAFF) && booking && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING)) {
         await loadUpcomingPayments(bookingId)
       }
     }
@@ -152,9 +152,11 @@ export default function Bookings() {
   }
 
   const isClubOwner = user?.role === UserRole.CLUB_OWNER
+  const isClubStaff = user?.role === UserRole.CLUB_STAFF
+  const canManageClubPayments = isClubOwner || isClubStaff
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
   const isVesselOwner = user?.role === UserRole.VESSEL_OWNER
-  const canViewDetails = isClubOwner || isSuperAdmin || isVesselOwner
+  const canViewDetails = isClubOwner || isSuperAdmin || isVesselOwner || isClubStaff
 
   const canCancelBooking = (booking: Booking) => {
     if (isSuperAdmin || user?.role === UserRole.ADMIN) return true
@@ -392,8 +394,8 @@ export default function Bookings() {
                     <tr>
                       <td colSpan={6} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-6">
-                          {/* Платежи для VESSEL_OWNER и CLUB_OWNER */}
-                          {(isVesselOwner || isClubOwner) && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING) && (
+                          {/* Платежи для VESSEL_OWNER, владельца и сотрудника клуба */}
+                          {(isVesselOwner || canManageClubPayments) && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING) && (
                             <div className="bg-white rounded-lg p-4 shadow-sm">
                               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                                 <CreditCard className="h-5 w-5 mr-2 text-primary-600" />
@@ -416,7 +418,7 @@ export default function Bookings() {
                                       <table className="min-w-full divide-y divide-gray-200">
                                         <thead className="bg-gray-50">
                                           <tr>
-                                            {isClubOwner && (
+                                            {canManageClubPayments && (
                                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Плательщик
                                               </th>
@@ -430,7 +432,7 @@ export default function Bookings() {
                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                               Статус
                                             </th>
-                                            {isClubOwner && (
+                                            {canManageClubPayments && (
                                               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Действие
                                               </th>
@@ -440,7 +442,7 @@ export default function Bookings() {
                                         <tbody className="bg-white divide-y divide-gray-200">
                                           {payments.map((payment) => (
                                             <tr key={payment.id} className="hover:bg-gray-50">
-                                              {isClubOwner && (
+                                              {canManageClubPayments && (
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                   <div className="text-sm text-gray-900">
                                                     {getManualBookingCustomerName(booking) ||
@@ -489,7 +491,7 @@ export default function Bookings() {
                                                     : payment.status}
                                                 </span>
                                               </td>
-                                              {isClubOwner && (
+                                              {canManageClubPayments && (
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                   {(payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.OVERDUE) ? (
                                                     <button

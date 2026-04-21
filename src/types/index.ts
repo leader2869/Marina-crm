@@ -7,6 +7,8 @@ export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   ADMIN = 'admin',
   CLUB_OWNER = 'club_owner',
+  /** Сотрудник яхт-клуба (касса, приём оплат, без прав агента) */
+  CLUB_STAFF = 'club_staff',
   VESSEL_OWNER = 'vessel_owner',
   GUEST = 'guest',
   PENDING_VALIDATION = 'pending_validation', // Ожидает валидации суперадминистратором

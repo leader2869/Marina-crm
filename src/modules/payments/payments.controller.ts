@@ -20,8 +20,35 @@ import {
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { isAfter } from 'date-fns';
 import { PaymentService } from '../../services/payment.service';
+import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
 
 export class PaymentsController {
+  /** Просмотр/приём оплат по клубу: владелец, сотрудник клуба (привязка), админы */
+  private async assertClubPaymentAccess(req: AuthRequest, clubId: number): Promise<void> {
+    if (!req.userId) {
+      throw new AppError('Требуется аутентификация', 401);
+    }
+    if (req.userRole === UserRole.SUPER_ADMIN || req.userRole === UserRole.ADMIN) {
+      return;
+    }
+    if (req.userRole === UserRole.CLUB_OWNER) {
+      const clubRepository = AppDataSource.getRepository(Club);
+      const club = await clubRepository.findOne({ where: { id: clubId }, select: ['id', 'ownerId'] });
+      if (club?.ownerId !== req.userId) {
+        throw new AppError('Доступ запрещен', 403);
+      }
+      return;
+    }
+    if (req.userRole === UserRole.CLUB_STAFF) {
+      const ok = await userHasAccessToClub(req.userId, clubId);
+      if (!ok) {
+        throw new AppError('Доступ запрещен', 403);
+      }
+      return;
+    }
+    throw new AppError('Доступ запрещен', 403);
+  }
+
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.userId) {
@@ -60,6 +87,13 @@ export class PaymentsController {
         }
         
         const clubIds = userClubs.map(club => club.id);
+        queryBuilder.where('club.id IN (:...clubIds)', { clubIds });
+      } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+        const clubIds = await getClubIdsForStaffUser(req.userId);
+        if (clubIds.length === 0) {
+          res.json(createPaginatedResponse([], 0, page, limit));
+          return;
+        }
         queryBuilder.where('club.id IN (:...clubIds)', { clubIds });
       } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
         // Для других ролей (guest и т.д.) показываем только свои платежи
@@ -117,6 +151,11 @@ export class PaymentsController {
         }
       } else if (req.userRole === UserRole.CLUB_OWNER) {
         if (payment.booking.club.ownerId !== req.userId) {
+          throw new AppError('Доступ запрещен', 403);
+        }
+      } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+        const ok = await userHasAccessToClub(req.userId, payment.booking.clubId);
+        if (!ok) {
           throw new AppError('Доступ запрещен', 403);
         }
       } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
@@ -205,6 +244,11 @@ export class PaymentsController {
         if (payment.booking.club.ownerId !== req.userId) {
           throw new AppError('Недостаточно прав для изменения статуса', 403);
         }
+      } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+        const ok = await userHasAccessToClub(req.userId, payment.booking.clubId);
+        if (!ok) {
+          throw new AppError('Недостаточно прав для изменения статуса', 403);
+        }
       } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
         // Для других ролей - только свои платежи
         if (payment.payerId !== req.userId) {
@@ -236,8 +280,11 @@ export class PaymentsController {
       if (
         status === PaymentStatus.PAID &&
         previousStatus !== PaymentStatus.PAID &&
-        req.userRole === UserRole.CLUB_OWNER
+        (req.userRole === UserRole.CLUB_OWNER || req.userRole === UserRole.CLUB_STAFF)
       ) {
+        if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+          await this.assertClubPaymentAccess(req, payment.booking.clubId);
+        }
         const normalizedAcceptedByPartnerId = Number(acceptedByPartnerId);
         if (!Number.isInteger(normalizedAcceptedByPartnerId) || normalizedAcceptedByPartnerId <= 0) {
           throw new AppError('Укажите партнера, который принял оплату', 400);
@@ -362,6 +409,13 @@ export class PaymentsController {
         }
         
         const clubIds = userClubs.map(club => club.id);
+        queryBuilder.andWhere('club.id IN (:...clubIds)', { clubIds });
+      } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+        const clubIds = await getClubIdsForStaffUser(req.userId);
+        if (clubIds.length === 0) {
+          res.json([]);
+          return;
+        }
         queryBuilder.andWhere('club.id IN (:...clubIds)', { clubIds });
       } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
         // Для других ролей показываем только свои просроченные платежи

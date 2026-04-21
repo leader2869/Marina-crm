@@ -175,7 +175,7 @@ function App() {
             <Route
               path="club-partners"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
                   <ClubPartners />
                 </RoleProtectedRoute>
               }
@@ -183,7 +183,7 @@ function App() {
             <Route
               path="club-cash"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
                   <ClubCashDesk />
                 </RoleProtectedRoute>
               }
@@ -191,7 +191,7 @@ function App() {
             <Route
               path="club-settlements"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
                   <ClubSettlements />
                 </RoleProtectedRoute>
               }

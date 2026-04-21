@@ -18,6 +18,7 @@ import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
 import { In } from 'typeorm';
+import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
 
 export class BookingsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -40,6 +41,13 @@ export class BookingsController {
       
       if (req.userRole === 'vessel_owner') {
         queryBuilder.where('booking.vesselOwnerId = :userId', { userId: req.userId });
+      } else if (req.userRole === 'club_staff' && req.userId) {
+        const clubIds = await getClubIdsForStaffUser(req.userId);
+        if (clubIds.length === 0) {
+          res.json(createPaginatedResponse([], 0, page, limit));
+          return;
+        }
+        queryBuilder.where('booking.clubId IN (:...clubIds)', { clubIds });
       } else if (req.userRole === 'club_owner') {
         // Владелец клуба видит только бронирования своих клубов
         // Получаем ID всех клубов, принадлежащих пользователю
@@ -129,11 +137,16 @@ export class BookingsController {
       }
 
       // Проверка прав доступа
+      const isStaffOfClub =
+        req.userRole === 'club_staff' && req.userId
+          ? await userHasAccessToClub(req.userId, booking.clubId)
+          : false;
       if (
         booking.vesselOwnerId !== req.userId &&
         req.userRole !== 'super_admin' &&
         req.userRole !== 'admin' &&
-        !(req.userRole === 'club_owner' && booking.club?.ownerId === req.userId)
+        !(req.userRole === 'club_owner' && booking.club?.ownerId === req.userId) &&
+        !isStaffOfClub
       ) {
         throw new AppError('Недостаточно прав доступа', 403);
       }
@@ -509,7 +522,7 @@ export class BookingsController {
         // Для тарифа используем его amount
         if (selectedTariff.type === 'season_payment') {
           // Оплата за весь сезон - используем полную сумму тарифа
-          totalPrice = selectedTariff.amount;
+          totalPrice = parseFloat(String(selectedTariff.amount));
           
           // Проверяем правила для сезонной оплаты
           const bookingRuleRepository = AppDataSource.getRepository(BookingRule);
@@ -550,9 +563,17 @@ export class BookingsController {
           );
 
           // Если есть правило REQUIRE_DEPOSIT, добавляем залог к общей сумме
-          if (depositRule && depositRule.parameters && depositRule.parameters.depositAmount) {
-            const depositAmount = parseFloat(String(depositRule.parameters.depositAmount));
-            totalPrice = totalPrice + depositAmount;
+          if (depositRule && depositRule.parameters) {
+            let depositAmount = 0;
+            if (typeof depositRule.parameters.depositAmount !== 'undefined') {
+              depositAmount = parseFloat(String(depositRule.parameters.depositAmount));
+            } else if (typeof depositRule.parameters.depositPercentage !== 'undefined') {
+              const depositPercentage = parseFloat(String(depositRule.parameters.depositPercentage));
+              depositAmount = (totalPrice * depositPercentage) / 100;
+            }
+            if (!Number.isNaN(depositAmount) && depositAmount > 0) {
+              totalPrice += depositAmount;
+            }
           }
 
           // Если есть правило REQUIRE_MEMBERSHIP_FEE, добавляем членский взнос
@@ -673,9 +694,17 @@ export class BookingsController {
           }
           
           // Если есть правило REQUIRE_DEPOSIT, добавляем залог к общей сумме
-          if (depositRule && depositRule.parameters && depositRule.parameters.depositAmount) {
-            const depositAmount = parseFloat(String(depositRule.parameters.depositAmount));
-            totalPrice = totalPrice + depositAmount;
+          if (depositRule && depositRule.parameters) {
+            let depositAmount = 0;
+            if (typeof depositRule.parameters.depositAmount !== 'undefined') {
+              depositAmount = parseFloat(String(depositRule.parameters.depositAmount));
+            } else if (typeof depositRule.parameters.depositPercentage !== 'undefined') {
+              const depositPercentage = parseFloat(String(depositRule.parameters.depositPercentage));
+              depositAmount = (totalPrice * depositPercentage) / 100;
+            }
+            if (!Number.isNaN(depositAmount) && depositAmount > 0) {
+              totalPrice += depositAmount;
+            }
           }
 
           // Если есть правило REQUIRE_MEMBERSHIP_FEE, добавляем членский взнос
@@ -1063,11 +1092,16 @@ export class BookingsController {
       }
 
       // Проверка прав доступа
+      const staffOk =
+        req.userRole === 'club_staff' && req.userId
+          ? await userHasAccessToClub(req.userId, booking.clubId)
+          : false;
       if (
         booking.vesselOwnerId !== req.userId &&
         booking.club.ownerId !== req.userId &&
         req.userRole !== 'super_admin' &&
-        req.userRole !== 'admin'
+        req.userRole !== 'admin' &&
+        !staffOk
       ) {
         throw new AppError('Недостаточно прав доступа', 403);
       }
