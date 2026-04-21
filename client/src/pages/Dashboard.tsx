@@ -299,7 +299,7 @@ export default function Dashboard() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-lg md:text-xl font-bold text-gray-900 break-all leading-tight">{stat.value}</p>
                 </div>
               </div>
             </button>
@@ -327,7 +327,7 @@ export default function Dashboard() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                      <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                      <p className="text-lg md:text-xl font-bold text-gray-900 break-all leading-tight">{stat.value}</p>
                     </div>
                   </div>
                 </button>
