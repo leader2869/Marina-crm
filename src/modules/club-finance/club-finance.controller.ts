@@ -389,7 +389,7 @@ export class ClubFinanceController {
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
       const transactions = await txRepository.find({
         where: { clubId },
-        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'createdBy'],
+        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'paidByManager', 'paidByManager.user', 'createdBy'],
         order: { date: 'DESC', createdAt: 'DESC' },
       });
 
@@ -414,6 +414,7 @@ export class ClubFinanceController {
         acceptedByPartnerId,
         acceptedByManagerId,
         paidByPartnerId,
+        paidByManagerId,
       } = req.body;
 
       if (!transactionType || !amount || !paymentMethod || !date) {
@@ -437,6 +438,9 @@ export class ClubFinanceController {
         }
         if (!acceptedByManagerId) {
           throw new AppError('Для перевода укажите менеджера, который принимает перевод', 400);
+        }
+        if (!paidByManagerId) {
+          throw new AppError('Для перевода укажите менеджера, с которого списываем перевод', 400);
         }
         if (Number(acceptedByPartnerId) === Number(paidByPartnerId)) {
           throw new AppError('Для перевода партнер-отправитель и партнер-получатель должны отличаться', 400);
@@ -470,6 +474,16 @@ export class ClubFinanceController {
         });
         if (!partner) throw new AppError('Партнер, оплативший расход, не найден', 404);
       }
+      if (
+        paidByManagerId &&
+        (transactionType === CashTransactionType.TRANSFER)
+      ) {
+        await this.ensureManagerInClubPartner(
+          clubId,
+          Number(paidByPartnerId),
+          Number(paidByManagerId)
+        );
+      }
 
       const tx = txRepository.create({
         clubId,
@@ -483,6 +497,7 @@ export class ClubFinanceController {
         acceptedByPartnerId: acceptedByPartnerId ? Number(acceptedByPartnerId) : null,
         acceptedByManagerId: acceptedByManagerId ? Number(acceptedByManagerId) : null,
         paidByPartnerId: paidByPartnerId ? Number(paidByPartnerId) : null,
+        paidByManagerId: paidByManagerId ? Number(paidByManagerId) : null,
         createdById: req.userId || null,
       });
 
@@ -490,7 +505,7 @@ export class ClubFinanceController {
 
       const savedTx = await txRepository.findOne({
         where: { id: tx.id },
-        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'createdBy'],
+        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'paidByManager', 'paidByManager.user', 'createdBy'],
       });
 
       res.status(201).json(savedTx);
@@ -522,6 +537,7 @@ export class ClubFinanceController {
         acceptedByPartnerId,
         acceptedByManagerId,
         paidByPartnerId,
+        paidByManagerId,
       } = req.body;
 
       if (typeof transactionType !== 'undefined') tx.transactionType = transactionType;
@@ -534,6 +550,7 @@ export class ClubFinanceController {
       if (typeof acceptedByPartnerId !== 'undefined') tx.acceptedByPartnerId = acceptedByPartnerId ? Number(acceptedByPartnerId) : null;
       if (typeof acceptedByManagerId !== 'undefined') tx.acceptedByManagerId = acceptedByManagerId ? Number(acceptedByManagerId) : null;
       if (typeof paidByPartnerId !== 'undefined') tx.paidByPartnerId = paidByPartnerId ? Number(paidByPartnerId) : null;
+      if (typeof paidByManagerId !== 'undefined') tx.paidByManagerId = paidByManagerId ? Number(paidByManagerId) : null;
 
       if (tx.transactionType === CashTransactionType.INCOME && !tx.acceptedByPartnerId) {
         throw new AppError('Для прихода укажите, кто принял деньги', 400);
@@ -551,6 +568,9 @@ export class ClubFinanceController {
         if (!tx.acceptedByManagerId) {
           throw new AppError('Для перевода укажите менеджера, который принимает перевод', 400);
         }
+        if (!tx.paidByManagerId) {
+          throw new AppError('Для перевода укажите менеджера, с которого списываем перевод', 400);
+        }
         if (tx.acceptedByPartnerId === tx.paidByPartnerId) {
           throw new AppError('Для перевода партнер-отправитель и партнер-получатель должны отличаться', 400);
         }
@@ -563,11 +583,18 @@ export class ClubFinanceController {
       ) {
         await this.ensureManagerInClubPartner(clubId, tx.acceptedByPartnerId, tx.acceptedByManagerId);
       }
+      if (
+        tx.transactionType === CashTransactionType.TRANSFER &&
+        tx.paidByPartnerId &&
+        tx.paidByManagerId
+      ) {
+        await this.ensureManagerInClubPartner(clubId, tx.paidByPartnerId, tx.paidByManagerId);
+      }
 
       await txRepository.save(tx);
       const updated = await txRepository.findOne({
         where: { id: tx.id },
-        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'createdBy'],
+        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'paidByManager', 'paidByManager.user', 'createdBy'],
       });
       res.json(updated);
     } catch (error) {

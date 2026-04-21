@@ -86,6 +86,14 @@ export class ClubCashTransaction {
   @Column({ type: 'integer', nullable: true })
   acceptedByManagerId: number | null;
 
+  // С какого менеджера списываем (для transfer)
+  @ManyToOne(() => ClubPartnerManager, { nullable: true })
+  @JoinColumn({ name: 'paidByManagerId' })
+  paidByManager: ClubPartnerManager | null;
+
+  @Column({ type: 'integer', nullable: true })
+  paidByManagerId: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

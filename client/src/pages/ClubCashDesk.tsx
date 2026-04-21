@@ -44,6 +44,7 @@ export default function ClubCashDesk() {
     acceptedByPartnerId: '',
     acceptedByManagerId: '',
     paidByPartnerId: '',
+    paidByManagerId: '',
     bookingId: '',
   })
 
@@ -120,6 +121,10 @@ export default function ClubCashDesk() {
           (form.transactionType === CashTransactionType.EXPENSE || form.transactionType === CashTransactionType.TRANSFER) && form.paidByPartnerId
             ? Number(form.paidByPartnerId)
             : null,
+        paidByManagerId:
+          form.transactionType === CashTransactionType.TRANSFER && form.paidByManagerId
+            ? Number(form.paidByManagerId)
+            : null,
       })
       setForm({
         transactionType: CashTransactionType.INCOME,
@@ -130,6 +135,7 @@ export default function ClubCashDesk() {
         acceptedByPartnerId: '',
         acceptedByManagerId: '',
         paidByPartnerId: '',
+        paidByManagerId: '',
         bookingId: '',
       })
       await loadData(selectedClubId)
@@ -206,7 +212,40 @@ export default function ClubCashDesk() {
           />
         </div>
 
-        <div className={`grid grid-cols-1 ${form.transactionType === CashTransactionType.TRANSFER ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3`}>
+        <div className={`grid grid-cols-1 ${form.transactionType === CashTransactionType.TRANSFER ? 'md:grid-cols-5' : 'md:grid-cols-3'} gap-3`}>
+          {form.transactionType === CashTransactionType.TRANSFER && (
+            <select
+              className="border rounded px-3 py-2"
+              value={form.paidByPartnerId}
+              onChange={(e) => setForm({ ...form, paidByPartnerId: e.target.value, paidByManagerId: '' })}
+            >
+              <option value="">С кого списать</option>
+              {partners.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {form.transactionType === CashTransactionType.TRANSFER && (
+            <select
+              className="border rounded px-3 py-2"
+              value={form.paidByManagerId}
+              onChange={(e) => setForm({ ...form, paidByManagerId: e.target.value })}
+              disabled={!form.paidByPartnerId}
+            >
+              <option value="">С какого менеджера списываем</option>
+              {partnerManagers
+                .filter((m) => String(m.partnerId) === form.paidByPartnerId)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.user
+                      ? `${m.user.lastName || ''} ${m.user.firstName || ''}`.trim() || m.user.email
+                      : `Менеджер #${m.id}`}
+                  </option>
+                ))}
+            </select>
+          )}
           {form.transactionType === CashTransactionType.INCOME || form.transactionType === CashTransactionType.TRANSFER ? (
             <select
               className="border rounded px-3 py-2"
@@ -229,7 +268,7 @@ export default function ClubCashDesk() {
             <select
               className="border rounded px-3 py-2"
               value={form.paidByPartnerId}
-              onChange={(e) => setForm({ ...form, paidByPartnerId: e.target.value })}
+              onChange={(e) => setForm({ ...form, paidByPartnerId: e.target.value, paidByManagerId: '' })}
             >
               <option value="">
                 Кто оплатил из своего кармана
@@ -267,20 +306,6 @@ export default function ClubCashDesk() {
             <div className="border rounded px-3 py-2 text-sm text-gray-400 flex items-center">
               Для расхода менеджер не требуется
             </div>
-          )}
-          {form.transactionType === CashTransactionType.TRANSFER && (
-            <select
-              className="border rounded px-3 py-2"
-              value={form.paidByPartnerId}
-              onChange={(e) => setForm({ ...form, paidByPartnerId: e.target.value })}
-            >
-              <option value="">С кого списать</option>
-              {partners.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
           )}
           <input
             className="border rounded px-3 py-2"
@@ -357,7 +382,17 @@ export default function ClubCashDesk() {
                     : `${tx.paidByPartner?.name || '—'} -> ${tx.acceptedByPartner?.name || '—'}`}
                 </td>
                 <td className="px-4 py-3">
-                  {tx.acceptedByManager?.user
+                  {tx.transactionType === CashTransactionType.TRANSFER
+                    ? `${tx.paidByManager?.user
+                        ? `${tx.paidByManager.user.lastName || ''} ${tx.paidByManager.user.firstName || ''}`.trim() ||
+                          tx.paidByManager.user.email
+                        : '—'} -> ${
+                        tx.acceptedByManager?.user
+                          ? `${tx.acceptedByManager.user.lastName || ''} ${tx.acceptedByManager.user.firstName || ''}`.trim() ||
+                            tx.acceptedByManager.user.email
+                          : '—'
+                      }`
+                    : tx.acceptedByManager?.user
                     ? `${tx.acceptedByManager.user.lastName || ''} ${tx.acceptedByManager.user.firstName || ''}`.trim() ||
                       tx.acceptedByManager.user.email
                     : '—'}

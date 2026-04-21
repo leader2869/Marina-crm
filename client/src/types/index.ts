@@ -463,9 +463,11 @@ export interface ClubCashTransaction {
   acceptedByPartnerId?: number | null
   acceptedByManagerId?: number | null
   paidByPartnerId?: number | null
+  paidByManagerId?: number | null
   acceptedByPartner?: ClubPartner | null
   acceptedByManager?: ClubPartnerManager | null
   paidByPartner?: ClubPartner | null
+  paidByManager?: ClubPartnerManager | null
   createdAt: string
   updatedAt: string
 }
