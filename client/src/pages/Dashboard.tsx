@@ -298,8 +298,8 @@ export default function Dashboard() {
                   <Icon className="h-6 w-6 text-white" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                  <p className="text-lg md:text-xl font-bold text-gray-900 break-all leading-tight">{stat.value}</p>
+                  <p className="text-xs md:text-sm font-medium text-gray-600">{stat.name}</p>
+                  <p className="text-base md:text-lg font-bold text-gray-900 break-all leading-tight">{stat.value}</p>
                 </div>
               </div>
             </button>
@@ -326,8 +326,8 @@ export default function Dashboard() {
                       <Icon className="h-6 w-6 text-white" />
                     </div>
                     <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                      <p className="text-lg md:text-xl font-bold text-gray-900 break-all leading-tight">{stat.value}</p>
+                      <p className="text-xs md:text-sm font-medium text-gray-600">{stat.name}</p>
+                      <p className="text-base md:text-lg font-bold text-gray-900 break-all leading-tight">{stat.value}</p>
                     </div>
                   </div>
                 </button>
@@ -335,12 +335,18 @@ export default function Dashboard() {
             })}
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
-              <h2 className="text-base font-semibold text-gray-900">Взаиморасчеты партнеров</h2>
+          <div
+            className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate('/club-settlements')}
+          >
+            <div
+              className="flex items-center justify-between gap-4 mb-4 flex-wrap"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-[17px] font-semibold text-gray-900">Взаиморасчеты партнеров</h2>
               {clubList.length > 0 && (
                 <select
-                  className="border rounded px-2 py-1 text-xs"
+                  className="border rounded px-2 py-1.5 text-sm"
                   value={selectedClubId || ''}
                   onChange={(e) => setSelectedClubId(Number(e.target.value))}
                 >
@@ -357,31 +363,31 @@ export default function Dashboard() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-2 py-1.5 text-left text-[10px] uppercase text-gray-500">Партнер</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] uppercase text-gray-500">Доля</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] uppercase text-gray-500">Приход</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] uppercase text-gray-500">Расход</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] uppercase text-gray-500">По доле</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] uppercase text-gray-500">Прошлый сез.</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] uppercase text-gray-500">Итог</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] uppercase text-gray-500">Итог+прошл.</th>
+                    <th className="px-2.5 py-2 text-left text-[11px] uppercase text-gray-500">Партнер</th>
+                    <th className="px-2.5 py-2 text-left text-[11px] uppercase text-gray-500">Доля</th>
+                    <th className="px-2.5 py-2 text-left text-[11px] uppercase text-gray-500">Приход</th>
+                    <th className="px-2.5 py-2 text-left text-[11px] uppercase text-gray-500">Расход</th>
+                    <th className="px-2.5 py-2 text-left text-[11px] uppercase text-gray-500">По доле</th>
+                    <th className="px-2.5 py-2 text-left text-[11px] uppercase text-gray-500">Прошлый сез.</th>
+                    <th className="px-2.5 py-2 text-left text-[11px] uppercase text-gray-500">Итог</th>
+                    <th className="px-2.5 py-2 text-left text-[11px] uppercase text-gray-500">Итог+прошл.</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 text-xs">
+                <tbody className="divide-y divide-gray-200 text-sm">
                   {clubSettlements.map((item: any) => (
                     <tr key={item.partnerId}>
-                      <td className="px-2 py-1.5">{item.partnerName}</td>
-                      <td className="px-2 py-1.5">{Number(item.sharePercent).toFixed(2)}%</td>
-                      <td className="px-2 py-1.5">{Number(item.incomeAccepted).toLocaleString('ru-RU')} ₽</td>
-                      <td className="px-2 py-1.5">{Number(item.expensesPaid).toLocaleString('ru-RU')} ₽</td>
-                      <td className="px-2 py-1.5">{Number(item.entitled).toLocaleString('ru-RU')} ₽</td>
-                      <td className="px-2 py-1.5">{Number(item.previousSeasonBalance || 0).toLocaleString('ru-RU')} ₽</td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-2.5 py-2">{item.partnerName}</td>
+                      <td className="px-2.5 py-2">{Number(item.sharePercent).toFixed(2)}%</td>
+                      <td className="px-2.5 py-2">{Number(item.incomeAccepted).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-2.5 py-2">{Number(item.expensesPaid).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-2.5 py-2">{Number(item.entitled).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-2.5 py-2">{Number(item.previousSeasonBalance || 0).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-2.5 py-2">
                         <span className={Number(item.settlementAmount) >= 0 ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>
                           {Number(item.settlementAmount).toLocaleString('ru-RU')} ₽
                         </span>
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-2.5 py-2">
                         <span className={Number(item.settlementWithPreviousSeason) >= 0 ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>
                           {Number(item.settlementWithPreviousSeason).toLocaleString('ru-RU')} ₽
                         </span>
