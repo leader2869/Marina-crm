@@ -85,6 +85,27 @@ export default function ReportsFinance() {
     [filteredTransactions]
   )
 
+  const getPersonLabel = (tx: ClubCashTransaction): string => {
+    const isIncome = tx.transactionType === CashTransactionType.INCOME
+    const partner = isIncome ? tx.acceptedByPartner : tx.paidByPartner
+    const manager = isIncome ? tx.acceptedByManager : tx.paidByManager
+
+    const managerName = manager?.user
+      ? `${manager.user.lastName || ''} ${manager.user.firstName || ''}`.trim() || manager.user.email
+      : ''
+
+    if (partner?.name && managerName) {
+      return `${partner.name} / ${managerName}`
+    }
+    if (partner?.name) {
+      return partner.name
+    }
+    if (managerName) {
+      return managerName
+    }
+    return '—'
+  }
+
   if (loading && clubs.length === 0) return <div className="p-6">Загрузка...</div>
 
   return (
@@ -151,6 +172,9 @@ export default function ReportsFinance() {
             <tr>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Дата</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Тип</th>
+              <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">
+                {reportType === CashTransactionType.EXPENSE ? 'Кто понес расход' : 'Кто получил приход'}
+              </th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Сумма</th>
               <th className="px-4 py-2 text-left text-xs uppercase text-gray-500">Описание</th>
             </tr>
@@ -162,13 +186,14 @@ export default function ReportsFinance() {
                 <td className="px-4 py-3">
                   {tx.transactionType === CashTransactionType.INCOME ? 'Доход' : 'Расход'}
                 </td>
+                <td className="px-4 py-3">{getPersonLabel(tx)}</td>
                 <td className="px-4 py-3">{Number(tx.amount).toLocaleString('ru-RU')} ₽</td>
                 <td className="px-4 py-3">{tx.description || '—'}</td>
               </tr>
             ))}
             {filteredTransactions.length === 0 && (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={4}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={5}>
                   Нет данных для отчета
                 </td>
               </tr>

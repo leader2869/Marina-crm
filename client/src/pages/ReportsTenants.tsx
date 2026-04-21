@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import BackButton from '../components/BackButton'
 import { clubsService, clubFinanceService } from '../services/api'
 import { Club, ClubTenantReportResponse } from '../types'
@@ -44,6 +44,19 @@ export default function ReportsTenants() {
     }
     loadTenantReport()
   }, [selectedClubId])
+
+  const occupiedItems = tenantReport?.occupiedItems || []
+  const totals = useMemo(
+    () =>
+      occupiedItems.reduce(
+        (acc, item) => ({
+          acceptedAmount: acc.acceptedAmount + Number(item.acceptedAmount),
+          expectedAmount: acc.expectedAmount + Number(item.expectedAmount),
+        }),
+        { acceptedAmount: 0, expectedAmount: 0 }
+      ),
+    [occupiedItems]
+  )
 
   if (loading && clubs.length === 0) return <div className="p-6">Загрузка...</div>
 
@@ -106,7 +119,7 @@ export default function ReportsTenants() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {(tenantReport?.occupiedItems || []).map((item) => (
+            {occupiedItems.map((item) => (
               <tr key={item.bookingId}>
                 <td className="px-4 py-3">{item.berthNumber}</td>
                 <td className="px-4 py-3">{item.renterFullName}</td>
@@ -119,7 +132,7 @@ export default function ReportsTenants() {
                 </td>
               </tr>
             ))}
-            {(tenantReport?.occupiedItems || []).length === 0 && (
+            {occupiedItems.length === 0 && (
               <tr>
                 <td className="px-4 py-6 text-center text-gray-500" colSpan={5}>
                   Нет данных по занятым местам
@@ -127,6 +140,21 @@ export default function ReportsTenants() {
               </tr>
             )}
           </tbody>
+          {occupiedItems.length > 0 && (
+            <tfoot className="bg-gray-50 border-t border-gray-200">
+              <tr>
+                <td className="px-4 py-3 font-semibold text-gray-900" colSpan={3}>
+                  Итого
+                </td>
+                <td className="px-4 py-3 text-green-700 font-semibold">
+                  {totals.acceptedAmount.toLocaleString('ru-RU')} ₽
+                </td>
+                <td className="px-4 py-3 text-amber-700 font-semibold">
+                  {totals.expectedAmount.toLocaleString('ru-RU')} ₽
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>

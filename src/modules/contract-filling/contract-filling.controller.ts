@@ -3,12 +3,14 @@ import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { AppDataSource } from '../../config/database';
 import { Contragent } from '../../entities/Contragent';
+import { Club } from '../../entities/Club';
 import { UserRole } from '../../types';
 import * as fs from 'fs';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
 import { parseString } from 'xml2js';
 import { promisify } from 'util';
+import { In } from 'typeorm';
 
 const parseStringAsync = promisify(parseString);
 
@@ -104,6 +106,19 @@ try {
 }
 
 export class ContractFillingController {
+  private async getOwnerClubIds(userId?: number): Promise<number[]> {
+    if (!userId) {
+      return [];
+    }
+
+    const clubRepository = AppDataSource.getRepository(Club);
+    const clubs = await clubRepository.find({
+      where: { ownerId: userId },
+      select: ['id'],
+    });
+    return clubs.map((club) => club.id);
+  }
+
   // Загрузка документа и извлечение якорей
   async upload(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -888,14 +903,21 @@ export class ContractFillingController {
         return;
       }
       
-      // Получаем контрагентов для текущего пользователя или клуба
+      // Получаем контрагентов пользователя, а для владельца клуба также клубные контрагенты.
       const where: any = {};
       if (req.userId) {
         where.userId = req.userId;
       }
+
+      const ownerClubIds =
+        req.userRole === UserRole.CLUB_OWNER ? await this.getOwnerClubIds(req.userId) : [];
+      const whereConditions =
+        ownerClubIds.length > 0
+          ? [{ ...where }, { clubId: In(ownerClubIds) }]
+          : where;
       
       const contragents = await contragentRepository.find({
-        where,
+        where: whereConditions,
         order: { updated_at: 'DESC' },
       });
 
@@ -984,6 +1006,13 @@ export class ContractFillingController {
       if (req.userId) {
         contragentData.userId = req.userId;
       }
+
+      if (req.userRole === UserRole.CLUB_OWNER) {
+        const ownerClubIds = await this.getOwnerClubIds(req.userId);
+        if (ownerClubIds.length === 1) {
+          contragentData.clubId = ownerClubIds[0];
+        }
+      }
       
       const contragent = contragentRepository.create(contragentData);
       const savedContragent = await contragentRepository.save(contragent);
@@ -1037,8 +1066,14 @@ export class ContractFillingController {
       if (req.userId) {
         where.userId = req.userId;
       }
-      
-      const contragent = await contragentRepository.findOne({ where });
+      const ownerClubIds =
+        req.userRole === UserRole.CLUB_OWNER ? await this.getOwnerClubIds(req.userId) : [];
+      const whereConditions =
+        ownerClubIds.length > 0
+          ? [{ ...where }, { id, clubId: In(ownerClubIds) }]
+          : where;
+
+      const contragent = await contragentRepository.findOne({ where: whereConditions });
 
       if (!contragent) {
         throw new AppError('Контрагент не найден', 404);
@@ -1090,8 +1125,14 @@ export class ContractFillingController {
       if (req.userId) {
         where.userId = req.userId;
       }
-      
-      const contragent = await contragentRepository.findOne({ where });
+      const ownerClubIds =
+        req.userRole === UserRole.CLUB_OWNER ? await this.getOwnerClubIds(req.userId) : [];
+      const whereConditions =
+        ownerClubIds.length > 0
+          ? [{ ...where }, { id, clubId: In(ownerClubIds) }]
+          : where;
+
+      const contragent = await contragentRepository.findOne({ where: whereConditions });
 
       if (!contragent) {
         throw new AppError('Контрагент не найден', 404);
