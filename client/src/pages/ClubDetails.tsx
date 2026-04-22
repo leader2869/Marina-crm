@@ -223,32 +223,28 @@ export default function ClubDetails() {
   }
 
   const getBerthStatus = (berth: Berth) => {
-    if (!availableBerthIds.has(berth.id)) {
-      return { status: 'booked', text: 'Недоступен', color: 'text-red-600' }
+    const bookings = berthBookings.get(berth.id)
+
+    if (bookings && bookings.length > 0) {
+      // Проверяем статусы бронирований
+      const hasPending = bookings.some((b: any) => b.status === 'pending')
+      const hasConfirmed = bookings.some((b: any) => b.status === 'confirmed')
+      const hasActive = bookings.some((b: any) => b.status === 'active')
+
+      if (hasActive || hasConfirmed) {
+        return { status: 'booked', text: 'Забронировано', color: 'text-red-600' }
+      }
+      if (hasPending) {
+        return { status: 'pending', text: 'Ожидает', color: 'text-yellow-600' }
+      }
     }
 
-    const bookings = berthBookings.get(berth.id)
-    if (!bookings || bookings.length === 0) {
-      return { status: 'available', text: 'Доступен', color: 'text-green-600' }
-    }
-    
-    // Проверяем статусы бронирований
-    const hasPending = bookings.some((b: any) => b.status === 'pending')
-    const hasConfirmed = bookings.some((b: any) => b.status === 'confirmed')
-    const hasActive = bookings.some((b: any) => b.status === 'active')
-    
-    if (hasActive) {
-      return { status: 'booked', text: 'Забронировано', color: 'text-red-600' }
-    }
-    if (hasConfirmed) {
-      return { status: 'booked', text: 'Забронировано', color: 'text-red-600' }
-    }
-    if (hasPending) {
-      return { status: 'pending', text: 'Ожидает', color: 'text-yellow-600' }
-    }
-    
     if (!hasActiveTariffForBerth(berth)) {
       return { status: 'no_tariff', text: 'Нет тарифа', color: 'text-yellow-600' }
+    }
+
+    if (!availableBerthIds.has(berth.id)) {
+      return { status: 'booked', text: 'Недоступен', color: 'text-red-600' }
     }
 
     return { status: 'available', text: 'Доступен', color: 'text-green-600' }
@@ -314,6 +310,18 @@ export default function ClubDetails() {
     })
     return map
   }, [sortedBerths])
+
+  const guestBerth = useMemo(() => {
+    // Сначала ищем явное гостевое место по имени
+    const byName = sortedBerths.find((berth) => {
+      const normalized = (berth.number || '').toLowerCase()
+      return normalized.includes('guest') || normalized.includes('гост')
+    })
+    if (byName) return byName
+
+    // Фолбэк для текущей схемы: гостевое место соответствует месту 75
+    return berthByNumericNumber.get(75) || null
+  }, [sortedBerths, berthByNumericNumber])
 
   const handleBerthSchemeClick = (berth: Berth) => {
     if (isBerthBookable(berth)) {
@@ -1288,7 +1296,7 @@ export default function ClubDetails() {
 
             {berthsViewMode === 'scheme' && (
               <div className="overflow-auto rounded-lg border border-gray-200 bg-[#d9edf3] p-2">
-                <svg width="3000" height="620" viewBox="250 410 2900 340" className="min-w-[2600px]">
+                <svg width="3000" height="620" viewBox="0 410 3150 340" className="min-w-[2600px]">
                 <defs>
                   <g id="scheme-boat-vertical">
                     <path d="M3,0 L15,0 L18,6 L18,46 L15,52 L3,52 L0,46 L0,6 Z" />
@@ -1304,12 +1312,32 @@ export default function ClubDetails() {
                 <g transform="translate(1620,76)">
                   {/* Малый понтон и Guest */}
                   <g transform="translate(-254,-26)">
-                    <g transform="translate(25,520) scale(1,1)" fill="#f6c78a" stroke="#8a4f1e" strokeWidth="1">
-                      <use href="#scheme-boat-horizontal" />
-                    </g>
-                    <text x="51" y="529" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="#111827">
-                      Гостевое место
-                    </text>
+                    {(() => {
+                      const status = guestBerth ? getBerthStatus(guestBerth) : null
+                      const fill =
+                        status?.status === 'booked'
+                          ? '#ef4444'
+                          : status?.status === 'no_tariff'
+                            ? '#facc15'
+                            : status?.status === 'available'
+                              ? '#22c55e'
+                              : '#9ca3af'
+                      const stroke = status ? '#7f1d1d' : '#6b7280'
+
+                      return (
+                        <g
+                          onClick={() => guestBerth && handleBerthSchemeClick(guestBerth)}
+                          style={{ cursor: guestBerth ? 'pointer' : 'default' }}
+                        >
+                          <g transform="translate(25,520) scale(1,1)" fill={fill} stroke={stroke} strokeWidth="1">
+                            <use href="#scheme-boat-horizontal" />
+                          </g>
+                          <text x="51" y="529" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="#111827">
+                            Гостевое место
+                          </text>
+                        </g>
+                      )
+                    })()}
                     <rect x="0" y="540" width="102" height="22" rx="3" fill="#626b79" />
                   </g>
 
@@ -1330,6 +1358,7 @@ export default function ClubDetails() {
                     { offset: -670, berths: [54, 53, 52, 51], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: -536, berths: [50, 49, 48, 47], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: -402, berths: [46, 45, 44, 43], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -268, berths: [42, 41, 40, 39], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: -134, berths: [38, 37, 36, 35], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: 0, berths: [34, 33, 32, 31], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: 134, berths: [30, 29, 28, 27], xs: [6, 44, 66, 104], fingers: [30, 86] },
