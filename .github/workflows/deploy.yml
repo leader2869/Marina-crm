@@ -11,7 +11,8 @@ jobs:
     env:
       SFTP_SERVER: ${{ secrets.SFTP_SERVER != '' && secrets.SFTP_SERVER || vars.SFTP_SERVER }}
       SFTP_USERNAME: ${{ secrets.SFTP_USERNAME != '' && secrets.SFTP_USERNAME || vars.SFTP_USERNAME }}
-      SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD != '' && secrets.SFTP_PASSWORD || vars.SFTP_PASSWORD }}
+      # Пароль только из Secrets (не из Variables). Fallback: старый FTP_PASSWORD.
+      SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD || secrets.FTP_PASSWORD }}
       SFTP_PORT: ${{ secrets.SFTP_PORT != '' && secrets.SFTP_PORT || vars.SFTP_PORT }}
       SFTP_TARGET_DIR: ${{ secrets.SFTP_TARGET_DIR != '' && secrets.SFTP_TARGET_DIR || vars.SFTP_TARGET_DIR }}
     steps:
@@ -29,12 +30,14 @@ jobs:
             exit 1
           fi
           if [ -z "$SFTP_PASSWORD" ]; then
-            echo "Missing required secret/variable: SFTP_PASSWORD"
+            echo "Не задан пароль SFTP."
+            echo "В GitHub: Settings → Secrets and variables → Actions → New repository secret"
+            echo "Имя: SFTP_PASSWORD (или FTP_PASSWORD как запасной вариант). Значение — не пустая строка."
             exit 1
           fi
           if [ -z "$SFTP_PORT" ]; then
-            echo "Missing required secret/variable: SFTP_PORT"
-            exit 1
+            echo "SFTP_PORT пустой, подставляю 22"
+            echo "SFTP_PORT=22" >> "$GITHUB_ENV"
           fi
           if [ -z "$SFTP_TARGET_DIR" ]; then
             echo "Missing required secret/variable: SFTP_TARGET_DIR"
@@ -46,11 +49,12 @@ jobs:
 
       - name: Deploy via SFTP (rsync over SSH)
         run: |
-          sshpass -p "$SFTP_PASSWORD" rsync -avz --delete \
+          export SSHPASS="$SFTP_PASSWORD"
+          PORT="${SFTP_PORT:-22}"
+          sshpass -e rsync -avz --delete \
+            -e "ssh -p $PORT -o StrictHostKeyChecking=accept-new" \
             --exclude ".git/" \
             --exclude ".github/" \
             --exclude "node_modules/" \
             --exclude ".cursor/" \
             ./ "$SFTP_USERNAME@$SFTP_SERVER:$SFTP_TARGET_DIR"
-        env:
-          SSHPASS: ${{ env.SFTP_PASSWORD }}
