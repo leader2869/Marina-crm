@@ -142,6 +142,27 @@ export default function ClubCashDesk() {
     })
   }, [filters, transactions])
 
+  const filteredTotals = useMemo(() => {
+    const income = filteredTransactions
+      .filter((tx) => tx.transactionType === CashTransactionType.INCOME)
+      .reduce((sum, tx) => sum + Number(tx.amount), 0)
+
+    const expense = filteredTransactions
+      .filter((tx) => tx.transactionType === CashTransactionType.EXPENSE)
+      .reduce((sum, tx) => sum + Number(tx.amount), 0)
+
+    const transfer = filteredTransactions
+      .filter((tx) => tx.transactionType === CashTransactionType.TRANSFER)
+      .reduce((sum, tx) => sum + Number(tx.amount), 0)
+
+    return {
+      income,
+      expense,
+      transfer,
+      result: income - expense,
+    }
+  }, [filteredTransactions])
+
   const handleCreate = async () => {
     if (!selectedClubId) return
     try {
@@ -506,6 +527,30 @@ export default function ClubCashDesk() {
               </tr>
             )}
           </tbody>
+          <tfoot className="bg-gray-50 border-t border-gray-200">
+            <tr>
+              <td className="px-4 py-3 text-sm font-semibold text-gray-900" colSpan={2}>
+                Итого (по фильтру)
+              </td>
+              <td className="px-4 py-3 text-sm">
+                <div className="space-y-0.5">
+                  <div className="text-green-700 font-semibold">
+                    Приход: {filteredTotals.income.toLocaleString('ru-RU')} ₽
+                  </div>
+                  <div className="text-red-700 font-semibold">
+                    Расход: {filteredTotals.expense.toLocaleString('ru-RU')} ₽
+                  </div>
+                  <div className="text-blue-700 font-semibold">
+                    Переводы: {filteredTotals.transfer.toLocaleString('ru-RU')} ₽
+                  </div>
+                  <div className={`font-bold ${filteredTotals.result >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                    Результат: {filteredTotals.result.toLocaleString('ru-RU')} ₽
+                  </div>
+                </div>
+              </td>
+              <td colSpan={5}></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
