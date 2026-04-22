@@ -79,6 +79,7 @@ export default function ClubDetails() {
     expectedAmount: number
   } | null>(null)
   const availableBerthIds = new Set(availableBerths.map((b) => b.id))
+  const freeBerthsCount = (club?.berths || []).filter((berth) => availableBerthIds.has(berth.id)).length
 
   useEffect(() => {
     if (id) {
@@ -1103,9 +1104,9 @@ export default function ClubDetails() {
                 <span className="font-semibold">{club.totalBerths}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Базовая цена за день:</span>
+                <span className="text-gray-600">Свободных мест:</span>
                 <span className="font-semibold text-primary-600">
-                  {club.basePrice.toLocaleString()} ₽
+                  {freeBerthsCount}
                 </span>
               </div>
               {club.minPricePerMonth && (
@@ -1293,8 +1294,7 @@ export default function ClubDetails() {
 
                   {/* Основная линия понтонов */}
                   {[
-                    { offset: -1608, berths: [79], xs: [39], horizontal: true, fingers: [] as number[] },
-                    { offset: -1474, berths: [78, 77, 76, 75], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -1608, berths: [75], xs: [39], horizontal: true, fingers: [] as number[] },
                     { offset: -1340, berths: [74, 73, 72, 71], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: -1206, berths: [70, 69, 68, 67], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: -1072, berths: [66, 65, 64, 63], xs: [6, 44, 66, 104], fingers: [30, 86] },
@@ -1373,6 +1373,32 @@ export default function ClubDetails() {
                   ))}
                 </g>
               </svg>
+            </div>
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">Список мест</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                {sortedBerths.map((berth) => {
+                  const status = getBerthStatus(berth)
+                  const statusClass =
+                    status.status === 'booked'
+                      ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                      : status.status === 'no_tariff'
+                        ? 'border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                        : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+
+                  return (
+                    <button
+                      key={`scheme-list-${berth.id}`}
+                      type="button"
+                      onClick={() => handleBerthSchemeClick(berth)}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors ${statusClass}`}
+                    >
+                      <div className="text-sm font-semibold">{berth.number}</div>
+                      <div className="text-xs">{status.text}</div>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}

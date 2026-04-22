@@ -32,23 +32,12 @@
        boats x=6,44,66,104 (no overlap, no crossing fingers) -->
   <g transform="translate(1620,76)">
     <!-- module -12 (extra far left): no fingers -->
-    <g transform="translate(-1608,0)">
+    <g transform="translate(-1474,0)">
       <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
       <g class="boat" transform="translate(39,520)">
         <use href="#boat-shape-horizontal" />
       </g>
-      <text class="num" x="65" y="529">79</text>
-    </g>
-
-    <!-- module -11 -->
-    <g transform="translate(-1474,0)">
-      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
-      <rect class="finger" x="30" y="458" width="10" height="82" />
-      <rect class="finger" x="86" y="458" width="10" height="82" />
-      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">78</text>
-      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">77</text>
-      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">76</text>
-      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">75</text>
+      <text class="num" x="65" y="529">75</text>
     </g>
 
     <!-- module -10 -->
