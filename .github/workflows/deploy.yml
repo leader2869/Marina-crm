@@ -51,10 +51,21 @@ jobs:
         run: |
           export SSHPASS="$SFTP_PASSWORD"
           PORT="${SFTP_PORT:-22}"
-          sshpass -e rsync -avz --delete \
+          REMOTE="$SFTP_USERNAME@$SFTP_SERVER:$SFTP_TARGET_DIR"
+          # --mkpath: создать целевую папку, если её нет (если существуют родители)
+          if ! sshpass -e rsync -avz --delete --mkpath \
             -e "ssh -p $PORT -o StrictHostKeyChecking=accept-new" \
             --exclude ".git/" \
             --exclude ".github/" \
             --exclude "node_modules/" \
             --exclude ".cursor/" \
-            ./ "$SFTP_USERNAME@$SFTP_SERVER:$SFTP_TARGET_DIR"
+            ./ "$REMOTE"; then
+            echo ""
+            echo "=== rsync: ошибка пути на сервере (часто mkdir ... No such file or directory) ==="
+            echo "Проверьте секрет/переменную SFTP_TARGET_DIR."
+            echo "Возьмите путь из панели reg.ru: «Файлы» / файловый менеджер — каталог сайта"
+            echo "(часто что-то вроде .../domains/1marina.ru/public_html или .../www/1marina.ru)."
+            echo "Путь /www/1marina.ru на виртуальном хостинге часто не существует."
+            echo "Либо укажите путь относительно домашнего каталога FTP без ведущего слэша, например: www/1marina.ru"
+            exit 1
+          fi
