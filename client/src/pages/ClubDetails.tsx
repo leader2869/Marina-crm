@@ -78,6 +78,7 @@ export default function ClubDetails() {
     acceptedAmount: number
     expectedAmount: number
   } | null>(null)
+  const [berthsViewMode, setBerthsViewMode] = useState<'scheme' | 'list'>('scheme')
   const availableBerthIds = new Set(availableBerths.map((b) => b.id))
   const freeBerthsCount = (club?.berths || []).filter((berth) => availableBerthIds.has(berth.id)).length
 
@@ -1260,8 +1261,34 @@ export default function ClubDetails() {
                 Занято
               </span>
             </div>
-            <div className="overflow-auto rounded-lg border border-gray-200 bg-[#d9edf3] p-3">
-              <svg width="2600" height="560" viewBox="0 0 3400 760" className="min-w-[2200px]">
+            <div className="mb-3 inline-flex rounded-lg border border-gray-200 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => setBerthsViewMode('scheme')}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  berthsViewMode === 'scheme'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Схема
+              </button>
+              <button
+                type="button"
+                onClick={() => setBerthsViewMode('list')}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  berthsViewMode === 'list'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Список
+              </button>
+            </div>
+
+            {berthsViewMode === 'scheme' && (
+              <div className="overflow-auto rounded-lg border border-gray-200 bg-[#d9edf3] p-2">
+                <svg width="3000" height="620" viewBox="250 410 2900 340" className="min-w-[2600px]">
                 <defs>
                   <g id="scheme-boat-vertical">
                     <path d="M3,0 L15,0 L18,6 L18,46 L15,52 L3,52 L0,46 L0,6 Z" />
@@ -1281,7 +1308,7 @@ export default function ClubDetails() {
                       <use href="#scheme-boat-horizontal" />
                     </g>
                     <text x="51" y="529" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="#111827">
-                      Guest
+                      Гостевое место
                     </text>
                     <rect x="0" y="540" width="102" height="22" rx="3" fill="#626b79" />
                   </g>
@@ -1373,9 +1400,11 @@ export default function ClubDetails() {
                   ))}
                 </g>
               </svg>
-            </div>
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">Список мест</h4>
+              </div>
+            )}
+            {berthsViewMode === 'list' && (
+              <div className="mt-2">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Список мест</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 {sortedBerths.map((berth) => {
                   const status = getBerthStatus(berth)
@@ -1399,7 +1428,8 @@ export default function ClubDetails() {
                   )
                 })}
               </div>
-            </div>
+              </div>
+            )}
           </div>
         )}
         {sortedBerths.length === 0 && (
