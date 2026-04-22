@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="980" viewBox="0 0 1900 980">
+  <defs>
+    <style>
+      .water { fill: #dceff4; }
+      .shore { fill: #f2ead6; }
+      .pontoon { fill: #5f6672; }
+      .finger { fill: #747d8a; }
+      .boat { fill: #f7c98b; stroke: #8a4f1e; stroke-width: 1; }
+      .boat-small { fill: #f3a9a9; stroke: #9f2a2a; stroke-width: 1; }
+      .admin { fill: #ffe08a; stroke: #8a6617; stroke-width: 2; }
+      .guest { fill: #bcd9ff; stroke: #2451a6; stroke-width: 2; }
+      .txt-title { font: 28px sans-serif; font-weight: 700; fill: #111827; }
+      .txt { font: 16px sans-serif; fill: #1f2937; }
+      .txt-note { font: 14px sans-serif; fill: #374151; }
+      .txt-berth { font: 12px sans-serif; fill: #111827; text-anchor: middle; dominant-baseline: middle; }
+      .guide { stroke: #7b8794; stroke-dasharray: 6 6; stroke-width: 1; }
+    </style>
+    <g id="boat-shape">
+      <path d="M2,0 L14,0 L18,8 L18,44 L14,52 L2,52 L0,44 L0,8 Z" />
+    </g>
+  </defs>
+
+  <rect class="water" x="0" y="0" width="1900" height="980" />
+  <rect class="shore" x="0" y="830" width="1900" height="150" />
+
+  <text class="txt-title" x="50" y="56">Berth Plan V2 (boats + corrected center)</text>
+  <text class="txt-note" x="50" y="84">Fingers are now berth-length or slightly longer. Berths are drawn as boat silhouettes.</text>
+  <text class="txt-note" x="50" y="108">Between 38 and 39: admin pontoon. Guest berth is side-attached alongside (no finger).</text>
+
+  <g transform="translate(80,0)">
+    <!-- Left side, 9 modules -->
+    <g>
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">76</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">75</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">74</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">73</text>
+    </g>
+    <g transform="translate(94,0)">
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">72</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">71</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">70</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">69</text>
+    </g>
+    <g transform="translate(188,0)">
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">68</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">67</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">66</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">65</text>
+    </g>
+    <g transform="translate(282,0)">
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">64</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">63</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">62</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">61</text>
+    </g>
+    <g transform="translate(376,0)">
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">60</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">59</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">58</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">57</text>
+    </g>
+    <g transform="translate(470,0)">
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">56</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">55</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">54</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">53</text>
+    </g>
+    <g transform="translate(564,0)">
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">52</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">51</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">50</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">49</text>
+    </g>
+    <g transform="translate(658,0)">
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">48</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">47</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">46</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">45</text>
+    </g>
+    <g transform="translate(752,0)">
+      <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+      <rect class="finger" x="22" y="620" width="10" height="80" />
+      <rect class="finger" x="52" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">44</text>
+      <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">43</text>
+      <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">42</text>
+      <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">41</text>
+    </g>
+
+    <!-- Central admin pontoon -->
+    <g transform="translate(860,0)">
+      <rect class="pontoon" x="0" y="700" width="120" height="24" rx="4" />
+      <!-- Small admin office placed ON the pontoon -->
+      <rect class="admin" x="44" y="684" width="32" height="14" rx="3" />
+      <text class="txt-note" x="60" y="678" text-anchor="middle">Admin</text>
+      <rect class="finger" x="-14" y="620" width="10" height="80" />
+      <rect class="finger" x="124" y="620" width="10" height="80" />
+      <g class="boat" transform="translate(-36,640)"><use href="#boat-shape" /></g><text class="txt-berth" x="-27" y="666">40</text>
+      <g class="boat" transform="translate(-14,640)"><use href="#boat-shape" /></g><text class="txt-berth" x="-5" y="666">39</text>
+      <g class="boat" transform="translate(124,640)"><use href="#boat-shape" /></g><text class="txt-berth" x="133" y="666">38</text>
+      <g class="boat" transform="translate(146,640)"><use href="#boat-shape" /></g><text class="txt-berth" x="155" y="666">37</text>
+    </g>
+
+    <!-- Guest berth -->
+    <g transform="translate(980,0)">
+      <!-- Separate pontoon of the same size, near admin pontoon -->
+      <rect class="pontoon" x="0" y="700" width="120" height="24" rx="4" />
+      <text class="txt-note" x="60" y="692" text-anchor="middle">Guest pontoon</text>
+      <text class="txt-note" x="60" y="741" text-anchor="middle">(alongside, no finger)</text>
+    </g>
+
+    <!-- Right side, 9 modules -->
+    <g transform="translate(1170,0)">
+      <g>
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">36</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">35</text>
+        <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">34</text>
+        <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">33</text>
+      </g>
+      <g transform="translate(94,0)">
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">32</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">31</text>
+        <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">30</text>
+        <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">29</text>
+      </g>
+      <g transform="translate(188,0)">
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">28</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">27</text>
+        <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">26</text>
+        <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">25</text>
+      </g>
+      <g transform="translate(282,0)">
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">24</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">23</text>
+        <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">22</text>
+        <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">21</text>
+      </g>
+      <g transform="translate(376,0)">
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">20</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">19</text>
+        <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">18</text>
+        <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">17</text>
+      </g>
+      <g transform="translate(470,0)">
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">16</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">15</text>
+        <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">14</text>
+        <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">13</text>
+      </g>
+      <g transform="translate(564,0)">
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">12</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">11</text>
+        <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">10</text>
+        <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">9</text>
+      </g>
+      <g transform="translate(658,0)">
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">8</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">7</text>
+        <g class="boat-small" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">6</text>
+        <g class="boat-small" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">5</text>
+      </g>
+      <g transform="translate(752,0)">
+        <rect class="pontoon" x="0" y="700" width="84" height="24" rx="4" />
+        <rect class="finger" x="22" y="620" width="10" height="80" />
+        <rect class="finger" x="52" y="620" width="10" height="80" />
+        <g class="boat" transform="translate(6,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="15" y="668">4</text>
+        <g class="boat" transform="translate(28,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="37" y="668">3</text>
+        <g class="boat" transform="translate(40,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="49" y="668">2</text>
+        <g class="boat" transform="translate(62,642)"><use href="#boat-shape" /></g><text class="txt-berth" x="71" y="668">1</text>
+      </g>
+    </g>
+  </g>
+
+  <line x1="950" y1="530" x2="950" y2="830" class="guide" />
+  <rect class="guest" x="918" y="830" width="64" height="120" />
+  <text class="txt" x="950" y="890" text-anchor="middle">Entrance</text>
+  <text class="txt-note" x="950" y="912" text-anchor="middle">between 38 and 39</text>
+  <text class="txt" x="1840" y="896" text-anchor="end">Shore</text>
+  <text class="txt-note" x="1840" y="920" text-anchor="end">Berths 5 and 6 are small-boat berths</text>
+</svg>

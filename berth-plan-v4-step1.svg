@@ -1,0 +1,269 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3400" height="760" viewBox="0 0 3400 760">
+  <defs>
+    <style>
+      .water { fill: #d9edf3; }
+      .shore { fill: #efe5cf; }
+      .pontoon { fill: #626b79; }
+      .finger { fill: #7a8493; }
+      .ladder { fill: #8b95a5; stroke: #5b6472; stroke-width: 1; }
+      .boat { fill: #f6c78a; stroke: #8a4f1e; stroke-width: 1; }
+      .txt-title { font: 22px sans-serif; font-weight: 700; fill: #111827; }
+      .txt { font: 14px sans-serif; fill: #1f2937; }
+      .num { font: 10px sans-serif; fill: #111827; text-anchor: middle; dominant-baseline: middle; }
+    </style>
+    <!-- simple, clean top-view boat -->
+    <g id="boat-shape">
+      <path d="M3,0 L15,0 L18,6 L18,46 L15,52 L3,52 L0,46 L0,6 Z" />
+    </g>
+    <g id="boat-shape-horizontal">
+      <path d="M0,3 L0,15 L6,18 L46,18 L52,15 L52,3 L46,0 L6,0 Z" />
+    </g>
+  </defs>
+
+  <rect class="water" x="0" y="0" width="3400" height="760" />
+  <rect class="shore" x="0" y="640" width="3400" height="120" />
+
+  <text class="txt-title" x="40" y="44">Step 1: 9 pontoon modules (2 fingers, 4 boats per module)</text>
+  <text class="txt" x="40" y="68">Numbering is right to left.</text>
+
+  <!-- Layout constants:
+       module width=130, step=134 (small gap)
+       fingers x=30 and x=86
+       boats x=6,44,66,104 (no overlap, no crossing fingers) -->
+  <g transform="translate(1620,76)">
+    <!-- module -12 (extra far left): no fingers -->
+    <g transform="translate(-1608,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <g class="boat" transform="translate(39,520)">
+        <use href="#boat-shape-horizontal" />
+      </g>
+      <text class="num" x="65" y="529">79</text>
+    </g>
+
+    <!-- module -11 -->
+    <g transform="translate(-1474,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">78</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">77</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">76</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">75</text>
+    </g>
+
+    <!-- module -10 -->
+    <g transform="translate(-1340,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">74</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">73</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">72</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">71</text>
+    </g>
+
+    <!-- module -9 -->
+    <g transform="translate(-1206,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">70</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">69</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">68</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">67</text>
+    </g>
+
+    <!-- module -8 -->
+    <g transform="translate(-1072,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">66</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">65</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">64</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">63</text>
+    </g>
+
+    <!-- module -7 -->
+    <g transform="translate(-938,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">62</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">61</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">60</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">59</text>
+    </g>
+
+    <!-- module -6 -->
+    <g transform="translate(-804,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">58</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">57</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">56</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">55</text>
+    </g>
+
+    <!-- module -5 -->
+    <g transform="translate(-670,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">54</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">53</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">52</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">51</text>
+    </g>
+
+    <!-- module -4 -->
+    <g transform="translate(-536,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">50</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">49</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">48</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">47</text>
+    </g>
+
+    <!-- module -3 -->
+    <g transform="translate(-402,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">46</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">45</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">44</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">43</text>
+    </g>
+
+    <!-- module -2 (small, upper-left): narrower pontoon -->
+    <g transform="translate(-254,-26)">
+      <g class="boat" transform="translate(25,520)">
+        <use href="#boat-shape-horizontal" />
+      </g>
+      <text class="num" x="51" y="529">Guest</text>
+      <rect class="pontoon" x="0" y="540" width="102" height="22" rx="3" />
+    </g>
+
+    <!-- module -1 (extra left): no fingers -->
+    <g transform="translate(-268,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <!-- ladder from shore to right side of big pontoon -->
+      <rect class="ladder" x="65" y="568" width="65" height="76" rx="2" />
+      <line x1="67" y1="578" x2="128" y2="578" stroke="#5b6472" stroke-width="1" />
+      <line x1="67" y1="588" x2="128" y2="588" stroke="#5b6472" stroke-width="1" />
+      <line x1="67" y1="598" x2="128" y2="598" stroke="#5b6472" stroke-width="1" />
+      <line x1="67" y1="608" x2="128" y2="608" stroke="#5b6472" stroke-width="1" />
+      <line x1="67" y1="618" x2="128" y2="618" stroke="#5b6472" stroke-width="1" />
+      <line x1="67" y1="628" x2="128" y2="628" stroke="#5b6472" stroke-width="1" />
+      <line x1="67" y1="638" x2="128" y2="638" stroke="#5b6472" stroke-width="1" />
+    </g>
+
+    <!-- module 1 -->
+    <g transform="translate(-134,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">38</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">37</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">36</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">35</text>
+    </g>
+
+    <!-- module 2 -->
+    <g transform="translate(0,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">34</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">33</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">32</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">31</text>
+    </g>
+
+    <!-- module 3 -->
+    <g transform="translate(134,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">30</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">29</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">28</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">27</text>
+    </g>
+
+    <!-- module 4 -->
+    <g transform="translate(268,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">26</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">25</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">24</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">23</text>
+    </g>
+
+    <!-- module 5 -->
+    <g transform="translate(402,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">22</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">21</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">20</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">19</text>
+    </g>
+
+    <!-- module 6 -->
+    <g transform="translate(536,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">18</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">17</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">16</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">15</text>
+    </g>
+
+    <!-- module 7 -->
+    <g transform="translate(670,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">14</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">13</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">12</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">11</text>
+    </g>
+
+    <!-- module 8 -->
+    <g transform="translate(804,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="16" y="458" width="10" height="82" />
+      <rect class="finger" x="56" y="458" width="10" height="82" />
+      <rect class="finger" x="96" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(1.5,486) scale(0.85,0.85)"><use href="#boat-shape"/></g><text class="num" x="9" y="508">10</text>
+      <g class="boat" transform="translate(25.5,486) scale(0.85,0.85)"><use href="#boat-shape"/></g><text class="num" x="33" y="508">9</text>
+      <g class="boat" transform="translate(41.5,486) scale(0.85,0.85)"><use href="#boat-shape"/></g><text class="num" x="49" y="508">8</text>
+      <g class="boat" transform="translate(65.5,486) scale(0.85,0.85)"><use href="#boat-shape"/></g><text class="num" x="73" y="508">7</text>
+      <g class="boat" transform="translate(81.5,486) scale(0.85,0.85)"><use href="#boat-shape"/></g><text class="num" x="89" y="508">6</text>
+      <g class="boat" transform="translate(105.5,486) scale(0.85,0.85)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">5</text>
+    </g>
+
+    <!-- module 9 -->
+    <g transform="translate(938,0)">
+      <rect class="pontoon" x="0" y="540" width="130" height="24" rx="3" />
+      <rect class="finger" x="30" y="458" width="10" height="82" />
+      <rect class="finger" x="86" y="458" width="10" height="82" />
+      <g class="boat" transform="translate(6,482)"><use href="#boat-shape"/></g><text class="num" x="15" y="508">4</text>
+      <g class="boat" transform="translate(44,482)"><use href="#boat-shape"/></g><text class="num" x="53" y="508">3</text>
+      <g class="boat" transform="translate(66,482)"><use href="#boat-shape"/></g><text class="num" x="75" y="508">2</text>
+      <g class="boat" transform="translate(104,482)"><use href="#boat-shape"/></g><text class="num" x="113" y="508">1</text>
+    </g>
+  </g>
+
+  <text class="txt" x="3340" y="710" text-anchor="end">Shore</text>
+</svg>

@@ -193,6 +193,33 @@ export default function ClubDetails() {
     }
   }
 
+  const hasActiveTariffForBerth = (berth: Berth) => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const tariffBerths = berth.tariffBerths || []
+    return tariffBerths.some((tb: any) => {
+      const tariff = tb?.tariff
+      if (!tariff) return false
+
+      if (!tariff.startDate && !tariff.endDate) return true
+
+      if (tariff.startDate) {
+        const startDate = new Date(tariff.startDate)
+        startDate.setHours(0, 0, 0, 0)
+        if (today < startDate) return false
+      }
+
+      if (tariff.endDate) {
+        const endDate = new Date(tariff.endDate)
+        endDate.setHours(23, 59, 59, 999)
+        if (today > endDate) return false
+      }
+
+      return true
+    })
+  }
+
   const getBerthStatus = (berth: Berth) => {
     if (!availableBerthIds.has(berth.id)) {
       return { status: 'booked', text: 'Недоступен', color: 'text-red-600' }
@@ -218,13 +245,17 @@ export default function ClubDetails() {
       return { status: 'pending', text: 'Ожидает', color: 'text-yellow-600' }
     }
     
+    if (!hasActiveTariffForBerth(berth)) {
+      return { status: 'no_tariff', text: 'Нет тарифа', color: 'text-yellow-600' }
+    }
+
     return { status: 'available', text: 'Доступен', color: 'text-green-600' }
   }
 
   const isBerthBookable = (berth: Berth) => {
     // Источник истины по доступности — backend endpoint /berths/club/:id/available
     // (учитывает статусы брони и блокирующие статусы оплат).
-    return berth.isAvailable && availableBerthIds.has(berth.id)
+    return berth.isAvailable && availableBerthIds.has(berth.id) && hasActiveTariffForBerth(berth)
   }
   
   // Для всех ролей (кроме гостя, который фильтруется на backend) показываем все места
@@ -270,6 +301,17 @@ export default function ClubDetails() {
     })
     return map
   }, [tenantReport])
+
+  const berthByNumericNumber = useMemo(() => {
+    const map = new Map<number, Berth>()
+    sortedBerths.forEach((berth) => {
+      const parsed = parseInt((berth.number || '').replace(/\D+/g, ''), 10)
+      if (!Number.isNaN(parsed)) {
+        map.set(parsed, berth)
+      }
+    })
+    return map
+  }, [sortedBerths])
 
   const handleBerthSchemeClick = (berth: Berth) => {
     if (isBerthBookable(berth)) {
@@ -1203,26 +1245,134 @@ export default function ClubDetails() {
               Авто-шаблон построен по количеству мест. Нажмите на свободное место для бронирования.
               Владельцу клуба по занятому месту показывается информация об арендаторе и суммах.
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-              {sortedBerths.map((berth) => {
-                const status = getBerthStatus(berth)
-                const isBookable = isBerthBookable(berth)
-                const statusClass = isBookable
-                  ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
-                  : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+            <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-gray-700">
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-3 w-3 rounded bg-green-500" />
+                Свободно
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-3 w-3 rounded bg-yellow-400" />
+                Нет тарифа
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-3 w-3 rounded bg-red-500" />
+                Занято
+              </span>
+            </div>
+            <div className="overflow-auto rounded-lg border border-gray-200 bg-[#d9edf3] p-3">
+              <svg width="2600" height="560" viewBox="0 0 3400 760" className="min-w-[2200px]">
+                <defs>
+                  <g id="scheme-boat-vertical">
+                    <path d="M3,0 L15,0 L18,6 L18,46 L15,52 L3,52 L0,46 L0,6 Z" />
+                  </g>
+                  <g id="scheme-boat-horizontal">
+                    <path d="M0,3 L0,15 L6,18 L46,18 L52,15 L52,3 L46,0 L6,0 Z" />
+                  </g>
+                </defs>
 
-                return (
-                  <button
-                    key={`scheme-${berth.id}`}
-                    type="button"
-                    onClick={() => handleBerthSchemeClick(berth)}
-                    className={`rounded-lg border px-3 py-2 text-left transition-colors ${statusClass}`}
-                  >
-                    <div className="text-sm font-semibold">{berth.number}</div>
-                    <div className="text-xs">{status.text}</div>
-                  </button>
-                )
-              })}
+                <rect x="0" y="0" width="3400" height="760" fill="#d9edf3" />
+                <rect x="0" y="640" width="3400" height="120" fill="#efe5cf" />
+
+                <g transform="translate(1620,76)">
+                  {/* Малый понтон и Guest */}
+                  <g transform="translate(-254,-26)">
+                    <g transform="translate(25,520) scale(1,1)" fill="#f6c78a" stroke="#8a4f1e" strokeWidth="1">
+                      <use href="#scheme-boat-horizontal" />
+                    </g>
+                    <text x="51" y="529" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="#111827">
+                      Guest
+                    </text>
+                    <rect x="0" y="540" width="102" height="22" rx="3" fill="#626b79" />
+                  </g>
+
+                  {/* Понтон у Guest + лестница */}
+                  <g transform="translate(-268,0)">
+                    <rect x="0" y="540" width="130" height="24" rx="3" fill="#626b79" />
+                    <rect x="65" y="568" width="65" height="76" rx="2" fill="#8b95a5" stroke="#5b6472" strokeWidth="1" />
+                  </g>
+
+                  {/* Основная линия понтонов */}
+                  {[
+                    { offset: -1608, berths: [79], xs: [39], horizontal: true, fingers: [] as number[] },
+                    { offset: -1474, berths: [78, 77, 76, 75], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -1340, berths: [74, 73, 72, 71], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -1206, berths: [70, 69, 68, 67], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -1072, berths: [66, 65, 64, 63], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -938, berths: [62, 61, 60, 59], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -804, berths: [58, 57, 56, 55], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -670, berths: [54, 53, 52, 51], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -536, berths: [50, 49, 48, 47], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -402, berths: [46, 45, 44, 43], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -134, berths: [38, 37, 36, 35], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: 0, berths: [34, 33, 32, 31], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: 134, berths: [30, 29, 28, 27], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: 268, berths: [26, 25, 24, 23], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: 402, berths: [22, 21, 20, 19], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: 536, berths: [18, 17, 16, 15], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: 670, berths: [14, 13, 12, 11], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: 804, berths: [10, 9, 8, 7, 6, 5], xs: [0, 24, 40, 64, 80, 104], fingers: [16, 56, 96] },
+                    { offset: 938, berths: [4, 3, 2, 1], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                  ].map((module) => (
+                    <g key={`module-${module.offset}`} transform={`translate(${module.offset},0)`}>
+                      <rect x="0" y="540" width="130" height="24" rx="3" fill="#626b79" />
+                      {module.fingers.map((fx) => (
+                        <rect key={`finger-${fx}`} x={fx} y="458" width="10" height="82" fill="#7a8493" />
+                      ))}
+
+                      {module.berths.map((berthNumber, index) => {
+                        const berth = berthByNumericNumber.get(berthNumber)
+                        const berthStatus = berth ? getBerthStatus(berth) : null
+                        const fill =
+                          berthStatus?.status === 'booked'
+                            ? '#ef4444'
+                            : berthStatus?.status === 'no_tariff'
+                              ? '#facc15'
+                              : berthStatus?.status === 'available'
+                                ? '#22c55e'
+                                : '#9ca3af'
+                        const stroke = berthStatus ? '#7f1d1d' : '#6b7280'
+                        const isHorizontal = module.horizontal === true
+                        const boatX = module.xs[index]
+                        const boatY = isHorizontal ? 520 : berthNumber >= 5 && berthNumber <= 10 ? 486 : 482
+                        const boatScale = berthNumber >= 5 && berthNumber <= 10 ? 0.85 : 1
+
+                        return (
+                          <g
+                            key={`berth-${berthNumber}`}
+                            onClick={() => berth && handleBerthSchemeClick(berth)}
+                            style={{ cursor: berth ? 'pointer' : 'default' }}
+                          >
+                            {isHorizontal ? (
+                              <g transform={`translate(${boatX},${boatY})`} fill={fill} stroke={stroke} strokeWidth="1">
+                                <use href="#scheme-boat-horizontal" />
+                              </g>
+                            ) : (
+                              <g
+                                transform={`translate(${boatX},${boatY}) scale(${boatScale},${boatScale})`}
+                                fill={fill}
+                                stroke={stroke}
+                                strokeWidth="1"
+                              >
+                                <use href="#scheme-boat-vertical" />
+                              </g>
+                            )}
+                            <text
+                              x={isHorizontal ? boatX + 26 : module.xs[index] + 9}
+                              y={isHorizontal ? boatY + 9 : 508}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              fontSize="10"
+                              fill="#111827"
+                            >
+                              {berthNumber}
+                            </text>
+                          </g>
+                        )
+                      })}
+                    </g>
+                  ))}
+                </g>
+              </svg>
             </div>
           </div>
         )}

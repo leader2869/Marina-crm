@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="900" viewBox="0 0 1800 900">
+  <defs>
+    <style>
+      .bg-water { fill: #d8edf3; }
+      .bg-shore { fill: #f5ecd7; }
+      .pontoon { fill: #6b7280; }
+      .finger { fill: #7c8594; }
+      .berth { fill: #fde68a; stroke: #a16207; stroke-width: 1; }
+      .berth-small { fill: #fca5a5; stroke: #b91c1c; stroke-width: 1; }
+      .berth-text { font: 11px sans-serif; fill: #111827; text-anchor: middle; dominant-baseline: middle; }
+      .title { font: 22px sans-serif; font-weight: 700; fill: #111827; }
+      .label { font: 16px sans-serif; fill: #374151; }
+      .note { font: 14px sans-serif; fill: #4b5563; }
+      .entrance { fill: #93c5fd; stroke: #1d4ed8; stroke-width: 2; }
+      .hut { fill: #fde68a; stroke: #92400e; stroke-width: 2; }
+      .guest { fill: #bfdbfe; stroke: #1e40af; stroke-width: 2; }
+      .guide { stroke: #9ca3af; stroke-dasharray: 5 5; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1800" height="900" class="bg-water" />
+  <rect x="0" y="760" width="1800" height="140" class="bg-shore" />
+
+  <text x="60" y="50" class="title">Draft pontoon line scheme (76 berths)</text>
+  <text x="60" y="78" class="note">Pontoons run left to right along shore. Berth numbering runs right to left.</text>
+
+  <rect x="90" y="650" width="1620" height="24" rx="4" class="pontoon" />
+  <text x="900" y="706" class="label" text-anchor="middle">Main pontoon line</text>
+
+  <g>
+    <rect x="140" y="440" width="10" height="210" class="finger" />
+    <rect x="220" y="440" width="10" height="210" class="finger" />
+    <rect x="300" y="440" width="10" height="210" class="finger" />
+    <rect x="380" y="440" width="10" height="210" class="finger" />
+    <rect x="460" y="440" width="10" height="210" class="finger" />
+    <rect x="540" y="440" width="10" height="210" class="finger" />
+    <rect x="620" y="440" width="10" height="210" class="finger" />
+    <rect x="700" y="440" width="10" height="210" class="finger" />
+    <rect x="780" y="440" width="10" height="210" class="finger" />
+    <rect x="860" y="440" width="10" height="210" class="finger" />
+    <rect x="940" y="440" width="10" height="210" class="finger" />
+    <rect x="1020" y="440" width="10" height="210" class="finger" />
+    <rect x="1100" y="440" width="10" height="210" class="finger" />
+    <rect x="1180" y="440" width="10" height="210" class="finger" />
+    <rect x="1260" y="440" width="10" height="210" class="finger" />
+    <rect x="1340" y="440" width="10" height="210" class="finger" />
+    <rect x="1420" y="440" width="10" height="210" class="finger" />
+    <rect x="1500" y="440" width="10" height="210" class="finger" />
+    <rect x="1580" y="440" width="10" height="210" class="finger" />
+  </g>
+
+  <g>
+    <rect x="102" y="600" width="72" height="32" rx="5" class="berth" /><text x="138" y="616" class="berth-text">76-73</text>
+    <rect x="182" y="600" width="72" height="32" rx="5" class="berth" /><text x="218" y="616" class="berth-text">72-69</text>
+    <rect x="262" y="600" width="72" height="32" rx="5" class="berth" /><text x="298" y="616" class="berth-text">68-65</text>
+    <rect x="342" y="600" width="72" height="32" rx="5" class="berth" /><text x="378" y="616" class="berth-text">64-61</text>
+    <rect x="422" y="600" width="72" height="32" rx="5" class="berth" /><text x="458" y="616" class="berth-text">60-57</text>
+    <rect x="502" y="600" width="72" height="32" rx="5" class="berth" /><text x="538" y="616" class="berth-text">56-53</text>
+    <rect x="582" y="600" width="72" height="32" rx="5" class="berth" /><text x="618" y="616" class="berth-text">52-49</text>
+    <rect x="662" y="600" width="72" height="32" rx="5" class="berth" /><text x="698" y="616" class="berth-text">48-45</text>
+    <rect x="742" y="600" width="72" height="32" rx="5" class="berth" /><text x="778" y="616" class="berth-text">44-41</text>
+    <rect x="822" y="600" width="72" height="32" rx="5" class="berth" /><text x="858" y="616" class="berth-text">40-39</text>
+    <rect x="902" y="600" width="72" height="32" rx="5" class="berth" /><text x="938" y="616" class="berth-text">38-37</text>
+    <rect x="982" y="600" width="72" height="32" rx="5" class="berth" /><text x="1018" y="616" class="berth-text">36-33</text>
+    <rect x="1062" y="600" width="72" height="32" rx="5" class="berth" /><text x="1098" y="616" class="berth-text">32-29</text>
+    <rect x="1142" y="600" width="72" height="32" rx="5" class="berth" /><text x="1178" y="616" class="berth-text">28-25</text>
+    <rect x="1222" y="600" width="72" height="32" rx="5" class="berth" /><text x="1258" y="616" class="berth-text">24-21</text>
+    <rect x="1302" y="600" width="72" height="32" rx="5" class="berth" /><text x="1338" y="616" class="berth-text">20-17</text>
+    <rect x="1382" y="600" width="72" height="32" rx="5" class="berth" /><text x="1418" y="616" class="berth-text">16-13</text>
+    <rect x="1462" y="600" width="72" height="32" rx="5" class="berth" /><text x="1498" y="616" class="berth-text">12-9</text>
+    <rect x="1542" y="600" width="72" height="32" rx="5" class="berth-small" /><text x="1578" y="616" class="berth-text">8-5*</text>
+    <text x="1578" y="642" class="note" text-anchor="middle">* Berths 5 and 6 are small-boat slots</text>
+  </g>
+
+  <line x1="900" y1="520" x2="900" y2="760" class="guide" />
+  <rect x="872" y="760" width="56" height="120" class="entrance" />
+  <text x="900" y="826" class="label" text-anchor="middle">Entrance</text>
+  <text x="900" y="846" class="note" text-anchor="middle">Between berths 38 and 39</text>
+
+  <rect x="840" y="560" width="120" height="66" rx="6" class="hut" />
+  <text x="900" y="590" class="label" text-anchor="middle">Admin hut</text>
+
+  <rect x="962" y="565" width="190" height="18" rx="4" class="guest" />
+  <rect x="1126" y="520" width="18" height="108" rx="4" class="guest" />
+  <text x="1058" y="548" class="label" text-anchor="middle">Guest pontoon (side mooring)</text>
+  <text x="1148" y="632" class="note">Guest berth</text>
+
+  <text x="140" y="406" class="note">Each module: 2 fingers / 4 berths</text>
+  <text x="1700" y="835" class="label" text-anchor="end">Shore</text>
+</svg>
