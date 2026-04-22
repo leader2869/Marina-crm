@@ -8,15 +8,44 @@ on:
 jobs:
   ftp-deploy:
     runs-on: ubuntu-latest
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_PORT: ${{ secrets.FTP_PORT }}
+      FTP_TARGET_DIR: ${{ secrets.FTP_TARGET_DIR }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate required FTP secrets
+        run: |
+          if [ -z "$FTP_SERVER" ]; then
+            echo "Missing required secret: FTP_SERVER"
+            exit 1
+          fi
+          if [ -z "$FTP_USERNAME" ]; then
+            echo "Missing required secret: FTP_USERNAME"
+            exit 1
+          fi
+          if [ -z "$FTP_PASSWORD" ]; then
+            echo "Missing required secret: FTP_PASSWORD"
+            exit 1
+          fi
+          if [ -z "$FTP_PORT" ]; then
+            echo "Missing required secret: FTP_PORT"
+            exit 1
+          fi
+          if [ -z "$FTP_TARGET_DIR" ]; then
+            echo "Missing required secret: FTP_TARGET_DIR"
+            exit 1
+          fi
+
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT }}
-          server-dir: ${{ secrets.FTP_TARGET_DIR }}
+          server: ${{ env.FTP_SERVER }}
+          username: ${{ env.FTP_USERNAME }}
+          password: ${{ env.FTP_PASSWORD }}
+          port: ${{ env.FTP_PORT }}
+          server-dir: ${{ env.FTP_TARGET_DIR }}
