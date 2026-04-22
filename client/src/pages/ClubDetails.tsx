@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { clubsService, berthsService, vesselsService, bookingsService, bookingRulesService } from '../services/api'
-import { Club, Berth, Vessel } from '../types'
+import {
+  clubsService,
+  berthsService,
+  vesselsService,
+  bookingsService,
+  bookingRulesService,
+  clubFinanceService,
+} from '../services/api'
+import { Club, Berth, Vessel, ClubTenantReportResponse } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
 import { MapPin, Phone, Mail, Globe, Anchor, Edit2, X, Plus, Trash2, Calendar, UserPlus, ShieldCheck } from 'lucide-react'
@@ -63,6 +70,15 @@ export default function ClubDetails() {
   const [showRegisterModal, setShowRegisterModal] = useState(false)
   const [berthBookings, setBerthBookings] = useState<Map<number, any[]>>(new Map())
   const [bookingRules, setBookingRules] = useState<any[]>([])
+  const [berthsViewMode, setBerthsViewMode] = useState<'scheme' | 'list'>('scheme')
+  const [tenantReport, setTenantReport] = useState<ClubTenantReportResponse | null>(null)
+  const [selectedOccupiedBerth, setSelectedOccupiedBerth] = useState<{
+    berthNumber: string
+    renterFullName: string
+    renterPhone: string
+    acceptedAmount: number
+    expectedAmount: number
+  } | null>(null)
   const availableBerthIds = new Set(availableBerths.map((b) => b.id))
 
   useEffect(() => {
@@ -77,6 +93,12 @@ export default function ClubDetails() {
       loadBerthBookings()
     }
   }, [club])
+
+  useEffect(() => {
+    if (club?.id) {
+      loadTenantReport(club.id)
+    }
+  }, [club?.id])
 
   useEffect(() => {
     // Загружаем суда пользователя, если он судовладелец
@@ -162,6 +184,16 @@ export default function ClubDetails() {
     }
   }
 
+  const loadTenantReport = async (clubId: number) => {
+    try {
+      const response = await clubFinanceService.getTenantReport(clubId)
+      setTenantReport(response as unknown as ClubTenantReportResponse)
+    } catch (error) {
+      console.error('Ошибка загрузки отчета по арендаторам:', error)
+      setTenantReport(null)
+    }
+  }
+
   const getBerthStatus = (berth: Berth) => {
     if (!availableBerthIds.has(berth.id)) {
       return { status: 'booked', text: 'Недоступен', color: 'text-red-600' }
@@ -218,6 +250,47 @@ export default function ClubDetails() {
     if (club) {
       loadBookingRules(club.id)
     }
+  }
+
+  const sortedBerths = useMemo(() => {
+    const berths = club?.berths || []
+    return [...berths].sort((a, b) => {
+      const aNum = parseInt((a.number || '').replace(/\D+/g, ''), 10)
+      const bNum = parseInt((b.number || '').replace(/\D+/g, ''), 10)
+      if (!Number.isNaN(aNum) && !Number.isNaN(bNum) && aNum !== bNum) {
+        return aNum - bNum
+      }
+      return (a.number || '').localeCompare(b.number || '', 'ru')
+    })
+  }, [club?.berths])
+
+  const tenantByBerthId = useMemo(() => {
+    const map = new Map<number, ClubTenantReportResponse['occupiedItems'][number]>()
+    ;(tenantReport?.occupiedItems || []).forEach((item) => {
+      map.set(item.berthId, item)
+    })
+    return map
+  }, [tenantReport])
+
+  const handleBerthSchemeClick = (berth: Berth) => {
+    if (isBerthBookable(berth)) {
+      handleOpenBookingModalForBerth(berth)
+      return
+    }
+
+    const isClubOwner = user?.role === UserRole.CLUB_OWNER && club?.ownerId === user?.id
+    if (!isClubOwner) return
+
+    const info = tenantByBerthId.get(berth.id)
+    if (!info) return
+
+    setSelectedOccupiedBerth({
+      berthNumber: info.berthNumber,
+      renterFullName: info.renterFullName,
+      renterPhone: info.renterPhone,
+      acceptedAmount: Number(info.acceptedAmount),
+      expectedAmount: Number(info.expectedAmount),
+    })
   }
 
   const loadBookingRules = async (clubId: number) => {
@@ -1140,6 +1213,30 @@ export default function ClubDetails() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">Места</h2>
           <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden mr-2">
+              <button
+                type="button"
+                onClick={() => setBerthsViewMode('scheme')}
+                className={`px-3 py-2 text-sm ${
+                  berthsViewMode === 'scheme'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                Схема
+              </button>
+              <button
+                type="button"
+                onClick={() => setBerthsViewMode('list')}
+                className={`px-3 py-2 text-sm border-l border-gray-300 ${
+                  berthsViewMode === 'list'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                Список
+              </button>
+            </div>
             {canManageBerths() && club.berths && club.berths.length > 0 && (
               <>
                 <button
@@ -1172,9 +1269,40 @@ export default function ClubDetails() {
           </div>
         </div>
 
-        {club.berths && club.berths.length > 0 ? (
+        {berthsViewMode === 'scheme' && sortedBerths.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Схема мест</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Авто-шаблон построен по количеству мест. Нажмите на свободное место для бронирования.
+              Владельцу клуба по занятому месту показывается информация об арендаторе и суммах.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+              {sortedBerths.map((berth) => {
+                const status = getBerthStatus(berth)
+                const isBookable = isBerthBookable(berth)
+                const statusClass = isBookable
+                  ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+                  : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+
+                return (
+                  <button
+                    key={`scheme-${berth.id}`}
+                    type="button"
+                    onClick={() => handleBerthSchemeClick(berth)}
+                    className={`rounded-lg border px-3 py-2 text-left transition-colors ${statusClass}`}
+                  >
+                    <div className="text-sm font-semibold">{berth.number}</div>
+                    <div className="text-xs">{status.text}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {berthsViewMode === 'list' && club.berths && club.berths.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {club.berths.map((berth) => (
+            {sortedBerths.map((berth) => (
               <div key={berth.id} className={`border rounded-lg p-4 relative ${selectedBerths.has(berth.id) ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}`}>
                 {canManageBerths() && (
                   <>
@@ -1370,7 +1498,7 @@ export default function ClubDetails() {
               </div>
             ))}
           </div>
-        ) : (
+        ) : berthsViewMode === 'list' ? (
           <div className="text-center py-8 text-gray-500">
             <Anchor className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <p>Места не добавлены</p>
@@ -1383,7 +1511,7 @@ export default function ClubDetails() {
               </button>
             )}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Модальное окно добавления места */}
@@ -2121,6 +2249,76 @@ export default function ClubDetails() {
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedOccupiedBerth && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+              onClick={() => setSelectedOccupiedBerth(null)}
+            />
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Информация по месту {selectedOccupiedBerth.berthNumber}
+                  </h3>
+                  <button
+                    onClick={() => setSelectedOccupiedBerth(null)}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">ФИО арендатора:</span>
+                    <span className="font-semibold text-gray-900">{selectedOccupiedBerth.renterFullName || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Телефон:</span>
+                    <span className="font-semibold text-gray-900">{selectedOccupiedBerth.renterPhone || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Принято:</span>
+                    <span className="font-semibold text-green-700">
+                      {selectedOccupiedBerth.acceptedAmount.toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Ожидается:</span>
+                    <span className="font-semibold text-amber-700">
+                      {selectedOccupiedBerth.expectedAmount.toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedOccupiedBerth(null)
+                    navigate('/bookings')
+                  }}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Открыть бронирования
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOccupiedBerth(null)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Закрыть
                 </button>
               </div>
             </div>
