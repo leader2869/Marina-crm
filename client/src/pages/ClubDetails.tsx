@@ -40,6 +40,7 @@ export default function ClubDetails() {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [infoMessage, setInfoMessage] = useState('')
   const [showAddBerthModal, setShowAddBerthModal] = useState(false)
   const [showEditBerthModal, setShowEditBerthModal] = useState(false)
   const [selectedBerth, setSelectedBerth] = useState<Berth | null>(null)
@@ -100,6 +101,12 @@ export default function ClubDetails() {
       loadTenantReport(club.id)
     }
   }, [club?.id])
+
+  useEffect(() => {
+    if (!infoMessage) return
+    const timeout = setTimeout(() => setInfoMessage(''), 2500)
+    return () => clearTimeout(timeout)
+  }, [infoMessage])
 
   useEffect(() => {
     // Загружаем суда пользователя, если он судовладелец
@@ -330,7 +337,10 @@ export default function ClubDetails() {
     }
 
     const isClubOwner = user?.role === UserRole.CLUB_OWNER && club?.ownerId === user?.id
-    if (!isClubOwner) return
+    if (!isClubOwner) {
+      setInfoMessage('Место забронировано')
+      return
+    }
 
     const info = tenantByBerthId.get(berth.id)
     if (!info) return
@@ -784,6 +794,12 @@ export default function ClubDetails() {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
           {error}
+        </div>
+      )}
+
+      {infoMessage && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded">
+          {infoMessage}
         </div>
       )}
 
