@@ -1296,7 +1296,7 @@ export default function ClubDetails() {
 
             {berthsViewMode === 'scheme' && (
               <div className="overflow-auto rounded-lg border border-gray-200 bg-[#d9edf3] p-2">
-                <svg width="3000" height="620" viewBox="0 410 3150 340" className="min-w-[2600px]">
+                <svg width="3000" height="620" viewBox="0 500 2820 240" className="min-w-[2600px]">
                 <defs>
                   <g id="scheme-boat-vertical">
                     <path d="M3,0 L15,0 L18,6 L18,46 L15,52 L3,52 L0,46 L0,6 Z" />
@@ -1308,8 +1308,11 @@ export default function ClubDetails() {
 
                 <rect x="0" y="0" width="3400" height="760" fill="#d9edf3" />
                 <rect x="0" y="640" width="3400" height="120" fill="#efe5cf" />
+                <text x="1410" y="470" textAnchor="middle" fontSize="24" fontWeight="700" fill="#1e3a8a">
+                  река Ждановка
+                </text>
 
-                <g transform="translate(1620,76)">
+                <g transform="translate(1660,76)">
                   {/* Малый понтон и Guest */}
                   <g transform="translate(-254,-26)">
                     {(() => {
@@ -1345,21 +1348,28 @@ export default function ClubDetails() {
                   <g transform="translate(-268,0)">
                     <rect x="0" y="540" width="130" height="24" rx="3" fill="#626b79" />
                     <rect x="65" y="568" width="65" height="76" rx="2" fill="#8b95a5" stroke="#5b6472" strokeWidth="1" />
+                    <line x1="67" y1="578" x2="128" y2="578" stroke="#5b6472" strokeWidth="1" />
+                    <line x1="67" y1="588" x2="128" y2="588" stroke="#5b6472" strokeWidth="1" />
+                    <line x1="67" y1="598" x2="128" y2="598" stroke="#5b6472" strokeWidth="1" />
+                    <line x1="67" y1="608" x2="128" y2="608" stroke="#5b6472" strokeWidth="1" />
+                    <line x1="67" y1="618" x2="128" y2="618" stroke="#5b6472" strokeWidth="1" />
+                    <line x1="67" y1="628" x2="128" y2="628" stroke="#5b6472" strokeWidth="1" />
+                    <line x1="67" y1="638" x2="128" y2="638" stroke="#5b6472" strokeWidth="1" />
                   </g>
 
                   {/* Основная линия понтонов */}
                   {[
-                    { offset: -1608, berths: [75], xs: [39], horizontal: true, fingers: [] as number[] },
-                    { offset: -1340, berths: [74, 73, 72, 71], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -1206, berths: [70, 69, 68, 67], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -1072, berths: [66, 65, 64, 63], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -938, berths: [62, 61, 60, 59], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -804, berths: [58, 57, 56, 55], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -670, berths: [54, 53, 52, 51], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -536, berths: [50, 49, 48, 47], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -402, berths: [46, 45, 44, 43], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -268, berths: [42, 41, 40, 39], xs: [6, 44, 66, 104], fingers: [30, 86] },
-                    { offset: -220, berths: [], xs: [], fingers: [] as number[] },
+                    { offset: -1638, berths: [75], xs: [39], horizontal: true, fingers: [] as number[] },
+                    { offset: -1502, berths: [74, 73, 72, 71], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -1368, berths: [70, 69, 68, 67], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -1234, berths: [66, 65, 64, 63], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -1100, berths: [62, 61, 60, 59], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -966, berths: [58, 57, 56, 55], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -832, berths: [54, 53, 52, 51], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -698, berths: [50, 49, 48, 47], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -564, berths: [46, 45, 44, 43], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -430, berths: [42, 41, 40, 39], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -295, berths: [], xs: [], fingers: [] as number[] },
                     { offset: -134, berths: [38, 37, 36, 35], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: 0, berths: [34, 33, 32, 31], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: 134, berths: [30, 29, 28, 27], xs: [6, 44, 66, 104], fingers: [30, 86] },
