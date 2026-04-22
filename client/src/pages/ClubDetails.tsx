@@ -11,7 +11,7 @@ import {
 import { Club, Berth, Vessel, ClubTenantReportResponse } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
-import { MapPin, Phone, Mail, Globe, Anchor, Edit2, X, Plus, Trash2, Calendar, UserPlus, ShieldCheck } from 'lucide-react'
+import { MapPin, Phone, Mail, Globe, Anchor, Edit2, X, Plus, Trash2, UserPlus, ShieldCheck } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 
@@ -70,7 +70,6 @@ export default function ClubDetails() {
   const [showRegisterModal, setShowRegisterModal] = useState(false)
   const [berthBookings, setBerthBookings] = useState<Map<number, any[]>>(new Map())
   const [bookingRules, setBookingRules] = useState<any[]>([])
-  const [berthsViewMode, setBerthsViewMode] = useState<'scheme' | 'list'>('scheme')
   const [tenantReport, setTenantReport] = useState<ClubTenantReportResponse | null>(null)
   const [selectedOccupiedBerth, setSelectedOccupiedBerth] = useState<{
     berthNumber: string
@@ -491,20 +490,6 @@ export default function ClubDetails() {
     setShowAddBerthModal(true)
   }
 
-  const handleOpenEditBerth = (berth: Berth) => {
-    setSelectedBerth(berth)
-    setBerthForm({
-      mode: 'single', // При редактировании всегда одно место
-      number: berth.number || '',
-      length: berth.length.toString(),
-      width: berth.width.toString(),
-      pricePerDay: berth.pricePerDay?.toString() || '',
-      notes: berth.notes || '',
-      count: '1', // Не используется при редактировании
-    })
-    setShowEditBerthModal(true)
-  }
-
   const handleCloseBerthModal = () => {
     setShowAddBerthModal(false)
     setShowEditBerthModal(false)
@@ -624,40 +609,6 @@ export default function ClubDetails() {
     } finally {
       setSavingBerth(false)
     }
-  }
-
-  const handleDeleteBerth = async (berthId: number) => {
-    if (!confirm('Вы уверены, что хотите удалить это место?')) return
-
-    setDeletingBerth(true)
-    setError('')
-
-    try {
-      await berthsService.delete(berthId)
-      await loadClub()
-      // Убираем из выбранных, если было выбрано
-      setSelectedBerths(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(berthId)
-        return newSet
-      })
-    } catch (err: any) {
-      setError(err.error || err.message || 'Ошибка удаления места')
-    } finally {
-      setDeletingBerth(false)
-    }
-  }
-
-  const handleToggleBerthSelection = (berthId: number) => {
-    setSelectedBerths(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(berthId)) {
-        newSet.delete(berthId)
-      } else {
-        newSet.add(berthId)
-      }
-      return newSet
-    })
   }
 
   const handleSelectAllBerths = () => {
@@ -1213,30 +1164,6 @@ export default function ClubDetails() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">Места</h2>
           <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden mr-2">
-              <button
-                type="button"
-                onClick={() => setBerthsViewMode('scheme')}
-                className={`px-3 py-2 text-sm ${
-                  berthsViewMode === 'scheme'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Схема
-              </button>
-              <button
-                type="button"
-                onClick={() => setBerthsViewMode('list')}
-                className={`px-3 py-2 text-sm border-l border-gray-300 ${
-                  berthsViewMode === 'list'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Список
-              </button>
-            </div>
             {canManageBerths() && club.berths && club.berths.length > 0 && (
               <>
                 <button
@@ -1269,7 +1196,7 @@ export default function ClubDetails() {
           </div>
         </div>
 
-        {berthsViewMode === 'scheme' && sortedBerths.length > 0 && (
+        {sortedBerths.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Схема мест</h3>
             <p className="text-sm text-gray-600 mb-3">
@@ -1299,206 +1226,7 @@ export default function ClubDetails() {
             </div>
           </div>
         )}
-
-        {berthsViewMode === 'list' && club.berths && club.berths.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {sortedBerths.map((berth) => (
-              <div key={berth.id} className={`border rounded-lg p-4 relative ${selectedBerths.has(berth.id) ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}`}>
-                {canManageBerths() && (
-                  <>
-                    <div className="absolute top-2 left-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedBerths.has(berth.id)}
-                        onChange={() => handleToggleBerthSelection(berth.id)}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                      />
-                    </div>
-                    <div className="absolute top-2 right-2 flex space-x-2">
-                      <button
-                        onClick={() => handleOpenEditBerth(berth)}
-                        className="p-1 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded"
-                        title="Редактировать"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteBerth(berth.id)}
-                        disabled={deletingBerth}
-                        className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
-                        title="Удалить"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </>
-                )}
-                <div className="flex items-center mb-2">
-                  <Anchor className="h-5 w-5 text-primary-600 mr-2" />
-                  <span className="font-semibold">{berth.number}</span>
-                </div>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <div>Максимальная длина катера: {berth.length} м</div>
-                  <div>Максимальная ширина катера: {berth.width} м</div>
-                  {(() => {
-                    // Проверяем, есть ли действующие тарифы для этого места
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0)
-                    
-                    const activeTariffs = berth.tariffBerths?.filter(tb => {
-                      if (!tb.tariff) return false
-                      const tariff = tb.tariff
-                      
-                      // Если даты не указаны, тариф действует всегда
-                      if (!tariff.startDate && !tariff.endDate) return true
-                      
-                      // Проверяем дату начала
-                      if (tariff.startDate) {
-                        const startDate = new Date(tariff.startDate)
-                        startDate.setHours(0, 0, 0, 0)
-                        if (today < startDate) return false
-                      }
-                      
-                      // Проверяем дату окончания
-                      if (tariff.endDate) {
-                        const endDate = new Date(tariff.endDate)
-                        endDate.setHours(23, 59, 59, 999)
-                        if (today > endDate) return false
-                      }
-                      
-                      return true
-                    }) || []
-                    
-                    if (activeTariffs.length > 0) {
-                      // Показываем тарифы
-                      return (
-                        <div className="space-y-1">
-                          {activeTariffs.map((tb) => {
-                            const tariff = tb.tariff!
-                            let tariffTypeText = tariff.type === 'season_payment' ? 'за сезон' : 'в месяц'
-                            let displayAmount = tariff.amount
-                            
-                            // Для помесячной оплаты определяем сумму за месяц
-                            if (tariff.type === 'monthly_payment') {
-                              if (tariff.monthlyAmounts && Object.keys(tariff.monthlyAmounts).length > 0) {
-                                const amounts = Object.values(tariff.monthlyAmounts)
-                                const minAmount = Math.min(...amounts)
-                                const maxAmount = Math.max(...amounts)
-                                
-                                if (minAmount === maxAmount) {
-                                  // Если все суммы одинаковые, показываем одну сумму
-                                  displayAmount = minAmount
-                                } else {
-                                  // Если суммы разные, показываем диапазон
-                                  displayAmount = minAmount
-                                  tariffTypeText = `в месяц (от ${minAmount.toLocaleString()} до ${maxAmount.toLocaleString()} ₽)`
-                                }
-                              } else {
-                                // Если monthlyAmounts нет, используем общую сумму деленную на количество месяцев
-                                const monthsCount = tariff.months?.length || 1
-                                displayAmount = tariff.amount / monthsCount
-                              }
-                            }
-                            
-                            return (
-                              <div key={tb.id} className="text-primary-600 font-semibold">
-                                {tariff.name}: {displayAmount.toLocaleString()} ₽ {tariffTypeText}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )
-                    } else {
-                      // Если нет тарифов, показываем сообщение
-                      return (
-                        <div className="text-red-600 font-semibold text-sm">
-                          Тариф не указан. Бронирование недоступно.
-                        </div>
-                      )
-                    }
-                  })()}
-                  <div className={`mt-2 ${getBerthStatus(berth).color} font-semibold`}>
-                    {getBerthStatus(berth).text}
-                  </div>
-                </div>
-                {club && club.isActive && isBerthBookable(berth) && (() => {
-                  // Проверяем, есть ли действующие тарифы для места
-                  const today = new Date()
-                  today.setHours(0, 0, 0, 0)
-                  
-                  const activeTariffs = berth.tariffBerths?.filter(tb => {
-                    if (!tb.tariff) return false
-                    const tariff = tb.tariff
-                    
-                    // Если даты не указаны, тариф действует всегда
-                    if (!tariff.startDate && !tariff.endDate) return true
-                    
-                    // Проверяем дату начала
-                    if (tariff.startDate) {
-                      const startDate = new Date(tariff.startDate)
-                      startDate.setHours(0, 0, 0, 0)
-                      if (today < startDate) return false
-                    }
-                    
-                    // Проверяем дату окончания
-                    if (tariff.endDate) {
-                      const endDate = new Date(tariff.endDate)
-                      endDate.setHours(23, 59, 59, 999)
-                      if (today > endDate) return false
-                    }
-                    
-                    return true
-                  }) || []
-                  const hasTariffs = activeTariffs.length > 0
-                  
-                  return (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      {user?.role === UserRole.VESSEL_OWNER || (user?.role === UserRole.CLUB_OWNER && club.ownerId === user.id) ? (
-                        hasTariffs ? (
-                          <button
-                            onClick={() => handleOpenBookingModalForBerth(berth)}
-                            className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                          >
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Забронировать
-                          </button>
-                        ) : (
-                          <button
-                            disabled
-                            className="w-full flex items-center justify-center px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed"
-                            title="Невозможно забронировать место без тарифа"
-                          >
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Забронировать (недоступно)
-                          </button>
-                        )
-                      ) : (
-                        <button
-                          onClick={() => setShowRegisterModal(true)}
-                          className="w-full flex items-center justify-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                        >
-                          <UserPlus className="h-4 w-4 mr-2" />
-                          Забронировать место
-                        </button>
-                      )}
-                    </div>
-                  )
-                })()}
-                {club && club.isActive && !isBerthBookable(berth) && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <button
-                      disabled
-                      className="w-full flex items-center justify-center px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed opacity-50"
-                    >
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Место недоступно
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : berthsViewMode === 'list' ? (
+        {sortedBerths.length === 0 && (
           <div className="text-center py-8 text-gray-500">
             <Anchor className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <p>Места не добавлены</p>
@@ -1511,7 +1239,7 @@ export default function ClubDetails() {
               </button>
             )}
           </div>
-        ) : null}
+        )}
       </div>
 
       {/* Модальное окно добавления места */}
