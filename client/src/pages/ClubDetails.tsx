@@ -1359,6 +1359,7 @@ export default function ClubDetails() {
                     { offset: -536, berths: [50, 49, 48, 47], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: -402, berths: [46, 45, 44, 43], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: -268, berths: [42, 41, 40, 39], xs: [6, 44, 66, 104], fingers: [30, 86] },
+                    { offset: -220, berths: [], xs: [], fingers: [] as number[] },
                     { offset: -134, berths: [38, 37, 36, 35], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: 0, berths: [34, 33, 32, 31], xs: [6, 44, 66, 104], fingers: [30, 86] },
                     { offset: 134, berths: [30, 29, 28, 27], xs: [6, 44, 66, 104], fingers: [30, 86] },
