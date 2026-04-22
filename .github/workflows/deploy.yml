@@ -54,9 +54,11 @@ jobs:
           # Убрать завершающий слэш — rsync трактует trailing slash иначе для источника; для приёма так стабильнее
           TARGET="${SFTP_TARGET_DIR%/}"
 
+          # Без --mkpath: на хостинге старый rsync (3.1.x) на стороне приёмника ругается:
+          # «--mkpath: unknown option» — тогда падает и локальный 3.2.x.
           run_rsync() {
             local dest="$1"
-            sshpass -e rsync -avz --delete --mkpath \
+            sshpass -e rsync -avz --delete \
               -e "ssh -p $PORT -o StrictHostKeyChecking=accept-new" \
               --exclude ".git/" \
               --exclude ".github/" \
