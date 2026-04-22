@@ -51,21 +51,37 @@ jobs:
         run: |
           export SSHPASS="$SFTP_PASSWORD"
           PORT="${SFTP_PORT:-22}"
-          REMOTE="$SFTP_USERNAME@$SFTP_SERVER:$SFTP_TARGET_DIR"
-          # --mkpath: создать целевую папку, если её нет (если существуют родители)
-          if ! sshpass -e rsync -avz --delete --mkpath \
-            -e "ssh -p $PORT -o StrictHostKeyChecking=accept-new" \
-            --exclude ".git/" \
-            --exclude ".github/" \
-            --exclude "node_modules/" \
-            --exclude ".cursor/" \
-            ./ "$REMOTE"; then
-            echo ""
-            echo "=== rsync: ошибка пути на сервере (часто mkdir ... No such file or directory) ==="
-            echo "Проверьте секрет/переменную SFTP_TARGET_DIR."
-            echo "Возьмите путь из панели reg.ru: «Файлы» / файловый менеджер — каталог сайта"
-            echo "(часто что-то вроде .../domains/1marina.ru/public_html или .../www/1marina.ru)."
-            echo "Путь /www/1marina.ru на виртуальном хостинге часто не существует."
-            echo "Либо укажите путь относительно домашнего каталога FTP без ведущего слэша, например: www/1marina.ru"
-            exit 1
+          # Убрать завершающий слэш — rsync трактует trailing slash иначе для источника; для приёма так стабильнее
+          TARGET="${SFTP_TARGET_DIR%/}"
+
+          run_rsync() {
+            local dest="$1"
+            sshpass -e rsync -avz --delete --mkpath \
+              -e "ssh -p $PORT -o StrictHostKeyChecking=accept-new" \
+              --exclude ".git/" \
+              --exclude ".github/" \
+              --exclude "node_modules/" \
+              --exclude ".cursor/" \
+              ./ "$SFTP_USERNAME@$SFTP_SERVER:$dest"
+          }
+
+          # В панели reg.ru часто показывают «/www/домен» — это путь в chroot FTP.
+          # По SSH корень другой: тот же каталог часто доступен как www/домен от домашней папки пользователя.
+          if run_rsync "$TARGET"; then
+            exit 0
           fi
+          if [[ "$TARGET" == /www/* ]]; then
+            REL="${TARGET#/}"
+            echo ""
+            echo "Повтор rsync с относительным путём: $REL (для reg.ru путь /www/... в файловом менеджере часто соответствует этому)"
+            if run_rsync "$REL"; then
+              exit 0
+            fi
+          fi
+          echo ""
+          echo "=== rsync: не удалось записать файлы ==="
+          echo "Проверьте SFTP_TARGET_DIR. В секретах можно указать:"
+          echo "  • как в панели: /www/1marina.ru — workflow сам попробует www/1marina.ru;"
+          echo "  • или сразу относительный: www/1marina.ru;"
+          echo "  • или полный путь из SSH, если он отличается (…/domains/…/public_html)."
+          exit 1
