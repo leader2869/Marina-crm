@@ -264,6 +264,7 @@ export class ClubsController {
         minPricePerMonth,
         season,
         rentalMonths,
+        logo,
       } = req.body;
 
       if (!name || !address || !latitude || !longitude || !season) {
@@ -280,6 +281,7 @@ export class ClubsController {
         phone,
         email,
         website,
+        logo: logo || null,
         totalBerths: totalBerths || 0,
         minRentalPeriod: minRentalPeriod || 1,
         maxRentalPeriod: maxRentalPeriod || 365,
@@ -386,6 +388,7 @@ export class ClubsController {
         season,
         rentalMonths,
         bookingRulesText,
+        logo,
       } = req.body;
 
       const clubRepository = AppDataSource.getRepository(Club);
@@ -419,6 +422,7 @@ export class ClubsController {
         phone: club.phone,
         email: club.email,
         website: club.website,
+        logo: club.logo,
         minRentalPeriod: club.minRentalPeriod,
         maxRentalPeriod: club.maxRentalPeriod,
         basePrice: club.basePrice,
@@ -441,6 +445,7 @@ export class ClubsController {
       if (phone !== undefined) club.phone = phone;
       if (email !== undefined) club.email = email;
       if (website !== undefined) club.website = website;
+      if (logo !== undefined) club.logo = logo || null;
       if (minRentalPeriod !== undefined) club.minRentalPeriod = parseInt(minRentalPeriod as string);
       if (maxRentalPeriod !== undefined) club.maxRentalPeriod = parseInt(maxRentalPeriod as string);
       if (basePrice !== undefined) club.basePrice = parseFloat(basePrice as string);
@@ -546,6 +551,7 @@ export class ClubsController {
         phone: updatedClub.phone,
         email: updatedClub.email,
         website: updatedClub.website,
+        logo: updatedClub.logo,
         minRentalPeriod: updatedClub.minRentalPeriod,
         maxRentalPeriod: updatedClub.maxRentalPeriod,
         basePrice: updatedClub.basePrice,

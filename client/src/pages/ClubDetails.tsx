@@ -37,8 +37,10 @@ export default function ClubDetails() {
     minPricePerMonth: '',
     season: '',
     rentalMonths: [] as number[],
+    photos: [] as string[],
   })
   const [saving, setSaving] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [error, setError] = useState('')
   const [infoMessage, setInfoMessage] = useState('')
   const [showAddBerthModal, setShowAddBerthModal] = useState(false)
@@ -478,6 +480,20 @@ export default function ClubDetails() {
       const data = (await clubsService.getById(parseInt(id!))) as unknown as Club
       setClub(data)
       if (data) {
+        let parsedPhotos: string[] = []
+        if (data.logo) {
+          try {
+            const parsed = JSON.parse(data.logo)
+            if (Array.isArray(parsed)) {
+              parsedPhotos = parsed.filter((item) => typeof item === 'string')
+            } else if (typeof data.logo === 'string') {
+              parsedPhotos = [data.logo]
+            }
+          } catch {
+            parsedPhotos = [data.logo]
+          }
+        }
+
         setEditForm({
           name: data.name,
           description: data.description || '',
@@ -493,6 +509,7 @@ export default function ClubDetails() {
           minPricePerMonth: data.minPricePerMonth?.toString() || '',
           season: data.season?.toString() || new Date().getFullYear().toString(),
           rentalMonths: data.rentalMonths || [],
+          photos: parsedPhotos,
         })
 
         // Для гостя места уже загружены в getById (включая забронированные)
@@ -738,6 +755,7 @@ export default function ClubDetails() {
         minPricePerMonth: editForm.minPricePerMonth ? parseFloat(editForm.minPricePerMonth) : null,
         season: parseInt(editForm.season),
         rentalMonths: editForm.rentalMonths.length > 0 ? editForm.rentalMonths : null,
+        logo: editForm.photos.length > 0 ? JSON.stringify(editForm.photos) : null,
       }
 
       await clubsService.update(club.id, updateData)
@@ -748,6 +766,78 @@ export default function ClubDetails() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const compressImageToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('Файл должен быть изображением'))
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const maxWidth = 1400
+          const maxHeight = 900
+          let width = img.width
+          let height = img.height
+
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width
+            width = maxWidth
+          }
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height
+            height = maxHeight
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            reject(new Error('Не удалось обработать изображение'))
+            return
+          }
+          ctx.drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', 0.8))
+        }
+        img.onerror = () => reject(new Error('Ошибка загрузки изображения'))
+        img.src = reader.result as string
+      }
+      reader.readAsDataURL(file)
+    })
+
+  const handlePhotoUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    if (editForm.photos.length + files.length > 7) {
+      setError(`Можно загрузить максимум 7 фото. Сейчас: ${editForm.photos.length}.`)
+      return
+    }
+
+    setUploadingPhoto(true)
+    setError('')
+    try {
+      const newPhotos = [...editForm.photos]
+      for (const file of Array.from(files)) {
+        const base64 = await compressImageToBase64(file)
+        newPhotos.push(base64)
+      }
+      setEditForm((prev) => ({ ...prev, photos: newPhotos }))
+    } catch (err: any) {
+      setError(err?.message || 'Ошибка загрузки фото')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  const handleRemovePhoto = (index: number) => {
+    setEditForm((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index),
+    }))
   }
 
   if (loading) {
@@ -1049,6 +1139,46 @@ export default function ClubDetails() {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Фотографии клуба ({editForm.photos.length}/7)
+              </label>
+              <label className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg cursor-pointer hover:bg-primary-700">
+                {uploadingPhoto ? 'Загрузка...' : 'Загрузить фото'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={uploadingPhoto || editForm.photos.length >= 7}
+                  onChange={(e) => {
+                    handlePhotoUpload(e.target.files)
+                    e.currentTarget.value = ''
+                  }}
+                  className="hidden"
+                />
+              </label>
+              {editForm.photos.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {editForm.photos.map((photo, index) => (
+                    <div key={`${photo.slice(0, 24)}-${index}`} className="relative group">
+                      <img
+                        src={photo}
+                        alt={`Фото клуба ${index + 1}`}
+                        className="w-full h-24 object-cover rounded border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(index)}
+                        className="absolute top-1 right-1 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-90 hover:opacity-100"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
@@ -1056,6 +1186,19 @@ export default function ClubDetails() {
                   setEditing(false)
                   setError('')
                   if (club) {
+                    let parsedPhotos: string[] = []
+                    if (club.logo) {
+                      try {
+                        const parsed = JSON.parse(club.logo)
+                        if (Array.isArray(parsed)) {
+                          parsedPhotos = parsed.filter((item) => typeof item === 'string')
+                        } else {
+                          parsedPhotos = [club.logo]
+                        }
+                      } catch {
+                        parsedPhotos = [club.logo]
+                      }
+                    }
                     setEditForm({
                       name: club.name,
                       description: club.description || '',
@@ -1071,6 +1214,7 @@ export default function ClubDetails() {
                       minPricePerMonth: club.minPricePerMonth?.toString() || '',
                       season: club.season?.toString() || new Date().getFullYear().toString(),
                       rentalMonths: club.rentalMonths || [],
+                      photos: parsedPhotos,
                     })
                   }
                 }}

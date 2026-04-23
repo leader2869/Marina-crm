@@ -189,6 +189,19 @@ export default function Clubs() {
     club.address.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const getClubPhotos = (club: Club): string[] => {
+    if (!club.logo) return []
+    try {
+      const parsed = JSON.parse(club.logo)
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => typeof item === 'string')
+      }
+      return typeof club.logo === 'string' ? [club.logo] : []
+    } catch {
+      return [club.logo]
+    }
+  }
+
   // handleHide удалена, так как кнопка "Скрыть" была удалена
   // Используется только handleUnpublish
 
@@ -546,7 +559,9 @@ export default function Clubs() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredClubs.map((club) => (
+        {filteredClubs.map((club) => {
+          const clubPhotos = getClubPhotos(club)
+          return (
           <Link
             key={club.id}
             to={`/clubs/${club.id}`}
@@ -554,6 +569,15 @@ export default function Clubs() {
               club.isActive === false ? 'opacity-60 border-2 border-gray-300' : ''
             }`}
           >
+            {clubPhotos[0] && (
+              <div className="mb-4 -mx-6 -mt-6">
+                <img
+                  src={clubPhotos[0]}
+                  alt={`Фото клуба ${club.name}`}
+                  className="w-full h-44 object-cover rounded-t-lg"
+                />
+              </div>
+            )}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center flex-1">
                 <Anchor className="h-8 w-8 text-primary-600 mr-3 flex-shrink-0" />
@@ -746,7 +770,8 @@ export default function Clubs() {
               </div>
             </div>
           </Link>
-        ))}
+          )
+        })}
       </div>
 
       {filteredClubs.length === 0 && (

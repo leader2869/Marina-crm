@@ -29,8 +29,7 @@ import {
   ShoppingCart,
   Route,
   Search,
-  UtensilsCrossed,
-  Gamepad2
+  UtensilsCrossed
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -94,7 +93,6 @@ export default function Layout() {
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_STAFF] },
       { name: 'Обслуживание катеров', href: '/vessel-maintenance', icon: Wrench, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Агентские заказы', href: '/agent-orders', icon: ShoppingCart, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.AGENT, UserRole.CAPTAIN, UserRole.MECHANIC, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
-      { name: 'Мини игры', href: '/mini-games', icon: Gamepad2, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.AGENT, UserRole.CAPTAIN, UserRole.MECHANIC, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Мои маршруты', href: '/agent/routes', icon: Route, roles: [UserRole.AGENT] },
       { name: 'Подборка катеров', href: '/agent/vessel-selection', icon: Search, roles: [UserRole.AGENT] },
       { name: 'Забронировать причал', href: '/agent/book-berth', icon: Calendar, roles: [UserRole.AGENT] },
