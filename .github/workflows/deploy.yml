@@ -47,6 +47,17 @@ jobs:
       - name: Install rsync + sshpass
         run: sudo apt-get update && sudo apt-get install -y rsync sshpass
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build frontend (Vite)
+        run: |
+          cd client
+          npm ci
+          npm run build
+
       - name: Deploy via SFTP (rsync over SSH)
         run: |
           export SSHPASS="$SFTP_PASSWORD"
@@ -60,11 +71,7 @@ jobs:
             local dest="$1"
             sshpass -e rsync -avz --delete \
               -e "ssh -p $PORT -o StrictHostKeyChecking=accept-new" \
-              --exclude ".git/" \
-              --exclude ".github/" \
-              --exclude "node_modules/" \
-              --exclude ".cursor/" \
-              ./ "$SFTP_USERNAME@$SFTP_SERVER:$dest"
+              ./client/dist/ "$SFTP_USERNAME@$SFTP_SERVER:$dest"
           }
 
           # В панели reg.ru часто показывают «/www/домен» — это путь в chroot FTP.
