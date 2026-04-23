@@ -100,9 +100,18 @@ export default function ClubDetails() {
 
   useEffect(() => {
     if (club?.id) {
-      loadTenantReport(club.id)
+      const canLoadTenantReport =
+        user?.role === UserRole.SUPER_ADMIN ||
+        user?.role === UserRole.ADMIN ||
+        user?.role === UserRole.CLUB_OWNER ||
+        user?.role === UserRole.CLUB_STAFF
+      if (canLoadTenantReport) {
+        loadTenantReport(club.id)
+      } else {
+        setTenantReport(null)
+      }
     }
-  }, [club?.id])
+  }, [club?.id, user?.role])
 
   useEffect(() => {
     if (!infoMessage) return
@@ -145,9 +154,8 @@ export default function ClubDetails() {
     if (!club || !club.berths) return
     
     try {
-      // Для гостя, VESSEL_OWNER и PENDING_VALIDATION используем специальный endpoint для получения бронирований клуба
-      // (так как у них может не быть своих клубов, и getAll не вернет все бронирования клуба)
-      // Для других ролей (CLUB_OWNER, SUPER_ADMIN, ADMIN) используем getAll
+      // Используем узкий endpoint по клубу, чтобы не тянуть тяжелые выборки getAll(limit=1000)
+      // и не провоцировать таймауты на production.
       let allBookings: any[] = []
       
       if (user?.role === UserRole.GUEST || user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.PENDING_VALIDATION || !user) {
@@ -155,18 +163,12 @@ export default function ClubDetails() {
           const response = await bookingsService.getByClub(club.id)
           allBookings = (response as any)?.data || response || []
         } catch (error) {
-          // Если не удалось загрузить через getByClub, пробуем getAll
-          try {
-            const response = await bookingsService.getAll({ limit: 1000 })
-            allBookings = (response as any)?.data || response || []
-          } catch (getAllError) {
-            console.error('Ошибка загрузки бронирований:', getAllError)
-            allBookings = []
-          }
+          console.error('Ошибка загрузки бронирований:', error)
+          allBookings = []
         }
       } else {
         try {
-          const response = await bookingsService.getAll({ limit: 1000 })
+          const response = await bookingsService.getByClub(club.id)
           allBookings = (response as any)?.data || response || []
         } catch (error) {
           console.error('Ошибка загрузки бронирований:', error)
