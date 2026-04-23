@@ -23,7 +23,7 @@ On push to `main`:
 
 1. Connects to VPS via SSH
 2. Runs `git pull --ff-only origin main`
-3. Installs backend dependencies: `npm ci --omit=dev`
+3. Installs backend dependencies: `npm ci`
 4. Builds backend: `npm run build:server`
 5. Restarts app in PM2:
    - `pm2 restart marina-api` (if exists)
@@ -36,7 +36,7 @@ Run once on VPS:
 
 ```bash
 cd /var/www/Marina-crm
-npm ci --omit=dev
+npm ci
 npm run build:server
 pm2 start dist/server.js --name marina-api
 pm2 save

@@ -54,7 +54,7 @@ jobs:
             cd '$VPS_PROJECT_DIR'
             echo '--- Deploy started on VPS ---'
             git pull --ff-only origin main
-            npm ci --omit=dev
+            npm ci
             npm run build:server
             pm2 describe marina-api >/dev/null 2>&1 && pm2 restart marina-api || pm2 start dist/server.js --name marina-api
             pm2 save
