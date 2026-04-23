@@ -22,6 +22,36 @@ import { generateActivityDescription } from '../../utils/activityLogDescription'
 import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
 
 export class ClubsController {
+  private mapClubListRow(row: Record<string, unknown>) {
+    return {
+      id: Number(row.id),
+      name: String(row.name ?? ''),
+      description: row.description ?? null,
+      address: String(row.address ?? ''),
+      latitude: row.latitude,
+      longitude: row.longitude,
+      phone: row.phone ?? null,
+      email: row.email ?? null,
+      website: row.website ?? null,
+      logo: this.toListLogo((row.logo as string | null) ?? null),
+      totalBerths: Number(row.totalBerths ?? 0),
+      minRentalPeriod: Number(row.minRentalPeriod ?? 0),
+      maxRentalPeriod: Number(row.maxRentalPeriod ?? 0),
+      basePrice: row.basePrice,
+      minPricePerMonth: row.minPricePerMonth ?? null,
+      season: row.season ?? null,
+      rentalMonths: row.rentalMonths ?? null,
+      bookingRulesText: row.bookingRulesText ?? null,
+      isActive: Boolean(row.isActive),
+      isValidated: Boolean(row.isValidated),
+      isSubmittedForValidation: Boolean(row.isSubmittedForValidation),
+      rejectionComment: row.rejectionComment ?? null,
+      ownerId: Number(row.ownerId),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
   private toListLogo(logo: string | null): string | null {
     if (!logo) return null;
     try {
@@ -45,7 +75,35 @@ export class ClubsController {
       const { location, minPrice, maxPrice, available, showHidden } = req.query;
 
       const clubRepository = AppDataSource.getRepository(Club);
-      const queryBuilder = clubRepository.createQueryBuilder('club');
+      const queryBuilder = clubRepository
+        .createQueryBuilder('club')
+        .select([
+          'club.id AS id',
+          'club.name AS name',
+          'club.description AS description',
+          'club.address AS address',
+          'club.latitude AS "latitude"',
+          'club.longitude AS "longitude"',
+          'club.phone AS phone',
+          'club.email AS email',
+          'club.website AS website',
+          'club.logo AS logo',
+          'club.totalBerths AS "totalBerths"',
+          'club.minRentalPeriod AS "minRentalPeriod"',
+          'club.maxRentalPeriod AS "maxRentalPeriod"',
+          'club.basePrice AS "basePrice"',
+          'club.minPricePerMonth AS "minPricePerMonth"',
+          'club.season AS season',
+          'club.rentalMonths AS "rentalMonths"',
+          'club.bookingRulesText AS "bookingRulesText"',
+          'club.isActive AS "isActive"',
+          'club.isValidated AS "isValidated"',
+          'club.isSubmittedForValidation AS "isSubmittedForValidation"',
+          'club.rejectionComment AS "rejectionComment"',
+          'club.ownerId AS "ownerId"',
+          'club.createdAt AS "createdAt"',
+          'club.updatedAt AS "updatedAt"',
+        ]);
       
       // Если суперадмин запрашивает скрытые клубы, показываем все, иначе только активные
       // Проверяем userRole (может быть undefined, если запрос без аутентификации)
@@ -101,10 +159,11 @@ export class ClubsController {
         queryBuilder.andWhere('club.totalBerths > 0');
       }
 
-      const clubs = await queryBuilder
+      const rows = await queryBuilder
         .skip((page - 1) * limit)
         .take(limit)
-        .getMany();
+        .getRawMany<Record<string, unknown>>();
+      const clubs = rows.map((row) => this.mapClubListRow(row));
 
       // Если владелец клуба запросил свои клубы, возвращаем только его клубы
       // Если суперадмин запросил скрытые клубы, возвращаем все, иначе фильтруем только активные
@@ -134,14 +193,7 @@ export class ClubsController {
         console.log('Скрытых клубов:', hiddenCount);
       }
 
-      // Для списка клубов отдаем только главное фото.
-      // Полный массив base64-фото сильно увеличивает payload и может приводить к 504.
-      const clubsForList = filteredClubs.map((club) => ({
-        ...club,
-        logo: this.toListLogo(club.logo),
-      }));
-
-      res.json(createPaginatedResponse(clubsForList, clubsForList.length, page, limit));
+      res.json(createPaginatedResponse(filteredClubs, filteredClubs.length, page, limit));
     } catch (error) {
       next(error);
     }
