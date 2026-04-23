@@ -12,10 +12,18 @@ import { ActivityType, EntityType } from '../entities/ActivityLog';
  * Платежи, которые должны быть оплачены сразу при бронировании (в течение 2 минут)
  */
 export class ImmediatePaymentCheckService {
+  private static isRunning = false;
+
   /**
    * Проверяет просроченные платежи с немедленной оплатой и отменяет бронирования
    */
   static async checkOverdueImmediatePayments(): Promise<void> {
+    if (this.isRunning) {
+      console.log('[ImmediatePaymentCheck] Предыдущая проверка еще выполняется, пропускаем новый запуск');
+      return;
+    }
+
+    this.isRunning = true;
     const paymentRepository = AppDataSource.getRepository(Payment);
     const bookingRepository = AppDataSource.getRepository(Booking);
 
@@ -98,7 +106,7 @@ export class ImmediatePaymentCheckService {
           const berthNumber = booking.berth?.number || 'неизвестное место';
           const description = `Система автоматически отменила бронь #${booking.id}: судно "${vesselName}" на месте ${berthNumber} в яхт-клубе "${clubName}" из-за непогашения платежа в течение 2 минут (платеж #${payment.id})`;
 
-          await ActivityLogService.logActivity({
+          void ActivityLogService.logActivity({
             activityType: ActivityType.DELETE,
             entityType: EntityType.BOOKING,
             entityId: booking.id,
@@ -108,6 +116,8 @@ export class ImmediatePaymentCheckService {
             newValues: { status: BookingStatus.CANCELLED },
             ipAddress: null,
             userAgent: 'System: ImmediatePaymentCheckService',
+          }).catch((error) => {
+            console.error('[ImmediatePaymentCheck] Ошибка логирования активности:', error);
           });
 
           // Освобождаем место (berth)
@@ -134,6 +144,8 @@ export class ImmediatePaymentCheckService {
         '[ImmediatePaymentCheck] Ошибка при проверке просроченных платежей:',
         error.message
       );
+    } finally {
+      this.isRunning = false;
     }
   }
 

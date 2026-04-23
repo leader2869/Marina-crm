@@ -337,13 +337,17 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
       await AppDataSource.initialize();
       console.log('✅ База данных подключена');
 
-      // Запускаем периодическую проверку просроченных платежей с немедленной оплатой
-      const { ImmediatePaymentCheckService } = await import('./services/immediatePaymentCheck.service');
+      // Периодическую проверку запускаем только при явном включении.
+      // В production это защищает API от перегрузки БД фоновыми задачами.
+      const shouldRunImmediatePaymentCheck = process.env.ENABLE_IMMEDIATE_PAYMENT_CHECK === 'true';
       let checkInterval: NodeJS.Timeout | null = null;
-      
-      // Запускаем проверку каждые 30 секунд
-      checkInterval = ImmediatePaymentCheckService.startPeriodicCheck(30);
-      console.log('✅ Запущена периодическая проверка просроченных платежей с немедленной оплатой');
+      if (shouldRunImmediatePaymentCheck) {
+        const { ImmediatePaymentCheckService } = await import('./services/immediatePaymentCheck.service');
+        checkInterval = ImmediatePaymentCheckService.startPeriodicCheck(30);
+        console.log('✅ Запущена периодическая проверка просроченных платежей с немедленной оплатой');
+      } else {
+        console.log('ℹ️ Периодическая проверка просроченных платежей отключена (ENABLE_IMMEDIATE_PAYMENT_CHECK != true)');
+      }
 
       app.listen(config.port, () => {
         console.log(`🚀 Сервер запущен на порту ${config.port}`);
