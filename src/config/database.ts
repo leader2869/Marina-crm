@@ -29,6 +29,13 @@ import { ClubPartnerManager } from '../entities/ClubPartnerManager';
 // Загружаем переменные окружения из .env файла
 dotenv.config();
 
+const pgNetworkTimeouts = {
+  connectionTimeoutMillis: 10000,
+  query_timeout: 60000,
+  statement_timeout: 60000,
+  idle_in_transaction_session_timeout: 30000,
+};
+
 // Поддержка connection string для Supabase и других облачных провайдеров
 const getDatabaseConfig = () => {
   // Если указан DATABASE_URL (connection string), используем его
@@ -45,6 +52,7 @@ const getDatabaseConfig = () => {
       ssl: isSupabase || process.env.NODE_ENV === 'production' ? {
         rejectUnauthorized: false
       } : false,
+      extra: pgNetworkTimeouts,
     };
   }
 
@@ -65,6 +73,7 @@ const getDatabaseConfig = () => {
     ssl: isSupabaseHost || process.env.NODE_ENV === 'production' ? {
       rejectUnauthorized: false
     } : false,
+    extra: pgNetworkTimeouts,
   };
 };
 
