@@ -279,7 +279,7 @@ export class AuthController {
         null
       );
 
-      await ActivityLogService.logActivity({
+      void ActivityLogService.logActivity({
         activityType: ActivityType.LOGIN,
         entityType: EntityType.USER,
         entityId: user.id,
