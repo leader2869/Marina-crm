@@ -400,9 +400,11 @@ export class AuthController {
         throw new AppError(`Ошибка доступа к базе данных: ${repoError.message}`, 500);
       }
       
+      // Для профиля не загружаем тяжелые связи (особенно vessels),
+      // чтобы избежать таймаутов БД на production.
       const user = await userRepository.findOne({
         where: { id: req.userId },
-        relations: ['ownedClubs', 'vessels', 'managedClub'],
+        relations: ['ownedClubs', 'managedClub'],
       });
 
       if (!user) {
@@ -419,7 +421,7 @@ export class AuthController {
         avatar: user.avatar,
         isValidated: user.isValidated,
         ownedClubs: user.ownedClubs,
-        vessels: user.vessels,
+        vessels: [],
         managedClub: user.managedClub,
         createdAt: user.createdAt,
       });
