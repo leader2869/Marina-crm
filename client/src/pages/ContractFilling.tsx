@@ -125,7 +125,8 @@ export default function ContractFilling() {
     try {
       console.log('[ContractFilling] Загрузка данных контрагента:', contragent)
       const token = localStorage.getItem('token')
-      const response = await fetch(`${API_URL}/contragent/${contragent.filename}`, {
+      const encodedFilename = encodeURIComponent(contragent.filename)
+      const response = await fetch(`${API_URL}/contragent/${encodedFilename}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
         }
@@ -244,7 +245,8 @@ export default function ContractFilling() {
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`${API_URL}/contragent/${filename}`, {
+      const encodedFilename = encodeURIComponent(filename)
+      const response = await fetch(`${API_URL}/contragent/${encodedFilename}`, {
         method: 'DELETE',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',

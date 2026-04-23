@@ -22,6 +22,23 @@ import { generateActivityDescription } from '../../utils/activityLogDescription'
 import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
 
 export class ClubsController {
+  private toListLogo(rawLogo: unknown): string | null {
+    if (!rawLogo || typeof rawLogo !== 'string') {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(rawLogo);
+      if (Array.isArray(parsed)) {
+        const firstPhoto = parsed.find((item) => typeof item === 'string' && item.trim().length > 0);
+        return typeof firstPhoto === 'string' ? firstPhoto : null;
+      }
+      return rawLogo;
+    } catch {
+      return rawLogo;
+    }
+  }
+
   private mapClubListRow(row: Record<string, unknown>) {
     return {
       id: Number(row.id),
@@ -33,7 +50,7 @@ export class ClubsController {
       phone: row.phone ?? null,
       email: row.email ?? null,
       website: row.website ?? null,
-      logo: null,
+      logo: this.toListLogo(row.logo),
       totalBerths: Number(row.totalBerths ?? 0),
       minRentalPeriod: Number(row.minRentalPeriod ?? 0),
       maxRentalPeriod: Number(row.maxRentalPeriod ?? 0),
@@ -73,6 +90,7 @@ export class ClubsController {
           'club.phone AS phone',
           'club.email AS email',
           'club.website AS website',
+          'club.logo AS logo',
           'club.totalBerths AS "totalBerths"',
           'club.minRentalPeriod AS "minRentalPeriod"',
           'club.maxRentalPeriod AS "maxRentalPeriod"',
