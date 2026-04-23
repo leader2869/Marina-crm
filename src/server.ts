@@ -184,6 +184,18 @@ app.options('*', (req: Request, res: Response) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Глобальный предохранитель пагинации: не позволяем тяжелые limit=1000/10000 на проде.
+app.use('/api', (req: Request, _res: Response, next: NextFunction) => {
+  const limitRaw = req.query.limit;
+  if (typeof limitRaw === 'string') {
+    const parsedLimit = Number(limitRaw);
+    if (Number.isFinite(parsedLimit) && parsedLimit > 100) {
+      req.query.limit = '100';
+    }
+  }
+  next();
+});
+
 // Debug logging for Vercel (only in production)
 if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
   app.use((req: Request, res: Response, next: NextFunction) => {
