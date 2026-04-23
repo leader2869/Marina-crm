@@ -22,6 +22,20 @@ import { generateActivityDescription } from '../../utils/activityLogDescription'
 import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
 
 export class ClubsController {
+  private toListLogo(logo: string | null): string | null {
+    if (!logo) return null;
+    try {
+      const parsed = JSON.parse(logo);
+      if (Array.isArray(parsed)) {
+        const firstPhoto = parsed.find((item) => typeof item === 'string' && item.length > 0);
+        return firstPhoto || null;
+      }
+      return logo;
+    } catch {
+      return logo;
+    }
+  }
+
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { page, limit } = getPaginationParams(
@@ -120,7 +134,14 @@ export class ClubsController {
         console.log('Скрытых клубов:', hiddenCount);
       }
 
-      res.json(createPaginatedResponse(filteredClubs, filteredClubs.length, page, limit));
+      // Для списка клубов отдаем только главное фото.
+      // Полный массив base64-фото сильно увеличивает payload и может приводить к 504.
+      const clubsForList = filteredClubs.map((club) => ({
+        ...club,
+        logo: this.toListLogo(club.logo),
+      }));
+
+      res.json(createPaginatedResponse(clubsForList, clubsForList.length, page, limit));
     } catch (error) {
       next(error);
     }
