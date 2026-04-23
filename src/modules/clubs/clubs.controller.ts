@@ -31,9 +31,7 @@ export class ClubsController {
       const { location, minPrice, maxPrice, available, showHidden } = req.query;
 
       const clubRepository = AppDataSource.getRepository(Club);
-      const queryBuilder = clubRepository
-        .createQueryBuilder('club')
-        .leftJoinAndSelect('club.owner', 'owner');
+      const queryBuilder = clubRepository.createQueryBuilder('club');
       
       // Если суперадмин запрашивает скрытые клубы, показываем все, иначе только активные
       // Проверяем userRole (может быть undefined, если запрос без аутентификации)
@@ -89,10 +87,10 @@ export class ClubsController {
         queryBuilder.andWhere('club.totalBerths > 0');
       }
 
-      const [clubs, total] = await queryBuilder
+      const clubs = await queryBuilder
         .skip((page - 1) * limit)
         .take(limit)
-        .getManyAndCount();
+        .getMany();
 
       // Если владелец клуба запросил свои клубы, возвращаем только его клубы
       // Если суперадмин запросил скрытые клубы, возвращаем все, иначе фильтруем только активные
