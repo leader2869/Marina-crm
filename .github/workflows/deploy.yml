@@ -15,8 +15,8 @@ jobs:
       SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD || secrets.FTP_PASSWORD }}
       SFTP_PORT: ${{ secrets.SFTP_PORT != '' && secrets.SFTP_PORT || vars.SFTP_PORT }}
       SFTP_TARGET_DIR: ${{ secrets.SFTP_TARGET_DIR != '' && secrets.SFTP_TARGET_DIR || vars.SFTP_TARGET_DIR }}
-      # Для production-сборки фронтенда на reg.ru принудительно используем API на VPS.
-      VITE_API_URL: ${{ vars.VITE_API_URL != '' && vars.VITE_API_URL || 'https://api.1marina.ru/api' }}
+      # Для production-сборки фронтенда используем backend на Vercel.
+      VITE_API_URL: ${{ vars.VITE_API_URL != '' && vars.VITE_API_URL || 'https://marina-crm.vercel.app/api' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

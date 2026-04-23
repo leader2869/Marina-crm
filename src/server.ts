@@ -26,6 +26,7 @@ import contractFillingRoutes from './modules/contract-filling/contract-filling.r
 import clubFinanceRoutes from './modules/club-finance/club-finance.routes';
 
 const app: Express = express();
+let dbInitPromise: Promise<void> | null = null;
 
 // Middleware
 const corsOptions = {
@@ -35,6 +36,7 @@ const corsOptions = {
       'https://1marina.ru',
       'http://www.1marina.ru',
       'http://1marina.ru',
+      'https://marina-crm.vercel.app',
       'http://localhost:5173',
       'http://localhost:3000',
       'http://localhost:3001',
@@ -86,6 +88,33 @@ app.use('/api', (req: Request, _res: Response, next: NextFunction) => {
     }
   }
   next();
+});
+
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  if (req.path === '/health') {
+    return next();
+  }
+
+  if (AppDataSource.isInitialized) {
+    return next();
+  }
+
+  try {
+    if (!dbInitPromise) {
+      dbInitPromise = AppDataSource.initialize().then(() => {
+        console.log('✅ База данных подключена (lazy init)');
+      });
+    }
+    await dbInitPromise;
+    next();
+  } catch (error: any) {
+    dbInitPromise = null;
+    console.error('❌ Ошибка lazy init базы данных:', error?.message || error);
+    return res.status(503).json({
+      error: 'Сервис временно недоступен',
+      message: 'База данных не подключена',
+    });
+  }
 });
 
 if (process.env.NODE_ENV === 'production') {
@@ -197,7 +226,9 @@ const startServer = async (): Promise<void> => {
   }
 };
 
-startServer();
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+  startServer();
+}
 
 
 
