@@ -25,9 +25,8 @@ On push to `main`:
 2. Runs `git pull --ff-only origin main`
 3. Installs backend dependencies: `npm ci`
 4. Builds backend: `npm run build:server`
-5. Restarts app in PM2:
-   - `pm2 restart marina-api` (if exists)
-   - or starts `pm2 start dist/server.js --name marina-api`
+5. Restarts app in PM2 via ecosystem:
+   - `pm2 startOrReload ecosystem.config.js --update-env`
 6. Verifies API with health check URL
 
 ## One-time VPS preparation
@@ -38,6 +37,6 @@ Run once on VPS:
 cd /var/www/Marina-crm
 npm ci
 npm run build:server
-pm2 start dist/server.js --name marina-api
+pm2 start ecosystem.config.js --update-env
 pm2 save
 ```
