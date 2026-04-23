@@ -70,6 +70,7 @@ jobs:
           run_rsync() {
             local dest="$1"
             sshpass -e rsync -avz --delete \
+              --ignore-times \
               -e "ssh -p $PORT -o StrictHostKeyChecking=accept-new" \
               ./client/dist/ "$SFTP_USERNAME@$SFTP_SERVER:$dest"
           }
