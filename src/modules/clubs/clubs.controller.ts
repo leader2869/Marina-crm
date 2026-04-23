@@ -33,8 +33,7 @@ export class ClubsController {
       const clubRepository = AppDataSource.getRepository(Club);
       const queryBuilder = clubRepository
         .createQueryBuilder('club')
-        .leftJoinAndSelect('club.owner', 'owner')
-        .leftJoinAndSelect('club.berths', 'berths');
+        .leftJoinAndSelect('club.owner', 'owner');
       
       // Если суперадмин запрашивает скрытые клубы, показываем все, иначе только активные
       // Проверяем userRole (может быть undefined, если запрос без аутентификации)
