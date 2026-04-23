@@ -33,7 +33,7 @@ export class ClubsController {
       phone: row.phone ?? null,
       email: row.email ?? null,
       website: row.website ?? null,
-      logo: this.toListLogo((row.logo as string | null) ?? null),
+      logo: null,
       totalBerths: Number(row.totalBerths ?? 0),
       minRentalPeriod: Number(row.minRentalPeriod ?? 0),
       maxRentalPeriod: Number(row.maxRentalPeriod ?? 0),
@@ -50,20 +50,6 @@ export class ClubsController {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
-  }
-
-  private toListLogo(logo: string | null): string | null {
-    if (!logo) return null;
-    try {
-      const parsed = JSON.parse(logo);
-      if (Array.isArray(parsed)) {
-        const firstPhoto = parsed.find((item) => typeof item === 'string' && item.length > 0);
-        return firstPhoto || null;
-      }
-      return logo;
-    } catch {
-      return logo;
-    }
   }
 
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -87,7 +73,6 @@ export class ClubsController {
           'club.phone AS phone',
           'club.email AS email',
           'club.website AS website',
-          'club.logo AS logo',
           'club.totalBerths AS "totalBerths"',
           'club.minRentalPeriod AS "minRentalPeriod"',
           'club.maxRentalPeriod AS "maxRentalPeriod"',
