@@ -44,7 +44,12 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "$VPS_SSH_KEY_B64" | base64 -d > ~/.ssh/id_rsa
+          CLEAN_KEY="$(printf '%s' "$VPS_SSH_KEY_B64" | tr -d '\r\n\t ')"
+          printf '%s' "$CLEAN_KEY" | base64 --decode --ignore-garbage > ~/.ssh/id_rsa
+          if ! rg -q "^-----BEGIN OPENSSH PRIVATE KEY-----" ~/.ssh/id_rsa; then
+            echo "Decoded key is not a valid OpenSSH private key"
+            exit 1
+          fi
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
