@@ -59,7 +59,7 @@ export class AuthController {
   }
 
   private getZvonokSuccessStatuses(): Set<string> {
-    const raw = process.env.ZVONOK_VERIFICATION_SUCCESS_STATUSES || 'answered,success,completed,complete';
+    const raw = process.env.ZVONOK_VERIFICATION_SUCCESS_STATUSES || 'answered,success,completed,complete,pincode_ok,pin_code_ok';
     return new Set(raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
   }
 
