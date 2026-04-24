@@ -143,24 +143,25 @@ export class AuthController {
         callerid?: string;
         caller?: string;
         number?: string;
+        callId?: number | string;
       };
-      if (!data?.call_id) {
-        throw new AppError('Сервис звонков не вернул call_id', 502);
-      }
+      const extractedCallId = Number(data.call_id ?? data.callId);
+      const hasCallId = Number.isFinite(extractedCallId) && extractedCallId > 0;
       const callToNumber = data.callerid || data.caller || data.number || null;
 
       const verificationToken = this.signPhoneVerificationToken(
         {
           purpose: this.phoneVerificationPurpose,
           phone: normalizedPhone,
-          callId: Number(data.call_id),
+          callId: hasCallId ? extractedCallId : null,
+          campaignId: Number(campaignId),
         },
         '10m'
       );
 
       res.json({
         message: 'Подтверждение номера инициировано',
-        callId: Number(data.call_id),
+        callId: hasCallId ? extractedCallId : null,
         verificationToken,
         callToNumber,
       });
@@ -177,7 +178,7 @@ export class AuthController {
       }
 
       const payload = this.verifyPhoneVerificationToken(verificationToken);
-      if (payload?.purpose !== this.phoneVerificationPurpose || !payload?.callId || !payload?.phone) {
+      if (payload?.purpose !== this.phoneVerificationPurpose || !payload?.phone) {
         throw new AppError('Недействительный токен верификации', 400);
       }
 
@@ -187,21 +188,42 @@ export class AuthController {
         throw new AppError('Не настроен сервис подтверждения звонком', 500);
       }
 
-      const url = `${apiBase}/phones/call_by_id/?${new URLSearchParams({
-        public_key: publicKey,
-        call_id: String(payload.callId),
-      }).toString()}`;
-      const response = await fetch(url, { method: 'GET' });
-      if (!response.ok) {
-        const detailedMessage = await this.buildZvonokErrorMessage(
-          response,
-          'Не удалось получить статус звонка'
-        );
-        throw new AppError(detailedMessage, 502);
-      }
+      let result: any = null;
 
-      const data = await response.json() as any;
-      const result = Array.isArray(data) ? data[0] : data;
+      if (payload.callId) {
+        const url = `${apiBase}/phones/call_by_id/?${new URLSearchParams({
+          public_key: publicKey,
+          call_id: String(payload.callId),
+        }).toString()}`;
+        const response = await fetch(url, { method: 'GET' });
+        if (!response.ok) {
+          const detailedMessage = await this.buildZvonokErrorMessage(
+            response,
+            'Не удалось получить статус звонка'
+          );
+          throw new AppError(detailedMessage, 502);
+        }
+        const data = await response.json() as any;
+        result = Array.isArray(data) ? data[0] : data;
+      } else {
+        const fallbackUrl = `${apiBase}/phones/calls_by_phone/?${new URLSearchParams({
+          public_key: publicKey,
+          campaign_id: String(payload.campaignId || process.env.ZVONOK_CAMPAIGN_ID || ''),
+          phone: String(payload.phone),
+        }).toString()}`;
+        const fallbackResponse = await fetch(fallbackUrl, { method: 'GET' });
+        if (!fallbackResponse.ok) {
+          const detailedMessage = await this.buildZvonokErrorMessage(
+            fallbackResponse,
+            'Не удалось получить статус звонка'
+          );
+          throw new AppError(detailedMessage, 502);
+        }
+        const list = await fallbackResponse.json() as any[];
+        if (Array.isArray(list) && list.length > 0) {
+          result = list[list.length - 1];
+        }
+      }
       const status = String(result?.status || result?.ct_status || 'unknown');
       const verified = this.isCallVerified(result);
 
