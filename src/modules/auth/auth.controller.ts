@@ -22,6 +22,11 @@ export class AuthController {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   }
 
+  private createVerificationLabel(phone: string): string {
+    const normalized = phone.replace(/\D/g, '').slice(-10);
+    return `marina_verify_${normalized}_${Date.now()}`;
+  }
+
   private normalizePhoneForCall(phone: string): string {
     const digits = phone.replace(/\D/g, '');
     if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
@@ -192,6 +197,7 @@ export class AuthController {
       }
 
       const normalizedPhone = this.normalizePhoneForCall(String(phone));
+      const verificationLabel = this.createVerificationLabel(normalizedPhone);
       const publicKey = process.env.ZVONOK_PUBLIC_KEY;
       const campaignId = process.env.ZVONOK_CAMPAIGN_ID;
       const apiBase = process.env.ZVONOK_API_BASE || 'https://zvonok.com/manager/cabapi_external/api/v1';
@@ -209,6 +215,7 @@ export class AuthController {
           public_key: publicKey,
           campaign_id: campaignId,
           phone: normalizedPhone,
+          label: verificationLabel,
         }),
       });
 
@@ -238,6 +245,7 @@ export class AuthController {
           callId: hasCallId ? extractedCallId : null,
           campaignId: Number(campaignId),
           startedAt: new Date().toISOString(),
+          label: verificationLabel,
         },
         '10m'
       );
@@ -272,8 +280,28 @@ export class AuthController {
       }
 
       let result: any = null;
+      const campaignId = String(payload.campaignId || process.env.ZVONOK_CAMPAIGN_ID || '');
 
-      if (payload.callId) {
+      if (payload.label && campaignId) {
+        const byLabelUrl = `${apiBase}/phones/calls_by_label/?${new URLSearchParams({
+          public_key: publicKey,
+          campaign_id: campaignId,
+          label: String(payload.label),
+          expand: '1',
+        }).toString()}`;
+        const byLabelResponse = await fetch(byLabelUrl, { method: 'GET' });
+        if (byLabelResponse.ok) {
+          let byLabelData: any = null;
+          try {
+            byLabelData = await byLabelResponse.json();
+          } catch {
+            byLabelData = null;
+          }
+          result = this.selectBestCallResult(byLabelData);
+        }
+      }
+
+      if (!result && payload.callId) {
         const url = `${apiBase}/phones/call_by_id/?${new URLSearchParams({
           public_key: publicKey,
           call_id: String(payload.callId),
@@ -288,7 +316,7 @@ export class AuthController {
         }
         const data = await response.json() as any;
         result = this.selectBestCallResult(data);
-      } else {
+      } else if (!result) {
         const now = new Date();
         const startedAtDate = payload.startedAt ? new Date(String(payload.startedAt)) : null;
         const fallbackFromDate = startedAtDate && !Number.isNaN(startedAtDate.getTime())
@@ -297,7 +325,7 @@ export class AuthController {
 
         const fallbackUrl = `${apiBase}/phones/calls_by_phone/?${new URLSearchParams({
           public_key: publicKey,
-          campaign_id: String(payload.campaignId || process.env.ZVONOK_CAMPAIGN_ID || ''),
+          campaign_id: campaignId,
           phone: String(payload.phone),
           from_created_date: this.formatZvonokDate(fallbackFromDate),
           to_created_date: this.formatZvonokDate(now),
