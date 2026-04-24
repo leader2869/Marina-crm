@@ -11,6 +11,38 @@ import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
 
 export class AuthController {
+  private async verifyRecaptchaToken(recaptchaToken: string | undefined): Promise<void> {
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+
+    if (!secretKey) {
+      throw new AppError('reCAPTCHA не настроена на сервере', 500);
+    }
+
+    if (!recaptchaToken) {
+      throw new AppError('Подтвердите, что вы не робот', 400);
+    }
+
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        secret: secretKey,
+        response: recaptchaToken,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new AppError('Не удалось проверить reCAPTCHA', 502);
+    }
+
+    const data = await response.json() as { success?: boolean };
+    if (!data.success) {
+      throw new AppError('Проверка reCAPTCHA не пройдена', 400);
+    }
+  }
+
   // Вспомогательный метод для нормализации номера телефона
   private normalizePhone(phone: string): string {
     if (!phone) return '';
@@ -30,11 +62,13 @@ export class AuthController {
 
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { password, firstName, lastName, phone, role } = req.body;
+      const { password, firstName, lastName, phone, role, recaptchaToken } = req.body;
 
       if (!password || !firstName || !lastName || !phone) {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
       }
+
+      await this.verifyRecaptchaToken(recaptchaToken);
 
       // Валидация телефона
       if (!phone || phone.trim() === '' || !phone.startsWith('+7')) {
@@ -313,11 +347,13 @@ export class AuthController {
 
   async loginAsGuest(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { firstName, phone } = req.body;
+      const { firstName, phone, recaptchaToken } = req.body;
 
       if (!firstName || !firstName.trim()) {
         throw new AppError('Имя обязательно для заполнения', 400);
       }
+
+      await this.verifyRecaptchaToken(recaptchaToken);
 
       const userRepository = AppDataSource.getRepository(User);
       

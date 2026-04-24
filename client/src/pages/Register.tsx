@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Anchor } from 'lucide-react'
+import ReCAPTCHA from 'react-google-recaptcha'
 
 export default function Register() {
   const [searchParams] = useSearchParams()
@@ -23,8 +24,10 @@ export default function Register() {
   }, [roleParam])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
   const { register } = useAuth()
   const navigate = useNavigate()
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
 
   // Функция валидации российского номера телефона
   const validateRussianPhone = (phone: string): boolean => {
@@ -61,11 +64,21 @@ export default function Register() {
       setError('Номер телефона должен соответствовать формату российского номера: +7 (999) 123-45-67')
       return
     }
+
+    if (!recaptchaSiteKey) {
+      setError('reCAPTCHA не настроена. Обратитесь к администратору.')
+      return
+    }
+
+    if (!recaptchaToken) {
+      setError('Подтвердите, что вы не робот')
+      return
+    }
     
     setLoading(true)
 
     try {
-      const response: any = await register(formData)
+      const response: any = await register(formData, recaptchaToken)
       // Если регистрация как CLUB_OWNER, показываем сообщение о валидации
       if (formData.role === 'club_owner' && response?.message) {
         alert(response.message)
@@ -278,6 +291,14 @@ export default function Register() {
                 Выберите роль для регистрации в системе
               </p>
             </div>
+            {recaptchaSiteKey && (
+              <div className="flex justify-center">
+                <ReCAPTCHA
+                  sitekey={recaptchaSiteKey}
+                  onChange={(token: string | null) => setRecaptchaToken(token)}
+                />
+              </div>
+            )}
           </div>
 
           <div>

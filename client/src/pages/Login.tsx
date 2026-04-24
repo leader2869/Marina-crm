@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Anchor, X } from 'lucide-react'
+import ReCAPTCHA from 'react-google-recaptcha'
 
 export default function Login() {
   const [emailOrPhone, setEmailOrPhone] = useState('')
@@ -14,8 +15,10 @@ export default function Login() {
     firstName: '',
     phone: '',
   })
+  const [guestRecaptchaToken, setGuestRecaptchaToken] = useState<string | null>(null)
   const { login, loginAsGuest } = useAuth()
   const navigate = useNavigate()
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +47,7 @@ export default function Login() {
   const handleGuestModalClose = () => {
     setShowGuestModal(false)
     setGuestForm({ firstName: '', phone: '' })
+    setGuestRecaptchaToken(null)
     setError('')
   }
 
@@ -149,6 +153,16 @@ export default function Login() {
       return
     }
 
+    if (!recaptchaSiteKey) {
+      setError('reCAPTCHA не настроена. Обратитесь к администратору.')
+      return
+    }
+
+    if (!guestRecaptchaToken) {
+      setError('Подтвердите, что вы не робот')
+      return
+    }
+
     // Валидация номера телефона, если он введен
     if (guestForm.phone && guestForm.phone.trim() !== '') {
       if (!validateRussianPhone(guestForm.phone)) {
@@ -160,9 +174,10 @@ export default function Login() {
     setGuestLoading(true)
 
     try {
-      await loginAsGuest(guestForm.firstName, guestForm.phone || undefined)
+      await loginAsGuest(guestForm.firstName, guestForm.phone || undefined, guestRecaptchaToken)
       setShowGuestModal(false)
       setGuestForm({ firstName: '', phone: '' })
+      setGuestRecaptchaToken(null)
       navigate('/clubs')
     } catch (err: any) {
       setError(err.error || 'Ошибка входа как гость')
@@ -342,6 +357,15 @@ export default function Login() {
                       Формат: +7 (999) 123-45-67 или 8 (999) 123-45-67
                     </p>
                   </div>
+
+                  {recaptchaSiteKey && (
+                    <div className="flex justify-center">
+                      <ReCAPTCHA
+                        sitekey={recaptchaSiteKey}
+                        onChange={(token: string | null) => setGuestRecaptchaToken(token)}
+                      />
+                    </div>
+                  )}
 
                   <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                     <button
