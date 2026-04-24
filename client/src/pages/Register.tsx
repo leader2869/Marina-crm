@@ -34,6 +34,15 @@ export default function Register() {
   const navigate = useNavigate()
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
 
+  const toErrorText = (err: any, fallback: string): string => {
+    if (!err) return fallback
+    if (typeof err === 'string') return err
+    if (typeof err.message === 'string') return err.message
+    if (typeof err.error === 'string') return err.error
+    if (err.error && typeof err.error.message === 'string') return err.error.message
+    return fallback
+  }
+
   // Функция валидации российского номера телефона
   const validateRussianPhone = (phone: string): boolean => {
     if (!phone || phone.trim() === '') {
@@ -90,7 +99,7 @@ export default function Register() {
       setPhoneVerificationStatus('Время ожидания подтверждения истекло')
       setError('Не удалось подтвердить номер. Попробуйте еще раз.')
     } catch (err: any) {
-      setError(err.error || err.message || 'Ошибка подтверждения номера')
+      setError(toErrorText(err, 'Ошибка подтверждения номера'))
       setPhoneVerificationStatus('Ошибка подтверждения')
     } finally {
       setPhoneVerificationLoading(false)
@@ -137,7 +146,7 @@ export default function Register() {
       }
       navigate('/dashboard')
     } catch (err: any) {
-      setError(err.error || 'Ошибка регистрации')
+      setError(toErrorText(err, 'Ошибка регистрации'))
     } finally {
       setLoading(false)
     }
@@ -295,12 +304,12 @@ export default function Register() {
                   const formatted = formatPhoneNumber(inputValue)
                   setFormData({ ...formData, phone: formatted })
                   // Очищаем ошибку при вводе
-                  if (error && error.includes('Номер телефона')) {
+                  if (typeof error === 'string' && error.includes('Номер телефона')) {
                     setError('')
                   }
                 }}
                 className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white ${
-                  error && error.includes('Номер телефона') 
+                  typeof error === 'string' && error.includes('Номер телефона') 
                     ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
                     : 'border-gray-300'
                 }`}

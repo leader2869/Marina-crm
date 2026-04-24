@@ -25,6 +25,15 @@ export default function Login() {
   const navigate = useNavigate()
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
 
+  const toErrorText = (err: any, fallback: string): string => {
+    if (!err) return fallback
+    if (typeof err === 'string') return err
+    if (typeof err.message === 'string') return err.message
+    if (typeof err.error === 'string') return err.error
+    if (err.error && typeof err.error.message === 'string') return err.error.message
+    return fallback
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -35,9 +44,8 @@ export default function Login() {
       navigate('/dashboard')
     } catch (err: any) {
       console.error('Login error:', err)
-      // Показываем более подробную информацию об ошибке
-      const errorMessage = err.message || err.error || 'Ошибка входа'
-      const errorDetails = err.details ? ` (${err.details})` : ''
+      const errorMessage = toErrorText(err, 'Ошибка входа')
+      const errorDetails = typeof err?.details === 'string' ? ` (${err.details})` : ''
       setError(errorMessage + errorDetails)
     } finally {
       setLoading(false)
@@ -187,7 +195,7 @@ export default function Login() {
       setGuestPhoneVerificationStatus('Время ожидания подтверждения истекло')
       setError('Не удалось подтвердить номер. Попробуйте еще раз.')
     } catch (err: any) {
-      setError(err.error || err.message || 'Ошибка подтверждения номера')
+      setError(toErrorText(err, 'Ошибка подтверждения номера'))
       setGuestPhoneVerificationStatus('Ошибка подтверждения')
     } finally {
       setGuestPhoneVerificationLoading(false)
@@ -243,7 +251,7 @@ export default function Login() {
       setGuestPhoneVerificationStatus('')
       navigate('/clubs')
     } catch (err: any) {
-      setError(err.error || 'Ошибка входа как гость')
+      setError(toErrorText(err, 'Ошибка входа как гость'))
     } finally {
       setGuestLoading(false)
     }
@@ -391,7 +399,7 @@ export default function Login() {
                         setGuestPhoneVerificationStatus('')
                         setGuestForm({ ...guestForm, phone: formatted })
                         // Очищаем ошибку при вводе
-                        if (error && error.includes('Номер телефона')) {
+                        if (typeof error === 'string' && error.includes('Номер телефона')) {
                           setError('')
                         }
                       }}
@@ -413,7 +421,7 @@ export default function Login() {
                         }
                       }}
                       className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white ${
-                        error && error.includes('Номер телефона') 
+                        typeof error === 'string' && error.includes('Номер телефона') 
                           ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
                           : 'border-gray-300'
                       }`}

@@ -189,6 +189,34 @@ export class AuthController {
     }
   }
 
+  async handlePhoneVerificationPostback(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const expectedSecret = process.env.ZVONOK_POSTBACK_SECRET;
+      const providedSecret = String(req.query.secret || '');
+
+      // Если секрет настроен, принимаем только валидные постбеки.
+      if (expectedSecret && providedSecret !== expectedSecret) {
+        throw new AppError('Неверный секрет postback', 403);
+      }
+
+      const payload = {
+        event: String(req.query.event || ''),
+        callId: String(req.query.call_id || req.query.ct_call_id || ''),
+        phone: String(req.query.phone || req.query.ct_phone || ''),
+        status: String(req.query.status || req.query.ct_status || ''),
+        dialStatus: String(req.query.dial_status || req.query.ct_dial_status || ''),
+        button: String(req.query.button || req.query.ct_button_num || ''),
+        completedTs: String(req.query.completed_ts || req.query.ct_completed_ts || ''),
+      };
+
+      console.log('[Zvonok Postback] Получен postback:', payload);
+
+      res.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   private async verifyRecaptchaToken(recaptchaToken: string | undefined): Promise<void> {
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;
 
