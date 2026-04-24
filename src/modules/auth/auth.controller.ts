@@ -57,8 +57,84 @@ export class AuthController {
     const status = String(result?.status || result?.ct_status || '').toLowerCase();
     const dialStatus = String(result?.dial_status || result?.ct_dial_status || '').toLowerCase();
     const buttonNum = String(result?.button_num || result?.ct_button_num || '').toLowerCase();
+    const buttons = String(
+      result?.buttons ||
+      result?.buttons_pressed ||
+      result?.pressed_buttons ||
+      result?.dtmf ||
+      ''
+    ).toLowerCase();
+    const isConfirmedFlag = String(
+      result?.verified ??
+      result?.is_verified ??
+      result?.phone_verified ??
+      ''
+    ).toLowerCase();
+    const durationSec = Number(
+      result?.duration ??
+      result?.billsec ??
+      result?.talk_duration ??
+      0
+    );
 
-    return successStatuses.has(status) || successStatuses.has(dialStatus) || buttonNum === '1';
+    return (
+      successStatuses.has(status) ||
+      successStatuses.has(dialStatus) ||
+      buttonNum === '1' ||
+      buttons.includes('1') ||
+      isConfirmedFlag === 'true' ||
+      durationSec > 0
+    );
+  }
+
+  private selectBestCallResult(input: any): any {
+    const list = Array.isArray(input)
+      ? input
+      : Array.isArray(input?.results)
+        ? input.results
+        : Array.isArray(input?.data)
+          ? input.data
+          : input
+            ? [input]
+            : [];
+
+    if (list.length === 0) {
+      return null;
+    }
+
+    const verifiedRecord = list.find((item: any) => this.isCallVerified(item));
+    if (verifiedRecord) {
+      return verifiedRecord;
+    }
+
+    const getTs = (item: any): number => {
+      const candidates = [
+        item?.updated_at,
+        item?.created_at,
+        item?.completed_ts,
+        item?.ct_completed_ts,
+        item?.timestamp,
+        item?.time,
+      ];
+      for (const value of candidates) {
+        if (value === undefined || value === null) {
+          continue;
+        }
+        const numeric = Number(value);
+        if (Number.isFinite(numeric) && numeric > 0) {
+          return numeric;
+        }
+        const parsed = Date.parse(String(value));
+        if (!Number.isNaN(parsed)) {
+          return parsed;
+        }
+      }
+      return 0;
+    };
+
+    return list.reduce((best: any, current: any) => (
+      getTs(current) > getTs(best) ? current : best
+    ));
   }
 
   private async buildZvonokErrorMessage(
@@ -204,7 +280,7 @@ export class AuthController {
           throw new AppError(detailedMessage, 502);
         }
         const data = await response.json() as any;
-        result = Array.isArray(data) ? data[0] : data;
+        result = this.selectBestCallResult(data);
       } else {
         const fallbackUrl = `${apiBase}/phones/calls_by_phone/?${new URLSearchParams({
           public_key: publicKey,
@@ -219,10 +295,8 @@ export class AuthController {
           );
           throw new AppError(detailedMessage, 502);
         }
-        const list = await fallbackResponse.json() as any[];
-        if (Array.isArray(list) && list.length > 0) {
-          result = list[list.length - 1];
-        }
+        const list = await fallbackResponse.json() as any;
+        result = this.selectBestCallResult(list);
       }
       const status = String(result?.status || result?.ct_status || 'unknown');
       const verified = this.isCallVerified(result);
