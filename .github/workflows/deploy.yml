@@ -17,6 +17,8 @@ jobs:
       SFTP_TARGET_DIR: ${{ secrets.SFTP_TARGET_DIR != '' && secrets.SFTP_TARGET_DIR || vars.SFTP_TARGET_DIR }}
       # Для production-сборки фронтенда используем backend на Vercel.
       VITE_API_URL: ${{ vars.VITE_API_URL != '' && vars.VITE_API_URL || 'https://marina-crm.vercel.app/api' }}
+      # Site key для отображения reCAPTCHA в клиенте.
+      VITE_RECAPTCHA_SITE_KEY: ${{ vars.VITE_RECAPTCHA_SITE_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,6 +59,9 @@ jobs:
       - name: Build frontend (Vite)
         run: |
           echo "Build with VITE_API_URL=$VITE_API_URL"
+          if [ -z "$VITE_RECAPTCHA_SITE_KEY" ]; then
+            echo "WARNING: VITE_RECAPTCHA_SITE_KEY is empty. reCAPTCHA widget will be hidden in production build."
+          fi
           cd client
           npm ci
           npm run build
