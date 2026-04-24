@@ -15,6 +15,12 @@ import { config } from '../../config/env';
 export class AuthController {
   private readonly phoneVerificationPurpose = 'phone_verification';
   private readonly phoneVerifiedPurpose = 'phone_verified';
+  private readonly phoneVerificationWindowMinutes = 20;
+
+  private formatZvonokDate(date: Date): string {
+    const pad = (value: number): string => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
 
   private normalizePhoneForCall(phone: string): string {
     const digits = phone.replace(/\D/g, '');
@@ -231,6 +237,7 @@ export class AuthController {
           phone: normalizedPhone,
           callId: hasCallId ? extractedCallId : null,
           campaignId: Number(campaignId),
+          startedAt: new Date().toISOString(),
         },
         '10m'
       );
@@ -282,10 +289,21 @@ export class AuthController {
         const data = await response.json() as any;
         result = this.selectBestCallResult(data);
       } else {
+        const now = new Date();
+        const startedAtDate = payload.startedAt ? new Date(String(payload.startedAt)) : null;
+        const fallbackFromDate = startedAtDate && !Number.isNaN(startedAtDate.getTime())
+          ? new Date(startedAtDate.getTime() - 60_000)
+          : new Date(now.getTime() - this.phoneVerificationWindowMinutes * 60_000);
+
         const fallbackUrl = `${apiBase}/phones/calls_by_phone/?${new URLSearchParams({
           public_key: publicKey,
           campaign_id: String(payload.campaignId || process.env.ZVONOK_CAMPAIGN_ID || ''),
           phone: String(payload.phone),
+          from_created_date: this.formatZvonokDate(fallbackFromDate),
+          to_created_date: this.formatZvonokDate(now),
+          from_updated_date: this.formatZvonokDate(fallbackFromDate),
+          to_updated_date: this.formatZvonokDate(now),
+          expand: '1',
         }).toString()}`;
         const fallbackResponse = await fetch(fallbackUrl, { method: 'GET' });
         if (!fallbackResponse.ok) {
