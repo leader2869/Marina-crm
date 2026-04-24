@@ -27,6 +27,29 @@ import { generateActivityDescription } from '../../utils/activityLogDescription'
 import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
 
 export class ClubsController {
+  private isMissingTableError(error: unknown): boolean {
+    const message = (error as any)?.message;
+    if (typeof message !== 'string') {
+      return false;
+    }
+    return message.includes('does not exist') || message.includes('не существует');
+  }
+
+  private async safeDeleteByClubId<T extends { clubId: number }>(
+    operationName: string,
+    deleteFn: () => Promise<T[] | any>
+  ): Promise<void> {
+    try {
+      await deleteFn();
+    } catch (error) {
+      if (this.isMissingTableError(error)) {
+        console.warn(`[ClubsController] Пропускаем ${operationName}: таблица отсутствует`);
+        return;
+      }
+      throw error;
+    }
+  }
+
   private toListLogo(rawLogo: unknown): string | null {
     if (!rawLogo || typeof rawLogo !== 'string') {
       return null;
@@ -983,22 +1006,32 @@ export class ClubsController {
           await expenseRepository.delete({ clubId: clubId });
 
           // Удаляем категории расходов, связанные с клубом
-          await expenseCategoryRepository.delete({ clubId: clubId });
+          await this.safeDeleteByClubId('expense_categories', () =>
+            expenseCategoryRepository.delete({ clubId: clubId })
+          );
 
           // Удаляем бюджеты (budgets)
           await budgetRepository.delete({ clubId: clubId });
 
           // Удаляем контрагентов клуба
-          await contragentRepository.delete({ clubId: clubId });
+          await this.safeDeleteByClubId('contragents', () =>
+            contragentRepository.delete({ clubId: clubId })
+          );
 
           // Удаляем транзакции кассы клуба
-          await clubCashTransactionRepository.delete({ clubId: clubId });
+          await this.safeDeleteByClubId('club_cash_transactions', () =>
+            clubCashTransactionRepository.delete({ clubId: clubId })
+          );
 
           // Удаляем менеджеров партнеров клуба до удаления самих партнеров
-          await clubPartnerManagerRepository.delete({ clubId: clubId });
+          await this.safeDeleteByClubId('club_partner_managers', () =>
+            clubPartnerManagerRepository.delete({ clubId: clubId })
+          );
 
           // Удаляем партнеров клуба
-          await clubPartnerRepository.delete({ clubId: clubId });
+          await this.safeDeleteByClubId('club_partners', () =>
+            clubPartnerRepository.delete({ clubId: clubId })
+          );
 
           // Удаляем связи многие-ко-многим (user_clubs)
           await userClubRepository.delete({ clubId: clubId });
