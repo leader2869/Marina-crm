@@ -1004,19 +1004,14 @@ export class ClubsController {
             console.log(`Удалено мест через репозиторий: ${allBerths.length}`);
           }
           
-          // Дополнительная проверка и удаление через raw SQL, если нужно
-          const berthsCheck = await queryRunner.manager.query(
-            'SELECT COUNT(*)::int as count FROM berths WHERE "clubId" = $1',
-            [clubId]
-          );
-          
-          const remainingCount = berthsCheck[0]?.count || 0;
-          if (remainingCount > 0) {
-            console.log(`Осталось мест после удаления через репозиторий: ${remainingCount}, удаляем через SQL...`);
-            await queryRunner.manager.query(
-              'DELETE FROM berths WHERE "clubId" = $1',
-              [clubId]
-            );
+          // Если после remove что-то осталось, удаляем через репозиторий (без raw SQL),
+          // чтобы TypeORM сам использовал корректное имя колонки для текущей схемы.
+          const remainingBerths = await berthRepository.count({
+            where: { clubId: clubId },
+          });
+          if (remainingBerths > 0) {
+            console.log(`Осталось мест после remove: ${remainingBerths}, удаляем через repository.delete...`);
+            await berthRepository.delete({ clubId: clubId });
           }
 
           // Удаляем доходы (incomes), напрямую связанные с клубом
