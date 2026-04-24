@@ -105,12 +105,15 @@ export default function Register() {
     setError('')
 
     try {
-      const startedAt = Date.now()
-      const pollIntervalMs = 3000
-      const timeoutMs = 2 * 60 * 1000
+      const pollIntervalMs = 2000
+      const maxAttempts = 30
+      setPhoneVerificationStatus('Проверяем статус подтверждения...')
 
-      while (Date.now() - startedAt < timeoutMs) {
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+        }
+
         const statusData = await authService.checkPhoneVerification(verificationSessionToken)
         if (statusData.callToNumber) {
           setCallToNumber(statusData.callToNumber)
@@ -464,6 +467,12 @@ export default function Register() {
                 {callToNumber && callToNumber !== '+7 800 555-86-07' && (
                   <p className="mt-2 text-xs text-gray-600">Номер от сервиса: {callToNumber}</p>
                 )}
+                {phoneVerificationStatus && (
+                  <p className="mt-3 text-sm text-gray-700">{phoneVerificationStatus}</p>
+                )}
+                {error && (
+                  <p className="mt-2 text-sm text-red-600">{error}</p>
+                )}
               </div>
 
               <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
@@ -480,7 +489,7 @@ export default function Register() {
                   disabled={phoneVerificationLoading}
                   className="px-4 py-2 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {phoneVerificationLoading ? 'Проверяем...' : 'Подтвердил'}
+                  {phoneVerificationLoading ? 'Проверяем...' : 'Проверить'}
                 </button>
               </div>
             </div>

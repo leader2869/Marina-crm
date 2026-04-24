@@ -204,12 +204,15 @@ export default function Login() {
     setError('')
 
     try {
-      const startedAt = Date.now()
-      const pollIntervalMs = 3000
-      const timeoutMs = 2 * 60 * 1000
+      const pollIntervalMs = 2000
+      const maxAttempts = 30
+      setGuestPhoneVerificationStatus('Проверяем статус подтверждения...')
 
-      while (Date.now() - startedAt < timeoutMs) {
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+        }
+
         const statusData = await authService.checkPhoneVerification(guestVerificationSessionToken)
         if (statusData.callToNumber) {
           setGuestCallToNumber(statusData.callToNumber)
@@ -553,6 +556,12 @@ export default function Login() {
                     Номер от сервиса: {guestCallToNumber}
                   </p>
                 )}
+                {guestPhoneVerificationStatus && (
+                  <p className="mt-3 text-sm text-gray-700">{guestPhoneVerificationStatus}</p>
+                )}
+                {error && (
+                  <p className="mt-2 text-sm text-red-600">{error}</p>
+                )}
               </div>
 
               <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
@@ -569,7 +578,7 @@ export default function Login() {
                   disabled={guestPhoneVerificationLoading}
                   className="px-4 py-2 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {guestPhoneVerificationLoading ? 'Проверяем...' : 'Подтвердил'}
+                  {guestPhoneVerificationLoading ? 'Проверяем...' : 'Проверить'}
                 </button>
               </div>
             </div>
