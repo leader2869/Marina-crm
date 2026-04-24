@@ -61,6 +61,31 @@ export class AuthController {
     return successStatuses.has(status) || successStatuses.has(dialStatus) || buttonNum === '1';
   }
 
+  private async buildZvonokErrorMessage(
+    response: { status: number; text: () => Promise<string> },
+    fallback: string
+  ): Promise<string> {
+    try {
+      const rawBody = await response.text();
+      let details = rawBody;
+      try {
+        const parsed = JSON.parse(rawBody);
+        if (parsed?.error) {
+          details = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+        } else if (parsed?.message) {
+          details = String(parsed.message);
+        } else {
+          details = JSON.stringify(parsed);
+        }
+      } catch {
+        // keep text body as-is
+      }
+      return `${fallback} (Zvonok HTTP ${response.status}: ${details.slice(0, 300)})`;
+    } catch {
+      return `${fallback} (Zvonok HTTP ${response.status})`;
+    }
+  }
+
   private verifyPhoneOwnershipToken(phoneVerificationToken: string | undefined, phone: string): void {
     if (!phoneVerificationToken) {
       throw new AppError('Подтвердите номер телефона перед продолжением', 400);
@@ -106,7 +131,11 @@ export class AuthController {
       });
 
       if (!response.ok) {
-        throw new AppError('Не удалось инициировать звонок для подтверждения номера', 502);
+        const detailedMessage = await this.buildZvonokErrorMessage(
+          response,
+          'Не удалось инициировать звонок для подтверждения номера'
+        );
+        throw new AppError(detailedMessage, 502);
       }
 
       const data = await response.json() as { call_id?: number | string };
@@ -157,7 +186,11 @@ export class AuthController {
       }).toString()}`;
       const response = await fetch(url, { method: 'GET' });
       if (!response.ok) {
-        throw new AppError('Не удалось получить статус звонка', 502);
+        const detailedMessage = await this.buildZvonokErrorMessage(
+          response,
+          'Не удалось получить статус звонка'
+        );
+        throw new AppError(detailedMessage, 502);
       }
 
       const data = await response.json() as any;
