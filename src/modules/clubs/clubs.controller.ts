@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
-import { In } from 'typeorm';
+import { In, QueryRunner } from 'typeorm';
 import { Club } from '../../entities/Club';
 import { Berth } from '../../entities/Berth';
 import { Booking } from '../../entities/Booking';
@@ -28,6 +28,54 @@ import { generateActivityDescription } from '../../utils/activityLogDescription'
 import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
 
 export class ClubsController {
+  private async resolveClubColumnName(queryRunner: QueryRunner, tableName: string): Promise<string | null> {
+    const rows = await queryRunner.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name IN ('clubId', 'club_id')
+        ORDER BY CASE column_name WHEN 'clubId' THEN 0 ELSE 1 END
+        LIMIT 1
+      `,
+      [tableName]
+    );
+    return rows?.[0]?.column_name ?? null;
+  }
+
+  private async deleteByClubIdRaw(queryRunner: QueryRunner, tableName: string, clubId: number): Promise<void> {
+    const clubColumn = await this.resolveClubColumnName(queryRunner, tableName);
+    if (!clubColumn) {
+      return;
+    }
+    await queryRunner.query(`DELETE FROM "${tableName}" WHERE "${clubColumn}" = $1`, [clubId]);
+  }
+
+  private async countByClubIdRaw(queryRunner: QueryRunner, tableName: string, clubId: number): Promise<number> {
+    const clubColumn = await this.resolveClubColumnName(queryRunner, tableName);
+    if (!clubColumn) {
+      return 0;
+    }
+    const rows = await queryRunner.query(
+      `SELECT COUNT(*)::int AS count FROM "${tableName}" WHERE "${clubColumn}" = $1`,
+      [clubId]
+    );
+    return rows?.[0]?.count ?? 0;
+  }
+
+  private async selectIdsByClubIdRaw(queryRunner: QueryRunner, tableName: string, clubId: number): Promise<number[]> {
+    const clubColumn = await this.resolveClubColumnName(queryRunner, tableName);
+    if (!clubColumn) {
+      return [];
+    }
+    const rows = await queryRunner.query(
+      `SELECT id FROM "${tableName}" WHERE "${clubColumn}" = $1`,
+      [clubId]
+    );
+    return rows.map((row: { id: number }) => Number(row.id)).filter((id: number) => Number.isFinite(id));
+  }
+
   private isMissingTableError(error: unknown): boolean {
     const message = (error as any)?.message;
     if (typeof message !== 'string') {
@@ -925,11 +973,7 @@ export class ClubsController {
           }
 
           // Получаем все бронирования клуба для удаления связанных платежей и доходов
-          const bookings = await bookingRepository.find({
-            where: { clubId: clubId },
-            select: ['id'],
-          });
-          const bookingIds = bookings.map((b) => b.id);
+          const bookingIds = await this.selectIdsByClubIdRaw(queryRunner, 'bookings', clubId);
 
           // Удаляем платежи (payments), связанные с бронированиями клуба
           if (bookingIds.length > 0) {
@@ -943,11 +987,7 @@ export class ClubsController {
 
           // Сначала удаляем все бронирования, которые ссылаются на места клуба
           // Это важно, так как бронирования имеют внешний ключ на места
-          const berths = await berthRepository.find({
-            where: { clubId: clubId },
-            select: ['id'],
-          });
-          const berthIds = berths.map((b) => b.id);
+          const berthIds = await this.selectIdsByClubIdRaw(queryRunner, 'berths', clubId);
 
           // Удаляем бронирования, связанные с местами клуба
           if (berthIds.length > 0) {
@@ -955,11 +995,11 @@ export class ClubsController {
           }
 
           // Удаляем бронирования, напрямую связанные с клубом
-          await bookingRepository.delete({ clubId: clubId });
+          await this.deleteByClubIdRaw(queryRunner, 'bookings', clubId);
 
           // Удаляем правила бронирования (booking_rules) ПЕРЕД удалением тарифов,
           // так как booking_rules имеют внешний ключ на tariffs
-          await bookingRuleRepository.delete({ clubId: clubId });
+          await this.deleteByClubIdRaw(queryRunner, 'booking_rules', clubId);
 
           // Удаляем связи тарифов и мест до удаления тарифов/мест, чтобы избежать FK-конфликтов.
           if (berthIds.length > 0) {
@@ -968,11 +1008,7 @@ export class ClubsController {
             );
           }
 
-          const tariffs = await tariffRepository.find({
-            where: { clubId: clubId },
-            select: ['id'],
-          });
-          const tariffIds = tariffs.map((t) => t.id);
+          const tariffIds = await this.selectIdsByClubIdRaw(queryRunner, 'tariffs', clubId);
           if (tariffIds.length > 0) {
             await this.safeDeleteByClubId('tariff_berths by tariffId', () =>
               tariffBerthRepository.delete({ tariffId: In(tariffIds) })
@@ -980,13 +1016,11 @@ export class ClubsController {
           }
 
           // Удаляем тарифы (tariffs) после удаления booking_rules, так как tariff_berths может иметь связи
-          await tariffRepository.delete({ clubId: clubId });
+          await this.deleteByClubIdRaw(queryRunner, 'tariffs', clubId);
 
           // Теперь можно безопасно удалить места (berths)
           // Проверяем, что все бронирования удалены перед удалением мест
-          const remainingBookings = await bookingRepository.count({
-            where: { clubId: clubId },
-          });
+          const remainingBookings = await this.countByClubIdRaw(queryRunner, 'bookings', clubId);
           
           if (remainingBookings > 0) {
             throw new AppError('Не удалось удалить все бронирования клуба', 500);
@@ -994,62 +1028,55 @@ export class ClubsController {
 
           // Удаляем все места через репозиторий в транзакции
           // Сначала получаем все места
-          const allBerths = await berthRepository.find({
-            where: { clubId: clubId },
-          });
-          
-          // Удаляем все места
-          if (allBerths.length > 0) {
-            await berthRepository.remove(allBerths);
-            console.log(`Удалено мест через репозиторий: ${allBerths.length}`);
+          if (berthIds.length > 0) {
+            await berthRepository.delete({ id: In(berthIds) });
+            console.log(`Удалено мест через репозиторий: ${berthIds.length}`);
           }
           
           // Если после remove что-то осталось, удаляем через репозиторий (без raw SQL),
           // чтобы TypeORM сам использовал корректное имя колонки для текущей схемы.
-          const remainingBerths = await berthRepository.count({
-            where: { clubId: clubId },
-          });
+          const remainingBerths = await this.countByClubIdRaw(queryRunner, 'berths', clubId);
           if (remainingBerths > 0) {
-            console.log(`Осталось мест после remove: ${remainingBerths}, удаляем через repository.delete...`);
-            await berthRepository.delete({ clubId: clubId });
+            console.log(`Осталось мест после удаления: ${remainingBerths}, удаляем через raw helper...`);
+            await this.deleteByClubIdRaw(queryRunner, 'berths', clubId);
           }
 
           // Удаляем доходы (incomes), напрямую связанные с клубом
-          await incomeRepository.delete({ clubId: clubId });
+          await this.deleteByClubIdRaw(queryRunner, 'incomes', clubId);
 
           // Удаляем расходы (expenses)
-          await expenseRepository.delete({ clubId: clubId });
+          await this.deleteByClubIdRaw(queryRunner, 'expenses', clubId);
 
           // Удаляем категории расходов, связанные с клубом
           await this.safeDeleteByClubId('expense_categories', () =>
-            expenseCategoryRepository.delete({ clubId: clubId })
+            this.deleteByClubIdRaw(queryRunner, 'expense_categories', clubId)
           );
 
           // Удаляем бюджеты (budgets)
-          await budgetRepository.delete({ clubId: clubId });
+          await this.deleteByClubIdRaw(queryRunner, 'budgets', clubId);
 
           // Удаляем контрагентов клуба
           await this.safeDeleteByClubId('contragents', () =>
-            contragentRepository.delete({ clubId: clubId })
+            this.deleteByClubIdRaw(queryRunner, 'contragents', clubId)
           );
 
           // Удаляем транзакции кассы клуба
           await this.safeDeleteByClubId('club_cash_transactions', () =>
-            clubCashTransactionRepository.delete({ clubId: clubId })
+            this.deleteByClubIdRaw(queryRunner, 'club_cash_transactions', clubId)
           );
 
           // Удаляем менеджеров партнеров клуба до удаления самих партнеров
           await this.safeDeleteByClubId('club_partner_managers', () =>
-            clubPartnerManagerRepository.delete({ clubId: clubId })
+            this.deleteByClubIdRaw(queryRunner, 'club_partner_managers', clubId)
           );
 
           // Удаляем партнеров клуба
           await this.safeDeleteByClubId('club_partners', () =>
-            clubPartnerRepository.delete({ clubId: clubId })
+            this.deleteByClubIdRaw(queryRunner, 'club_partners', clubId)
           );
 
           // Удаляем связи многие-ко-многим (user_clubs)
-          await userClubRepository.delete({ clubId: clubId });
+          await this.deleteByClubIdRaw(queryRunner, 'user_clubs', clubId);
 
           // Обновляем пользователей, у которых этот клуб был установлен как managedClub
           await userRepository.update(
@@ -1058,9 +1085,7 @@ export class ClubsController {
           );
 
           // Финальная проверка, что все места удалены
-          const finalBerthsCount = await berthRepository.count({
-            where: { clubId: clubId },
-          });
+          const finalBerthsCount = await this.countByClubIdRaw(queryRunner, 'berths', clubId);
           
           console.log('Оставшихся мест перед удалением клуба:', finalBerthsCount);
           
