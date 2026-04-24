@@ -12,6 +12,11 @@ import { User } from '../../entities/User';
 import { Payment } from '../../entities/Payment';
 import { Tariff } from '../../entities/Tariff';
 import { BookingRule } from '../../entities/BookingRule';
+import { Contragent } from '../../entities/Contragent';
+import { ClubPartner } from '../../entities/ClubPartner';
+import { ClubPartnerManager } from '../../entities/ClubPartnerManager';
+import { ExpenseCategory } from '../../entities/ExpenseCategory';
+import { ClubCashTransaction } from '../../entities/ClubCashTransaction';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
@@ -835,6 +840,9 @@ export class ClubsController {
         throw new AppError('Недостаточно прав для удаления', 403);
       }
 
+      const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
+      const isClubOwner = req.userRole === UserRole.CLUB_OWNER && club.ownerId === req.userId;
+
       // Формируем детальное описание перед удалением
       const userName = req.user ? `${req.user.firstName} ${req.user.lastName}`.trim() : null;
       const clubName = club.name || 'неизвестный клуб';
@@ -854,53 +862,8 @@ export class ClubsController {
         userAgent: req.headers['user-agent'] || null,
       });
 
-      // Для владельца клуба проверяем наличие связей
-      const isClubOwner = req.userRole === UserRole.CLUB_OWNER && club.ownerId === req.userId;
-      if (isClubOwner) {
-        // Проверяем наличие связей
-        const berthRepository = AppDataSource.getRepository(Berth);
-        const bookingRepository = AppDataSource.getRepository(Booking);
-        const userClubRepository = AppDataSource.getRepository(UserClub);
-        const tariffRepository = AppDataSource.getRepository(Tariff);
-        const bookingRuleRepository = AppDataSource.getRepository(BookingRule);
-        const paymentRepository = AppDataSource.getRepository(Payment);
-        const incomeRepository = AppDataSource.getRepository(Income);
-        const expenseRepository = AppDataSource.getRepository(Expense);
-        const budgetRepository = AppDataSource.getRepository(Budget);
-
-        // Проверяем наличие связей
-        const hasBerths = await berthRepository.count({ where: { clubId: clubId } }) > 0;
-        const hasBookings = await bookingRepository.count({ where: { clubId: clubId } }) > 0;
-        const hasUserClubs = await userClubRepository.count({ where: { clubId: clubId } }) > 0;
-        const hasTariffs = await tariffRepository.count({ where: { clubId: clubId } }) > 0;
-        const hasBookingRules = await bookingRuleRepository.count({ where: { clubId: clubId } }) > 0;
-        
-        // Проверяем payments через bookings
-        const clubBookings = await bookingRepository.find({ 
-          where: { clubId: clubId },
-          select: ['id']
-        });
-        const bookingIds = clubBookings.map(b => b.id);
-        const hasPayments = bookingIds.length > 0 && await paymentRepository.count({ 
-          where: { bookingId: In(bookingIds) } 
-        }) > 0;
-        
-        const hasIncomes = await incomeRepository.count({ where: { clubId: clubId } }) > 0;
-        const hasExpenses = await expenseRepository.count({ where: { clubId: clubId } }) > 0;
-        const hasBudgets = await budgetRepository.count({ where: { clubId: clubId } }) > 0;
-
-        if (hasBerths || hasBookings || hasUserClubs || hasTariffs || hasBookingRules || hasPayments || hasIncomes || hasExpenses || hasBudgets) {
-          throw new AppError('Невозможно удалить яхт-клуб: у клуба есть связи (места, бронирования, пользователи, тарифы и т.д.). Сначала удалите все связи.', 400);
-        }
-
-        // Если связей нет, владелец может удалить клуб
-        await clubRepository.remove(club);
-        res.json({ message: 'Яхт-клуб успешно удален' });
-        return;
-      }
-
-      // Супер-администратор может полностью удалить клуб (удаляет все связи)
-      if (req.userRole === UserRole.SUPER_ADMIN) {
+      // Владелец клуба (своего) и супер-администратор могут полностью удалить клуб со всеми связями.
+      if (isSuperAdmin || isClubOwner) {
         console.log(`Начало удаления клуба ID: ${clubId}`);
         
         // Используем транзакцию для атомарности операций
@@ -920,6 +883,11 @@ export class ClubsController {
           const paymentRepository = queryRunner.manager.getRepository(Payment);
           const tariffRepository = queryRunner.manager.getRepository(Tariff);
           const bookingRuleRepository = queryRunner.manager.getRepository(BookingRule);
+          const contragentRepository = queryRunner.manager.getRepository(Contragent);
+          const clubPartnerRepository = queryRunner.manager.getRepository(ClubPartner);
+          const clubPartnerManagerRepository = queryRunner.manager.getRepository(ClubPartnerManager);
+          const expenseCategoryRepository = queryRunner.manager.getRepository(ExpenseCategory);
+          const clubCashTransactionRepository = queryRunner.manager.getRepository(ClubCashTransaction);
           const clubRepositoryTransaction = queryRunner.manager.getRepository(Club);
           
           // Загружаем клуб в транзакции
@@ -1014,8 +982,23 @@ export class ClubsController {
           // Удаляем расходы (expenses)
           await expenseRepository.delete({ clubId: clubId });
 
+          // Удаляем категории расходов, связанные с клубом
+          await expenseCategoryRepository.delete({ clubId: clubId });
+
           // Удаляем бюджеты (budgets)
           await budgetRepository.delete({ clubId: clubId });
+
+          // Удаляем контрагентов клуба
+          await contragentRepository.delete({ clubId: clubId });
+
+          // Удаляем транзакции кассы клуба
+          await clubCashTransactionRepository.delete({ clubId: clubId });
+
+          // Удаляем менеджеров партнеров клуба до удаления самих партнеров
+          await clubPartnerManagerRepository.delete({ clubId: clubId });
+
+          // Удаляем партнеров клуба
+          await clubPartnerRepository.delete({ clubId: clubId });
 
           // Удаляем связи многие-ко-многим (user_clubs)
           await userClubRepository.delete({ clubId: clubId });
