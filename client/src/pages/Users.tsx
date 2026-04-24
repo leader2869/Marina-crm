@@ -57,6 +57,7 @@ export default function UsersPage() {
   const [showVesselModal, setShowVesselModal] = useState(false)
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
 
   useEffect(() => {
     loadUsers()
@@ -69,7 +70,11 @@ export default function UsersPage() {
       setError('')
       const response = await usersService.getAll({ limit: 100 })
       console.log('Ответ API пользователей:', response)
-      setUsers(response.data || [])
+      const loadedUsers = response.data || []
+      setUsers(loadedUsers)
+      setSelectedUserIds((prev) =>
+        prev.filter((id) => loadedUsers.some((u: UserData) => u.id === id))
+      )
     } catch (error: any) {
       console.error('Ошибка загрузки пользователей:', error)
       const errorMessage = error.error || error.message || 'Ошибка загрузки пользователей'
@@ -232,8 +237,46 @@ export default function UsersPage() {
     try {
       await usersService.delete(userId)
       await loadUsers()
+      setSelectedUserIds((prev) => prev.filter((id) => id !== userId))
     } catch (err: any) {
       setError(err.error || err.message || 'Ошибка удаления пользователя')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const canSelectUserForBulkDelete = (user: UserData) => {
+    return user.role !== UserRole.SUPER_ADMIN && user.id !== currentUser?.id
+  }
+
+  const toggleUserSelection = (userId: number) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    )
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedUserIds.length === 0) return
+
+    const selectedUsers = users.filter((u) => selectedUserIds.includes(u.id))
+    const nonDeletableSelected = selectedUsers.filter((u) => !canSelectUserForBulkDelete(u))
+    if (nonDeletableSelected.length > 0) {
+      setError('В списке есть пользователи, которых нельзя удалить (супер-администратор или вы сами)')
+      return
+    }
+
+    if (!confirm(`Вы уверены, что хотите удалить пользователей: ${selectedUserIds.length} шт.?`)) return
+    if (!confirm('ВНИМАНИЕ! Это действие необратимо. Выбранные пользователи будут удалены из базы данных. Продолжить?')) return
+
+    setDeleting(true)
+    setError('')
+
+    try {
+      await Promise.all(selectedUserIds.map((id) => usersService.delete(id)))
+      setSelectedUserIds([])
+      await loadUsers()
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка массового удаления пользователей')
     } finally {
       setDeleting(false)
     }
@@ -448,6 +491,45 @@ export default function UsersPage() {
     return <ArrowDown className="h-4 w-4 ml-1 text-primary-600" />
   }
 
+  const filteredUsers = users.filter((user) => {
+    if (!searchTerm) return true
+
+    const searchLower = searchTerm.toLowerCase().trim()
+
+    const lastName = user.lastName?.toLowerCase() || ''
+    if (lastName.includes(searchLower)) return true
+
+    const phone = user.phone?.toLowerCase() || ''
+    if (phone !== '-' && phone.includes(searchLower)) return true
+
+    if (user.vessels && user.vessels.length > 0) {
+      const vesselNames = user.vessels
+        .map((vessel) => vessel.name?.toLowerCase() || '')
+        .join(' ')
+      if (vesselNames.includes(searchLower)) return true
+    }
+
+    return false
+  })
+
+  const sortedUsers = sortUsers(filteredUsers)
+  const bulkEligibleUsers = sortedUsers.filter(canSelectUserForBulkDelete)
+  const allEligibleSelected =
+    bulkEligibleUsers.length > 0 && bulkEligibleUsers.every((u) => selectedUserIds.includes(u.id))
+
+  const handleToggleSelectAllVisible = () => {
+    if (allEligibleSelected) {
+      setSelectedUserIds((prev) => prev.filter((id) => !bulkEligibleUsers.some((u) => u.id === id)))
+      return
+    }
+
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev)
+      bulkEligibleUsers.forEach((u) => next.add(u.id))
+      return Array.from(next)
+    })
+  }
+
   // Проверка роли (дополнительная защита)
   if (currentUser && currentUser.role !== UserRole.SUPER_ADMIN) {
     return (
@@ -475,6 +557,17 @@ export default function UsersPage() {
           </div>
         </div>
         <div className="flex gap-3">
+          {selectedUserIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={deleting}
+              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+              title="Удалить выбранных пользователей"
+            >
+              <Trash2 className="h-5 w-5 mr-2" />
+              Удалить выбранных ({selectedUserIds.length})
+            </button>
+          )}
           <button
             onClick={exportToExcel}
             className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
@@ -511,6 +604,15 @@ export default function UsersPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={allEligibleSelected}
+                    onChange={handleToggleSelectAllVisible}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    title="Выбрать/снять выбор у всех пользователей на странице"
+                  />
+                </th>
                 <th 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                   onClick={() => handleSort('id')}
@@ -590,37 +692,10 @@ export default function UsersPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {(() => {
-                const filteredUsers = users.filter((user) => {
-                  if (!searchTerm) return true
-                  
-                  const searchLower = searchTerm.toLowerCase().trim()
-                  
-                  // Поиск по фамилии
-                  const lastName = user.lastName?.toLowerCase() || ''
-                  if (lastName.includes(searchLower)) return true
-                  
-                  // Поиск по телефону
-                  const phone = user.phone?.toLowerCase() || ''
-                  if (phone !== '-' && phone.includes(searchLower)) return true
-                  
-                  // Поиск по названию катера
-                  if (user.vessels && user.vessels.length > 0) {
-                    const vesselNames = user.vessels
-                      .map((vessel) => vessel.name?.toLowerCase() || '')
-                      .join(' ')
-                    if (vesselNames.includes(searchLower)) return true
-                  }
-                  
-                  return false
-                })
-                
-                // Применяем сортировку к отфильтрованным пользователям
-                const sortedUsers = sortUsers(filteredUsers)
-                
                 if (sortedUsers.length === 0 && users.length > 0) {
                   return (
                     <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center">
+                      <td colSpan={10} className="px-6 py-12 text-center">
                         <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-600">Пользователи по запросу "{searchTerm}" не найдены</p>
                       </td>
@@ -634,6 +709,20 @@ export default function UsersPage() {
                   onClick={() => navigate(`/users/${user.id}`)}
                   className="hover:bg-gray-50 cursor-pointer"
                 >
+                  <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedUserIds.includes(user.id)}
+                      disabled={!canSelectUserForBulkDelete(user) || deleting}
+                      onChange={() => toggleUserSelection(user.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:cursor-not-allowed"
+                      title={
+                        !canSelectUserForBulkDelete(user)
+                          ? 'Нельзя выбрать этого пользователя для удаления'
+                          : 'Выбрать пользователя'
+                      }
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
                       {(() => {
