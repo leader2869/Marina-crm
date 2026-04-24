@@ -27,10 +27,12 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
   const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null)
+  const [verificationSessionToken, setVerificationSessionToken] = useState<string | null>(null)
   const [phoneVerified, setPhoneVerified] = useState(false)
   const [phoneVerificationLoading, setPhoneVerificationLoading] = useState(false)
   const [phoneVerificationStatus, setPhoneVerificationStatus] = useState('')
   const [callToNumber, setCallToNumber] = useState<string | null>(null)
+  const [showPhoneCallModal, setShowPhoneCallModal] = useState(false)
   const { register } = useAuth()
   const navigate = useNavigate()
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
@@ -74,26 +76,42 @@ export default function Register() {
     setPhoneVerificationLoading(true)
     setError('')
     setPhoneVerified(false)
+    setPhoneVerificationToken(null)
+    setVerificationSessionToken(null)
     setCallToNumber(null)
-    setPhoneVerificationStatus('Инициируем звонок...')
+    setPhoneVerificationStatus('Инициируем подтверждение...')
 
     try {
       const startData = await authService.startPhoneVerification(formData.phone)
-      setPhoneVerificationToken(startData.verificationToken)
-      if (startData.callToNumber) {
-        setCallToNumber(startData.callToNumber)
-        setPhoneVerificationStatus(`Позвоните на номер ${startData.callToNumber}. Проверяем статус...`)
-      } else {
-        setPhoneVerificationStatus('Ожидаем номер для звонка от сервиса. Проверяем статус...')
-      }
+      setVerificationSessionToken(startData.verificationToken)
+      setCallToNumber(startData.callToNumber || '+7 800 555-86-07')
+      setShowPhoneCallModal(true)
+      setPhoneVerificationStatus('Ожидаем подтверждение после звонка')
+    } catch (err: any) {
+      setError(toErrorText(err, 'Ошибка подтверждения номера'))
+      setPhoneVerificationStatus('Ошибка подтверждения')
+    } finally {
+      setPhoneVerificationLoading(false)
+    }
+  }
 
+  const confirmPhoneAfterCall = async () => {
+    if (!verificationSessionToken) {
+      setError('Сессия подтверждения не найдена. Нажмите "Подтвердить номер" еще раз')
+      return
+    }
+
+    setPhoneVerificationLoading(true)
+    setError('')
+
+    try {
       const startedAt = Date.now()
       const pollIntervalMs = 3000
       const timeoutMs = 2 * 60 * 1000
 
       while (Date.now() - startedAt < timeoutMs) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
-        const statusData = await authService.checkPhoneVerification(startData.verificationToken)
+        const statusData = await authService.checkPhoneVerification(verificationSessionToken)
         if (statusData.callToNumber) {
           setCallToNumber(statusData.callToNumber)
         }
@@ -102,6 +120,7 @@ export default function Register() {
           setPhoneVerified(true)
           setPhoneVerificationToken(statusData.phoneVerificationToken)
           setPhoneVerificationStatus('Номер успешно подтвержден')
+          setShowPhoneCallModal(false)
           return
         }
       }
@@ -114,6 +133,17 @@ export default function Register() {
     } finally {
       setPhoneVerificationLoading(false)
     }
+  }
+
+  const cancelPhoneVerification = () => {
+    setShowPhoneCallModal(false)
+    setPhoneVerificationToken(null)
+    setVerificationSessionToken(null)
+    setPhoneVerified(false)
+    setCallToNumber(null)
+    setPhoneVerificationStatus('')
+    setError('')
+    navigate('/login')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -314,6 +344,11 @@ export default function Register() {
                   }
                   const formatted = formatPhoneNumber(inputValue)
                   setFormData({ ...formData, phone: formatted })
+                  setPhoneVerified(false)
+                  setPhoneVerificationToken(null)
+                  setVerificationSessionToken(null)
+                  setCallToNumber(null)
+                  setPhoneVerificationStatus('')
                   // Очищаем ошибку при вводе
                   if (typeof error === 'string' && error.includes('Номер телефона')) {
                     setError('')
@@ -342,11 +377,6 @@ export default function Register() {
               </div>
               {phoneVerificationStatus && (
                 <p className="mt-2 text-xs text-gray-600">{phoneVerificationStatus}</p>
-              )}
-              {callToNumber && (
-                <p className="mt-1 text-xs text-blue-700 font-medium">
-                  Для подтверждения позвоните на: {callToNumber}
-                </p>
               )}
             </div>
             <div>
@@ -412,6 +442,51 @@ export default function Register() {
           </div>
         </form>
       </div>
+
+      {showPhoneCallModal && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" />
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-6 pt-6 pb-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Подтверждение номера телефона</h3>
+                <p className="text-sm text-gray-700">
+                  Для подтверждения номера телефона, позвонить{' '}
+                  <a
+                    href="tel:+78005558607"
+                    className="text-blue-600 underline font-semibold"
+                  >
+                    +7 800 555-86-07
+                  </a>{' '}
+                  - бесплатный вызов со всех телефонов РФ
+                </p>
+                {callToNumber && callToNumber !== '+7 800 555-86-07' && (
+                  <p className="mt-2 text-xs text-gray-600">Номер от сервиса: {callToNumber}</p>
+                )}
+              </div>
+
+              <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={cancelPhoneVerification}
+                  className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmPhoneAfterCall}
+                  disabled={phoneVerificationLoading}
+                  className="px-4 py-2 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {phoneVerificationLoading ? 'Проверяем...' : 'Подтвердил'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

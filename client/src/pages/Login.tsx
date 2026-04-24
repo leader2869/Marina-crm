@@ -18,10 +18,12 @@ export default function Login() {
   })
   const [guestRecaptchaToken, setGuestRecaptchaToken] = useState<string | null>(null)
   const [guestPhoneVerificationToken, setGuestPhoneVerificationToken] = useState<string | null>(null)
+  const [guestVerificationSessionToken, setGuestVerificationSessionToken] = useState<string | null>(null)
   const [guestPhoneVerified, setGuestPhoneVerified] = useState(false)
   const [guestPhoneVerificationLoading, setGuestPhoneVerificationLoading] = useState(false)
   const [guestPhoneVerificationStatus, setGuestPhoneVerificationStatus] = useState('')
   const [guestCallToNumber, setGuestCallToNumber] = useState<string | null>(null)
+  const [showPhoneCallModal, setShowPhoneCallModal] = useState(false)
   const { login, loginAsGuest } = useAuth()
   const navigate = useNavigate()
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
@@ -63,8 +65,10 @@ export default function Login() {
     setGuestForm({ firstName: '', phone: '' })
     setGuestRecaptchaToken(null)
     setGuestPhoneVerificationToken(null)
+    setGuestVerificationSessionToken(null)
     setGuestPhoneVerified(false)
     setGuestCallToNumber(null)
+    setShowPhoneCallModal(false)
     setGuestPhoneVerificationStatus('')
     setError('')
   }
@@ -171,26 +175,42 @@ export default function Login() {
     setGuestPhoneVerificationLoading(true)
     setGuestPhoneVerified(false)
     setGuestPhoneVerificationToken(null)
+    setGuestVerificationSessionToken(null)
     setGuestCallToNumber(null)
-    setGuestPhoneVerificationStatus('Инициируем звонок...')
+    setGuestPhoneVerificationStatus('Инициируем подтверждение...')
     setError('')
 
     try {
       const startData = await authService.startPhoneVerification(guestForm.phone)
-      if (startData.callToNumber) {
-        setGuestCallToNumber(startData.callToNumber)
-        setGuestPhoneVerificationStatus(`Позвоните на номер ${startData.callToNumber}. Проверяем статус...`)
-      } else {
-        setGuestPhoneVerificationStatus('Ожидаем номер для звонка от сервиса. Проверяем статус...')
-      }
+      setGuestVerificationSessionToken(startData.verificationToken)
+      setGuestCallToNumber(startData.callToNumber || '+7 800 555-86-07')
+      setShowPhoneCallModal(true)
+      setGuestPhoneVerificationStatus('Ожидаем подтверждение после звонка')
+    } catch (err: any) {
+      setError(toErrorText(err, 'Ошибка подтверждения номера'))
+      setGuestPhoneVerificationStatus('Ошибка подтверждения')
+    } finally {
+      setGuestPhoneVerificationLoading(false)
+    }
+  }
 
+  const confirmGuestPhoneAfterCall = async () => {
+    if (!guestVerificationSessionToken) {
+      setError('Сессия подтверждения не найдена. Нажмите "Подтвердить номер" еще раз')
+      return
+    }
+
+    setGuestPhoneVerificationLoading(true)
+    setError('')
+
+    try {
       const startedAt = Date.now()
       const pollIntervalMs = 3000
       const timeoutMs = 2 * 60 * 1000
 
       while (Date.now() - startedAt < timeoutMs) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
-        const statusData = await authService.checkPhoneVerification(startData.verificationToken)
+        const statusData = await authService.checkPhoneVerification(guestVerificationSessionToken)
         if (statusData.callToNumber) {
           setGuestCallToNumber(statusData.callToNumber)
         }
@@ -199,6 +219,7 @@ export default function Login() {
           setGuestPhoneVerified(true)
           setGuestPhoneVerificationToken(statusData.phoneVerificationToken)
           setGuestPhoneVerificationStatus('Номер успешно подтвержден')
+          setShowPhoneCallModal(false)
           return
         }
       }
@@ -211,6 +232,18 @@ export default function Login() {
     } finally {
       setGuestPhoneVerificationLoading(false)
     }
+  }
+
+  const cancelGuestPhoneVerification = () => {
+    setShowPhoneCallModal(false)
+    setGuestPhoneVerificationToken(null)
+    setGuestVerificationSessionToken(null)
+    setGuestPhoneVerified(false)
+    setGuestCallToNumber(null)
+    setGuestPhoneVerificationStatus('')
+    setError('')
+    handleGuestModalClose()
+    navigate('/login')
   }
 
   const handleGuestLogin = async (e: React.FormEvent) => {
@@ -490,6 +523,54 @@ export default function Login() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно подтверждения звонком */}
+      {showPhoneCallModal && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" />
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-6 pt-6 pb-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Подтверждение номера телефона</h3>
+                <p className="text-sm text-gray-700">
+                  Для подтверждения номера телефона, позвонить{' '}
+                  <a
+                    href="tel:+78005558607"
+                    className="text-blue-600 underline font-semibold"
+                  >
+                    +7 800 555-86-07
+                  </a>{' '}
+                  - бесплатный вызов со всех телефонов РФ
+                </p>
+                {guestCallToNumber && guestCallToNumber !== '+7 800 555-86-07' && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Номер от сервиса: {guestCallToNumber}
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={cancelGuestPhoneVerification}
+                  className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmGuestPhoneAfterCall}
+                  disabled={guestPhoneVerificationLoading}
+                  className="px-4 py-2 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {guestPhoneVerificationLoading ? 'Проверяем...' : 'Подтвердил'}
+                </button>
               </div>
             </div>
           </div>
