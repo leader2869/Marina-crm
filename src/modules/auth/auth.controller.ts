@@ -9,8 +9,186 @@ import { UserRole } from '../../types';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import { config } from '../../config/env';
 
 export class AuthController {
+  private readonly phoneVerificationPurpose = 'phone_verification';
+  private readonly phoneVerifiedPurpose = 'phone_verified';
+
+  private normalizePhoneForCall(phone: string): string {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+      return `+7${digits.slice(1)}`;
+    }
+    if (digits.length === 10) {
+      return `+7${digits}`;
+    }
+    throw new AppError('Номер телефона должен быть в формате +7XXXXXXXXXX', 400);
+  }
+
+  private signPhoneVerificationToken(payload: Record<string, unknown>, expiresIn: string): string {
+    const secret = config.jwt.secret;
+    if (!secret) {
+      throw new AppError('JWT secret is not configured', 500);
+    }
+    return jwt.sign(payload, secret, { expiresIn } as SignOptions);
+  }
+
+  private verifyPhoneVerificationToken(token: string): any {
+    const secret = config.jwt.secret;
+    if (!secret) {
+      throw new AppError('JWT secret is not configured', 500);
+    }
+    try {
+      return jwt.verify(token, secret);
+    } catch {
+      throw new AppError('Недействительный токен подтверждения номера', 400);
+    }
+  }
+
+  private getZvonokSuccessStatuses(): Set<string> {
+    const raw = process.env.ZVONOK_VERIFICATION_SUCCESS_STATUSES || 'answered,success,completed,complete';
+    return new Set(raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+  }
+
+  private isCallVerified(result: any): boolean {
+    const successStatuses = this.getZvonokSuccessStatuses();
+    const status = String(result?.status || result?.ct_status || '').toLowerCase();
+    const dialStatus = String(result?.dial_status || result?.ct_dial_status || '').toLowerCase();
+    const buttonNum = String(result?.button_num || result?.ct_button_num || '').toLowerCase();
+
+    return successStatuses.has(status) || successStatuses.has(dialStatus) || buttonNum === '1';
+  }
+
+  private verifyPhoneOwnershipToken(phoneVerificationToken: string | undefined, phone: string): void {
+    if (!phoneVerificationToken) {
+      throw new AppError('Подтвердите номер телефона перед продолжением', 400);
+    }
+
+    const payload = this.verifyPhoneVerificationToken(phoneVerificationToken);
+    if (payload?.purpose !== this.phoneVerifiedPurpose) {
+      throw new AppError('Недействительный токен подтверждения номера', 400);
+    }
+
+    const normalizedRequestPhone = this.normalizePhoneForCall(phone);
+    if (payload?.phone !== normalizedRequestPhone) {
+      throw new AppError('Токен подтверждения не соответствует номеру телефона', 400);
+    }
+  }
+
+  async startPhoneVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { phone } = req.body;
+      if (!phone || !String(phone).trim()) {
+        throw new AppError('Номер телефона обязателен', 400);
+      }
+
+      const normalizedPhone = this.normalizePhoneForCall(String(phone));
+      const publicKey = process.env.ZVONOK_PUBLIC_KEY;
+      const campaignId = process.env.ZVONOK_CAMPAIGN_ID;
+      const apiBase = process.env.ZVONOK_API_BASE || 'https://zvonok.com/manager/cabapi_external/api/v1';
+
+      if (!publicKey || !campaignId) {
+        throw new AppError('Не настроен сервис подтверждения звонком', 500);
+      }
+
+      const response = await fetch(`${apiBase}/phones/call/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          public_key: publicKey,
+          campaign_id: campaignId,
+          phone: normalizedPhone,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new AppError('Не удалось инициировать звонок для подтверждения номера', 502);
+      }
+
+      const data = await response.json() as { call_id?: number | string };
+      if (!data?.call_id) {
+        throw new AppError('Сервис звонков не вернул call_id', 502);
+      }
+
+      const verificationToken = this.signPhoneVerificationToken(
+        {
+          purpose: this.phoneVerificationPurpose,
+          phone: normalizedPhone,
+          callId: Number(data.call_id),
+        },
+        '10m'
+      );
+
+      res.json({
+        message: 'Звонок на подтверждение инициирован',
+        callId: Number(data.call_id),
+        verificationToken,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async checkPhoneVerificationStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const verificationToken = String(req.query.verificationToken || '');
+      if (!verificationToken) {
+        throw new AppError('verificationToken обязателен', 400);
+      }
+
+      const payload = this.verifyPhoneVerificationToken(verificationToken);
+      if (payload?.purpose !== this.phoneVerificationPurpose || !payload?.callId || !payload?.phone) {
+        throw new AppError('Недействительный токен верификации', 400);
+      }
+
+      const publicKey = process.env.ZVONOK_PUBLIC_KEY;
+      const apiBase = process.env.ZVONOK_API_BASE || 'https://zvonok.com/manager/cabapi_external/api/v1';
+      if (!publicKey) {
+        throw new AppError('Не настроен сервис подтверждения звонком', 500);
+      }
+
+      const url = `${apiBase}/phones/call_by_id/?${new URLSearchParams({
+        public_key: publicKey,
+        call_id: String(payload.callId),
+      }).toString()}`;
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) {
+        throw new AppError('Не удалось получить статус звонка', 502);
+      }
+
+      const data = await response.json() as any;
+      const result = Array.isArray(data) ? data[0] : data;
+      const status = String(result?.status || result?.ct_status || 'unknown');
+      const verified = this.isCallVerified(result);
+
+      if (!verified) {
+        res.json({ verified: false, status });
+        return;
+      }
+
+      const phoneVerificationToken = this.signPhoneVerificationToken(
+        {
+          purpose: this.phoneVerifiedPurpose,
+          phone: payload.phone,
+          callId: payload.callId,
+        },
+        '15m'
+      );
+
+      res.json({
+        verified: true,
+        status,
+        phoneVerificationToken,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   private async verifyRecaptchaToken(recaptchaToken: string | undefined): Promise<void> {
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;
 
@@ -62,7 +240,7 @@ export class AuthController {
 
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { password, firstName, lastName, phone, role, recaptchaToken } = req.body;
+      const { password, firstName, lastName, phone, role, recaptchaToken, phoneVerificationToken } = req.body;
 
       if (!password || !firstName || !lastName || !phone) {
         throw new AppError('Все обязательные поля должны быть заполнены', 400);
@@ -74,6 +252,8 @@ export class AuthController {
       if (!phone || phone.trim() === '' || !phone.startsWith('+7')) {
         throw new AppError('Номер телефона обязателен и должен начинаться с +7', 400);
       }
+
+      this.verifyPhoneOwnershipToken(phoneVerificationToken, phone);
 
       // Генерируем email на основе телефона
       // Удаляем все нецифровые символы из телефона для создания уникального email
@@ -347,7 +527,7 @@ export class AuthController {
 
   async loginAsGuest(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { firstName, phone, recaptchaToken } = req.body;
+      const { firstName, phone, recaptchaToken, phoneVerificationToken } = req.body;
 
       if (!firstName || !firstName.trim()) {
         throw new AppError('Имя обязательно для заполнения', 400);
@@ -356,6 +536,11 @@ export class AuthController {
       await this.verifyRecaptchaToken(recaptchaToken);
 
       const userRepository = AppDataSource.getRepository(User);
+
+      if (!phone || !phone.trim()) {
+        throw new AppError('Номер телефона обязателен', 400);
+      }
+      this.verifyPhoneOwnershipToken(phoneVerificationToken, phone);
       
       // Проверяем уникальность телефона, если он указан
       if (phone && phone.trim()) {

@@ -17,6 +17,8 @@ router.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Основные роуты
+router.post('/phone-verification/start', authController.startPhoneVerification.bind(authController));
+router.get('/phone-verification/status', authController.checkPhoneVerificationStatus.bind(authController));
 router.post('/register', authController.register.bind(authController));
 router.post('/login', authController.login.bind(authController));
 router.post('/guest', authController.loginAsGuest.bind(authController));
@@ -58,6 +60,8 @@ router.all('*', (req: Request, res: Response) => {
   res.status(404).json({ 
     error: 'Маршрут не найден в auth роутере',
     availableRoutes: [
+      'POST /api/auth/phone-verification/start',
+      'GET /api/auth/phone-verification/status',
       'POST /api/auth/login',
       'POST /api/auth/register',
       'POST /api/auth/guest',

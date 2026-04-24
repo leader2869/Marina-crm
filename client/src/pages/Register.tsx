@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { authService } from '../services/api'
 import { Anchor } from 'lucide-react'
 import ReCAPTCHA from 'react-google-recaptcha'
 
@@ -25,6 +26,10 @@ export default function Register() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null)
+  const [phoneVerified, setPhoneVerified] = useState(false)
+  const [phoneVerificationLoading, setPhoneVerificationLoading] = useState(false)
+  const [phoneVerificationStatus, setPhoneVerificationStatus] = useState('')
   const { register } = useAuth()
   const navigate = useNavigate()
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
@@ -50,6 +55,48 @@ export default function Register() {
     return false
   }
 
+  const startPhoneVerification = async () => {
+    if (!validateRussianPhone(formData.phone)) {
+      setError('Укажите корректный номер в формате +7 (999) 123-45-67')
+      return
+    }
+
+    setPhoneVerificationLoading(true)
+    setError('')
+    setPhoneVerified(false)
+    setPhoneVerificationStatus('Инициируем звонок...')
+
+    try {
+      const startData = await authService.startPhoneVerification(formData.phone)
+      setPhoneVerificationToken(startData.verificationToken)
+      setPhoneVerificationStatus('Позвоните на указанный номер. Проверяем статус...')
+
+      const startedAt = Date.now()
+      const pollIntervalMs = 3000
+      const timeoutMs = 2 * 60 * 1000
+
+      while (Date.now() - startedAt < timeoutMs) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+        const statusData = await authService.checkPhoneVerification(startData.verificationToken)
+        setPhoneVerificationStatus(`Статус: ${statusData.status}`)
+        if (statusData.verified && statusData.phoneVerificationToken) {
+          setPhoneVerified(true)
+          setPhoneVerificationToken(statusData.phoneVerificationToken)
+          setPhoneVerificationStatus('Номер успешно подтвержден')
+          return
+        }
+      }
+
+      setPhoneVerificationStatus('Время ожидания подтверждения истекло')
+      setError('Не удалось подтвердить номер. Попробуйте еще раз.')
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка подтверждения номера')
+      setPhoneVerificationStatus('Ошибка подтверждения')
+    } finally {
+      setPhoneVerificationLoading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -62,6 +109,11 @@ export default function Register() {
     
     if (!validateRussianPhone(formData.phone)) {
       setError('Номер телефона должен соответствовать формату российского номера: +7 (999) 123-45-67')
+      return
+    }
+
+    if (!phoneVerified || !phoneVerificationToken) {
+      setError('Сначала подтвердите номер телефона через звонок')
       return
     }
 
@@ -78,7 +130,7 @@ export default function Register() {
     setLoading(true)
 
     try {
-      const response: any = await register(formData, recaptchaToken)
+      const response: any = await register(formData, recaptchaToken, phoneVerificationToken)
       // Если регистрация как CLUB_OWNER, показываем сообщение о валидации
       if (formData.role === 'club_owner' && response?.message) {
         alert(response.message)
@@ -149,6 +201,9 @@ export default function Register() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (e.target.name === 'phone') {
       const formatted = formatPhoneNumber(e.target.value)
+      setPhoneVerified(false)
+      setPhoneVerificationToken(null)
+      setPhoneVerificationStatus('')
       setFormData({ ...formData, phone: formatted })
     } else {
       setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -254,6 +309,20 @@ export default function Register() {
               <p className="mt-1 text-xs text-gray-500">
                 Формат: +7 (999) 123-45-67
               </p>
+              <div className="mt-3 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={startPhoneVerification}
+                  disabled={phoneVerificationLoading}
+                  className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {phoneVerificationLoading ? 'Проверка...' : 'Подтвердить номер'}
+                </button>
+                {phoneVerified && <span className="text-green-600 text-sm font-medium">Номер подтвержден</span>}
+              </div>
+              {phoneVerificationStatus && (
+                <p className="mt-2 text-xs text-gray-600">{phoneVerificationStatus}</p>
+              )}
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">

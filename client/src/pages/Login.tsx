@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { authService } from '../services/api'
 import { Anchor, X } from 'lucide-react'
 import ReCAPTCHA from 'react-google-recaptcha'
 
@@ -16,6 +17,10 @@ export default function Login() {
     phone: '',
   })
   const [guestRecaptchaToken, setGuestRecaptchaToken] = useState<string | null>(null)
+  const [guestPhoneVerificationToken, setGuestPhoneVerificationToken] = useState<string | null>(null)
+  const [guestPhoneVerified, setGuestPhoneVerified] = useState(false)
+  const [guestPhoneVerificationLoading, setGuestPhoneVerificationLoading] = useState(false)
+  const [guestPhoneVerificationStatus, setGuestPhoneVerificationStatus] = useState('')
   const { login, loginAsGuest } = useAuth()
   const navigate = useNavigate()
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
@@ -48,6 +53,9 @@ export default function Login() {
     setShowGuestModal(false)
     setGuestForm({ firstName: '', phone: '' })
     setGuestRecaptchaToken(null)
+    setGuestPhoneVerificationToken(null)
+    setGuestPhoneVerified(false)
+    setGuestPhoneVerificationStatus('')
     setError('')
   }
 
@@ -144,6 +152,48 @@ export default function Login() {
     return false
   }
 
+  const startGuestPhoneVerification = async () => {
+    if (!guestForm.phone || guestForm.phone.trim() === '' || !validateRussianPhone(guestForm.phone)) {
+      setError('Укажите корректный номер телефона для подтверждения')
+      return
+    }
+
+    setGuestPhoneVerificationLoading(true)
+    setGuestPhoneVerified(false)
+    setGuestPhoneVerificationToken(null)
+    setGuestPhoneVerificationStatus('Инициируем звонок...')
+    setError('')
+
+    try {
+      const startData = await authService.startPhoneVerification(guestForm.phone)
+      setGuestPhoneVerificationStatus('Позвоните на указанный номер. Проверяем статус...')
+
+      const startedAt = Date.now()
+      const pollIntervalMs = 3000
+      const timeoutMs = 2 * 60 * 1000
+
+      while (Date.now() - startedAt < timeoutMs) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+        const statusData = await authService.checkPhoneVerification(startData.verificationToken)
+        setGuestPhoneVerificationStatus(`Статус: ${statusData.status}`)
+        if (statusData.verified && statusData.phoneVerificationToken) {
+          setGuestPhoneVerified(true)
+          setGuestPhoneVerificationToken(statusData.phoneVerificationToken)
+          setGuestPhoneVerificationStatus('Номер успешно подтвержден')
+          return
+        }
+      }
+
+      setGuestPhoneVerificationStatus('Время ожидания подтверждения истекло')
+      setError('Не удалось подтвердить номер. Попробуйте еще раз.')
+    } catch (err: any) {
+      setError(err.error || err.message || 'Ошибка подтверждения номера')
+      setGuestPhoneVerificationStatus('Ошибка подтверждения')
+    } finally {
+      setGuestPhoneVerificationLoading(false)
+    }
+  }
+
   const handleGuestLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -163,6 +213,11 @@ export default function Login() {
       return
     }
 
+    if (!guestPhoneVerified || !guestPhoneVerificationToken) {
+      setError('Сначала подтвердите номер телефона через звонок')
+      return
+    }
+
     // Валидация номера телефона, если он введен
     if (guestForm.phone && guestForm.phone.trim() !== '') {
       if (!validateRussianPhone(guestForm.phone)) {
@@ -174,10 +229,18 @@ export default function Login() {
     setGuestLoading(true)
 
     try {
-      await loginAsGuest(guestForm.firstName, guestForm.phone || undefined, guestRecaptchaToken)
+      await loginAsGuest(
+        guestForm.firstName,
+        guestForm.phone || undefined,
+        guestRecaptchaToken,
+        guestPhoneVerificationToken
+      )
       setShowGuestModal(false)
       setGuestForm({ firstName: '', phone: '' })
       setGuestRecaptchaToken(null)
+      setGuestPhoneVerificationToken(null)
+      setGuestPhoneVerified(false)
+      setGuestPhoneVerificationStatus('')
       navigate('/clubs')
     } catch (err: any) {
       setError(err.error || 'Ошибка входа как гость')
@@ -323,6 +386,9 @@ export default function Login() {
                           }
                         }
                         const formatted = formatPhoneNumber(inputValue)
+                        setGuestPhoneVerified(false)
+                        setGuestPhoneVerificationToken(null)
+                        setGuestPhoneVerificationStatus('')
                         setGuestForm({ ...guestForm, phone: formatted })
                         // Очищаем ошибку при вводе
                         if (error && error.includes('Номер телефона')) {
@@ -356,6 +422,20 @@ export default function Login() {
                     <p className="mt-1 text-xs text-gray-500">
                       Формат: +7 (999) 123-45-67 или 8 (999) 123-45-67
                     </p>
+                    <div className="mt-3 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={startGuestPhoneVerification}
+                        disabled={guestPhoneVerificationLoading}
+                        className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {guestPhoneVerificationLoading ? 'Проверка...' : 'Подтвердить номер'}
+                      </button>
+                      {guestPhoneVerified && <span className="text-green-600 text-sm font-medium">Номер подтвержден</span>}
+                    </div>
+                    {guestPhoneVerificationStatus && (
+                      <p className="mt-2 text-xs text-gray-600">{guestPhoneVerificationStatus}</p>
+                    )}
                   </div>
 
                   {recaptchaSiteKey && (

@@ -6,8 +6,8 @@ interface AuthContextType {
   user: User | null
   token: string | null
   login: (emailOrPhone: string, password: string) => Promise<void>
-  loginAsGuest: (firstName: string, phone?: string, recaptchaToken?: string) => Promise<void>
-  register: (data: RegisterData, recaptchaToken?: string) => Promise<void>
+  loginAsGuest: (firstName: string, phone?: string, recaptchaToken?: string, phoneVerificationToken?: string) => Promise<void>
+  register: (data: RegisterData, recaptchaToken?: string, phoneVerificationToken?: string) => Promise<void>
   logout: () => void
   loading: boolean
 }
@@ -62,8 +62,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('token', data.token)
   }
 
-  const loginAsGuest = async (firstName: string, phone?: string, recaptchaToken?: string) => {
-    const data = await authService.loginAsGuest(firstName, phone, recaptchaToken)
+  const loginAsGuest = async (firstName: string, phone?: string, recaptchaToken?: string, phoneVerificationToken?: string) => {
+    const data = await authService.loginAsGuest(firstName, phone, recaptchaToken, phoneVerificationToken)
     console.log('Guest login response:', data)
     console.log('User role from guest login:', data.user?.role)
     setToken(data.token)
@@ -71,8 +71,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('token', data.token)
   }
 
-  const register = async (data: RegisterData, recaptchaToken?: string) => {
-    const responseData = await authService.register(data, recaptchaToken)
+  const register = async (data: RegisterData, recaptchaToken?: string, phoneVerificationToken?: string) => {
+    const responseData = await authService.register(data, recaptchaToken, phoneVerificationToken)
     setToken(responseData.token)
     setUser(responseData.user)
     localStorage.setItem('token', responseData.token)
