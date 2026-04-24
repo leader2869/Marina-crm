@@ -12,6 +12,7 @@ import { User } from '../../entities/User';
 import { Payment } from '../../entities/Payment';
 import { Tariff } from '../../entities/Tariff';
 import { BookingRule } from '../../entities/BookingRule';
+import { TariffBerth } from '../../entities/TariffBerth';
 import { Contragent } from '../../entities/Contragent';
 import { ClubPartner } from '../../entities/ClubPartner';
 import { ClubPartnerManager } from '../../entities/ClubPartnerManager';
@@ -905,6 +906,7 @@ export class ClubsController {
           const userRepository = queryRunner.manager.getRepository(User);
           const paymentRepository = queryRunner.manager.getRepository(Payment);
           const tariffRepository = queryRunner.manager.getRepository(Tariff);
+          const tariffBerthRepository = queryRunner.manager.getRepository(TariffBerth);
           const bookingRuleRepository = queryRunner.manager.getRepository(BookingRule);
           const contragentRepository = queryRunner.manager.getRepository(Contragent);
           const clubPartnerRepository = queryRunner.manager.getRepository(ClubPartner);
@@ -958,6 +960,24 @@ export class ClubsController {
           // Удаляем правила бронирования (booking_rules) ПЕРЕД удалением тарифов,
           // так как booking_rules имеют внешний ключ на tariffs
           await bookingRuleRepository.delete({ clubId: clubId });
+
+          // Удаляем связи тарифов и мест до удаления тарифов/мест, чтобы избежать FK-конфликтов.
+          if (berthIds.length > 0) {
+            await this.safeDeleteByClubId('tariff_berths by berthId', () =>
+              tariffBerthRepository.delete({ berthId: In(berthIds) })
+            );
+          }
+
+          const tariffs = await tariffRepository.find({
+            where: { clubId: clubId },
+            select: ['id'],
+          });
+          const tariffIds = tariffs.map((t) => t.id);
+          if (tariffIds.length > 0) {
+            await this.safeDeleteByClubId('tariff_berths by tariffId', () =>
+              tariffBerthRepository.delete({ tariffId: In(tariffIds) })
+            );
+          }
 
           // Удаляем тарифы (tariffs) после удаления booking_rules, так как tariff_berths может иметь связи
           await tariffRepository.delete({ clubId: clubId });
