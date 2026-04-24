@@ -118,7 +118,7 @@ export class AuthController {
         throw new AppError('Не настроен сервис подтверждения звонком', 500);
       }
 
-      const response = await fetch(`${apiBase}/phones/call/`, {
+      const response = await fetch(`${apiBase}/phones/confirm/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -159,7 +159,7 @@ export class AuthController {
       );
 
       res.json({
-        message: 'Звонок на подтверждение инициирован',
+        message: 'Подтверждение номера инициировано',
         callId: Number(data.call_id),
         verificationToken,
         callToNumber,
