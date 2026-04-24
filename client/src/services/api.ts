@@ -139,10 +139,10 @@ export const authService = {
     api.post('/auth/register', { ...data, recaptchaToken, phoneVerificationToken }) as Promise<{ user: any; token: string }>,
   loginAsGuest: (firstName: string, phone?: string, recaptchaToken?: string, phoneVerificationToken?: string): Promise<{ user: any; token: string }> => 
     api.post('/auth/guest', { firstName, phone, recaptchaToken, phoneVerificationToken }) as Promise<{ user: any; token: string }>,
-  startPhoneVerification: (phone: string): Promise<{ verificationToken: string; callId: number; message: string }> =>
-    api.post('/auth/phone-verification/start', { phone }) as Promise<{ verificationToken: string; callId: number; message: string }>,
-  checkPhoneVerification: (verificationToken: string): Promise<{ verified: boolean; status: string; phoneVerificationToken?: string }> =>
-    api.get('/auth/phone-verification/status', { params: { verificationToken } }) as Promise<{ verified: boolean; status: string; phoneVerificationToken?: string }>,
+  startPhoneVerification: (phone: string): Promise<{ verificationToken: string; callId: number; message: string; callToNumber?: string | null }> =>
+    api.post('/auth/phone-verification/start', { phone }) as Promise<{ verificationToken: string; callId: number; message: string; callToNumber?: string | null }>,
+  checkPhoneVerification: (verificationToken: string): Promise<{ verified: boolean; status: string; phoneVerificationToken?: string; callToNumber?: string | null }> =>
+    api.get('/auth/phone-verification/status', { params: { verificationToken } }) as Promise<{ verified: boolean; status: string; phoneVerificationToken?: string; callToNumber?: string | null }>,
   getProfile: (): Promise<any> => api.get('/auth/profile') as Promise<any>,
   updateProfile: (data: { firstName?: string; lastName?: string; email?: string }): Promise<{ user: any; message: string }> =>
     api.put('/auth/profile', data) as Promise<{ user: any; message: string }>,

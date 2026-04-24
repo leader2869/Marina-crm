@@ -30,6 +30,7 @@ export default function Register() {
   const [phoneVerified, setPhoneVerified] = useState(false)
   const [phoneVerificationLoading, setPhoneVerificationLoading] = useState(false)
   const [phoneVerificationStatus, setPhoneVerificationStatus] = useState('')
+  const [callToNumber, setCallToNumber] = useState<string | null>(null)
   const { register } = useAuth()
   const navigate = useNavigate()
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
@@ -73,12 +74,18 @@ export default function Register() {
     setPhoneVerificationLoading(true)
     setError('')
     setPhoneVerified(false)
+    setCallToNumber(null)
     setPhoneVerificationStatus('Инициируем звонок...')
 
     try {
       const startData = await authService.startPhoneVerification(formData.phone)
       setPhoneVerificationToken(startData.verificationToken)
-      setPhoneVerificationStatus('Позвоните на указанный номер. Проверяем статус...')
+      if (startData.callToNumber) {
+        setCallToNumber(startData.callToNumber)
+        setPhoneVerificationStatus(`Позвоните на номер ${startData.callToNumber}. Проверяем статус...`)
+      } else {
+        setPhoneVerificationStatus('Ожидаем номер для звонка от сервиса. Проверяем статус...')
+      }
 
       const startedAt = Date.now()
       const pollIntervalMs = 3000
@@ -87,6 +94,9 @@ export default function Register() {
       while (Date.now() - startedAt < timeoutMs) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
         const statusData = await authService.checkPhoneVerification(startData.verificationToken)
+        if (statusData.callToNumber) {
+          setCallToNumber(statusData.callToNumber)
+        }
         setPhoneVerificationStatus(`Статус: ${statusData.status}`)
         if (statusData.verified && statusData.phoneVerificationToken) {
           setPhoneVerified(true)
@@ -212,6 +222,7 @@ export default function Register() {
       const formatted = formatPhoneNumber(e.target.value)
       setPhoneVerified(false)
       setPhoneVerificationToken(null)
+      setCallToNumber(null)
       setPhoneVerificationStatus('')
       setFormData({ ...formData, phone: formatted })
     } else {
@@ -331,6 +342,11 @@ export default function Register() {
               </div>
               {phoneVerificationStatus && (
                 <p className="mt-2 text-xs text-gray-600">{phoneVerificationStatus}</p>
+              )}
+              {callToNumber && (
+                <p className="mt-1 text-xs text-blue-700 font-medium">
+                  Для подтверждения позвоните на: {callToNumber}
+                </p>
               )}
             </div>
             <div>

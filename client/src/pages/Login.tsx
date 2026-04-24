@@ -21,6 +21,7 @@ export default function Login() {
   const [guestPhoneVerified, setGuestPhoneVerified] = useState(false)
   const [guestPhoneVerificationLoading, setGuestPhoneVerificationLoading] = useState(false)
   const [guestPhoneVerificationStatus, setGuestPhoneVerificationStatus] = useState('')
+  const [guestCallToNumber, setGuestCallToNumber] = useState<string | null>(null)
   const { login, loginAsGuest } = useAuth()
   const navigate = useNavigate()
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
@@ -63,6 +64,7 @@ export default function Login() {
     setGuestRecaptchaToken(null)
     setGuestPhoneVerificationToken(null)
     setGuestPhoneVerified(false)
+    setGuestCallToNumber(null)
     setGuestPhoneVerificationStatus('')
     setError('')
   }
@@ -169,12 +171,18 @@ export default function Login() {
     setGuestPhoneVerificationLoading(true)
     setGuestPhoneVerified(false)
     setGuestPhoneVerificationToken(null)
+    setGuestCallToNumber(null)
     setGuestPhoneVerificationStatus('Инициируем звонок...')
     setError('')
 
     try {
       const startData = await authService.startPhoneVerification(guestForm.phone)
-      setGuestPhoneVerificationStatus('Позвоните на указанный номер. Проверяем статус...')
+      if (startData.callToNumber) {
+        setGuestCallToNumber(startData.callToNumber)
+        setGuestPhoneVerificationStatus(`Позвоните на номер ${startData.callToNumber}. Проверяем статус...`)
+      } else {
+        setGuestPhoneVerificationStatus('Ожидаем номер для звонка от сервиса. Проверяем статус...')
+      }
 
       const startedAt = Date.now()
       const pollIntervalMs = 3000
@@ -183,6 +191,9 @@ export default function Login() {
       while (Date.now() - startedAt < timeoutMs) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
         const statusData = await authService.checkPhoneVerification(startData.verificationToken)
+        if (statusData.callToNumber) {
+          setGuestCallToNumber(statusData.callToNumber)
+        }
         setGuestPhoneVerificationStatus(`Статус: ${statusData.status}`)
         if (statusData.verified && statusData.phoneVerificationToken) {
           setGuestPhoneVerified(true)
@@ -248,6 +259,7 @@ export default function Login() {
       setGuestRecaptchaToken(null)
       setGuestPhoneVerificationToken(null)
       setGuestPhoneVerified(false)
+      setGuestCallToNumber(null)
       setGuestPhoneVerificationStatus('')
       navigate('/clubs')
     } catch (err: any) {
@@ -396,6 +408,7 @@ export default function Login() {
                         const formatted = formatPhoneNumber(inputValue)
                         setGuestPhoneVerified(false)
                         setGuestPhoneVerificationToken(null)
+                        setGuestCallToNumber(null)
                         setGuestPhoneVerificationStatus('')
                         setGuestForm({ ...guestForm, phone: formatted })
                         // Очищаем ошибку при вводе
@@ -443,6 +456,11 @@ export default function Login() {
                     </div>
                     {guestPhoneVerificationStatus && (
                       <p className="mt-2 text-xs text-gray-600">{guestPhoneVerificationStatus}</p>
+                    )}
+                    {guestCallToNumber && (
+                      <p className="mt-1 text-xs text-blue-700 font-medium">
+                        Для подтверждения позвоните на: {guestCallToNumber}
+                      </p>
                     )}
                   </div>
 

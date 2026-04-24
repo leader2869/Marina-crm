@@ -138,10 +138,16 @@ export class AuthController {
         throw new AppError(detailedMessage, 502);
       }
 
-      const data = await response.json() as { call_id?: number | string };
+      const data = await response.json() as {
+        call_id?: number | string;
+        callerid?: string;
+        caller?: string;
+        number?: string;
+      };
       if (!data?.call_id) {
         throw new AppError('Сервис звонков не вернул call_id', 502);
       }
+      const callToNumber = data.callerid || data.caller || data.number || null;
 
       const verificationToken = this.signPhoneVerificationToken(
         {
@@ -156,6 +162,7 @@ export class AuthController {
         message: 'Звонок на подтверждение инициирован',
         callId: Number(data.call_id),
         verificationToken,
+        callToNumber,
       });
     } catch (error) {
       next(error);
@@ -199,7 +206,11 @@ export class AuthController {
       const verified = this.isCallVerified(result);
 
       if (!verified) {
-        res.json({ verified: false, status });
+        res.json({
+          verified: false,
+          status,
+          callToNumber: result?.callerid || result?.caller || null,
+        });
         return;
       }
 
@@ -216,6 +227,7 @@ export class AuthController {
         verified: true,
         status,
         phoneVerificationToken,
+        callToNumber: result?.callerid || result?.caller || null,
       });
     } catch (error) {
       next(error);
