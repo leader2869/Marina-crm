@@ -558,6 +558,36 @@ export default function ClubDetails() {
     }
   }
 
+  const handleUnpublishClub = async () => {
+    if (!club) return
+    if (!confirm('Вы уверены, что хотите снять клуб с публикации?')) {
+      return
+    }
+    try {
+      await clubsService.hide(club.id)
+      await loadClub()
+      alert('Клуб снят с публикации')
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка снятия с публикации')
+    }
+  }
+
+  const handleDeleteClub = async () => {
+    if (!club) return
+    if (!confirm('Вы уверены, что хотите удалить этот яхт-клуб?')) {
+      return
+    }
+    if (!confirm('ВНИМАНИЕ! Это действие необратимо. Продолжить?')) {
+      return
+    }
+    try {
+      await clubsService.delete(club.id)
+      navigate('/clubs')
+    } catch (err: any) {
+      alert(err.error || err.message || 'Ошибка удаления яхт-клуба')
+    }
+  }
+
   const handleOpenAddBerth = () => {
     setBerthForm({
       mode: 'single',
@@ -868,6 +898,27 @@ export default function ClubDetails() {
             >
               <Edit2 className="h-5 w-5 mr-2" />
               {editing ? 'Отмена' : 'Редактировать'}
+            </button>
+          )}
+          {user?.role === UserRole.CLUB_OWNER &&
+            club.ownerId === user.id &&
+            club.isSubmittedForValidation === true &&
+            club.isValidated === true && (
+              <button
+                onClick={handleUnpublishClub}
+                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <X className="h-5 w-5 mr-2" />
+                Снять с публикации
+              </button>
+            )}
+          {user?.role === UserRole.CLUB_OWNER && club.ownerId === user.id && (
+            <button
+              onClick={handleDeleteClub}
+              className="flex items-center px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              <Trash2 className="h-5 w-5 mr-2" />
+              Удалить
             </button>
           )}
           {/* Кнопка "Отправить на проверку" для владельца клуба, если клуб еще не отправлен */}

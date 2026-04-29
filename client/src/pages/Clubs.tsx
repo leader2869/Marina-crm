@@ -673,17 +673,6 @@ export default function Clubs() {
                     </button>
                   </>
                 )}
-                {/* Кнопка удаления для владельца клуба */}
-                {isClubOwner && club.ownerId === user?.id && (
-                  <button
-                    onClick={(e) => handleDelete(club.id, e)}
-                    disabled={deleting || restoring}
-                    className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
-                    title="Удалить (доступно только если нет связей)"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                )}
               </div>
             </div>
             <div className="flex-1 flex flex-col">
@@ -753,8 +742,8 @@ export default function Clubs() {
                     Опубликовать
                   </button>
                 )}
-                {/* Кнопка "Снять с публикации" для владельца клуба и суперадминистратора, если клуб опубликован */}
-                {(isSuperAdmin || (isClubOwner && club.ownerId === user?.id)) && club.isSubmittedForValidation === true && club.isValidated === true && (
+                {/* Кнопка "Снять с публикации" только для суперадминистратора, если клуб опубликован */}
+                {isSuperAdmin && club.isSubmittedForValidation === true && club.isValidated === true && (
                   <button
                     onClick={(e) => {
                       e.preventDefault()
