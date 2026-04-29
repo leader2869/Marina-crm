@@ -2319,19 +2319,6 @@ export default function ClubDetails() {
                             </span>
                           </div>
 
-                          {/* Показываем информацию о примененных правилах */}
-                          {appliedRules.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <p className="text-xs font-medium text-gray-700 mb-1">Примененные правила:</p>
-                              <div className="space-y-1">
-                                {appliedRules.map((rule: any, index: number) => (
-                                  <p key={index} className="text-xs text-blue-600 italic">
-                                    • {rule.description}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
                     )
