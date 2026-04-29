@@ -705,12 +705,6 @@ export default function Layout() {
                       <User className="h-6 w-6 text-gray-400" />
                     </div>
                   )}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {user?.firstName} {user?.lastName}
-                    </p>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
-                  </div>
                 </div>
                 {user?.role === UserRole.SUPER_ADMIN && (
                   <div className="mt-1">
