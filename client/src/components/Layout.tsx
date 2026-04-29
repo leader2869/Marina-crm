@@ -712,14 +712,6 @@ export default function Layout() {
                     <p className="text-xs text-gray-500">{user?.email}</p>
                   </div>
                 </div>
-                <p className="text-xs text-primary-600 font-medium mt-1">
-                  {user?.role === UserRole.CLUB_OWNER && 'Владелец клуба'}
-                  {user?.role === UserRole.CLUB_STAFF && 'Сотрудник яхт-клуба'}
-                  {user?.role === UserRole.VESSEL_OWNER && 'Судовладелец'}
-                  {user?.role === UserRole.ADMIN && 'Администратор'}
-                  {user?.role === UserRole.SUPER_ADMIN && 'Супер-администратор'}
-                  {user?.role === UserRole.PENDING_VALIDATION && 'Ожидает валидации'}
-                </p>
                 {user?.role === UserRole.SUPER_ADMIN && (
                   <div className="mt-1">
                     {isEditingDate ? (
@@ -779,13 +771,6 @@ export default function Layout() {
                 )}
               </div>
             </div>
-            <button
-              onClick={logout}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
-            >
-              <LogOut className="mr-3 h-5 w-5" />
-              Выйти
-            </button>
           </div>
         </div>
       </div>
@@ -846,9 +831,14 @@ export default function Layout() {
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
               )}
-              <span className="text-sm text-gray-600">
+              <button
+                type="button"
+                onClick={handleOpenProfileModal}
+                className="text-sm text-gray-600 hover:text-primary-600 transition-colors"
+                title="Личный кабинет"
+              >
                 {user?.firstName} {user?.lastName}
-              </span>
+              </button>
               {user && (
                 <button
                   onClick={logout}
