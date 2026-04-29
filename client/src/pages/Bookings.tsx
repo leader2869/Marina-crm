@@ -518,6 +518,30 @@ export default function Bookings() {
                     <tr>
                       <td colSpan={6} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-6">
+                          {canTransferBooking(booking) && (
+                            <div className="bg-white rounded-lg p-4 shadow-sm">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <h3 className="text-sm font-semibold text-gray-900">Перенос места</h3>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Можно переставить бронь на другое свободное место с тем же тарифом.
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openTransferBerthModal(booking)
+                                  }}
+                                  className="inline-flex items-center px-3 py-2 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
+                                >
+                                  <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                  Перенести место
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                           {/* Платежи для VESSEL_OWNER, владельца и сотрудника клуба */}
                           {(isVesselOwner || canManageClubPayments) && (booking.status === BookingStatus.ACTIVE || booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.PENDING) && (
                             <div className="bg-white rounded-lg p-4 shadow-sm">
