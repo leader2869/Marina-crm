@@ -826,11 +826,26 @@ export class BookingsController {
   async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
+      const isTransferBerthEndpoint = req.originalUrl?.includes('/transfer-berth');
+      if (req.body?.berthId !== undefined && !isTransferBerthEndpoint) {
+        throw new AppError(
+          'Смена места через общий endpoint недоступна. Используйте endpoint переноса места.',
+          400
+        );
+      }
+      const requestedBerthId =
+        req.body.berthId !== undefined && req.body.berthId !== null
+          ? Number(req.body.berthId)
+          : null;
+      const requestedTariffId =
+        req.body.tariffId !== undefined && req.body.tariffId !== null
+          ? Number(req.body.tariffId)
+          : null;
 
       const bookingRepository = AppDataSource.getRepository(Booking);
       const booking = await bookingRepository.findOne({
         where: { id: parseInt(id) },
-        relations: ['club'],
+        relations: ['club', 'vessel', 'berth'],
       });
 
       if (!booking) {
@@ -838,13 +853,99 @@ export class BookingsController {
       }
 
       // Проверка прав доступа
+      const isStaffOfClub =
+        req.userRole === UserRole.CLUB_STAFF && req.userId
+          ? await userHasAccessToClub(req.userId, booking.clubId)
+          : false;
       if (
         booking.vesselOwnerId !== req.userId &&
         booking.club.ownerId !== req.userId &&
         req.userRole !== 'super_admin' &&
-        req.userRole !== 'admin'
+        req.userRole !== 'admin' &&
+        !isStaffOfClub
       ) {
         throw new AppError('Недостаточно прав для редактирования', 403);
+      }
+
+      // При переносе оставляем тот же тариф: тариф оплаченного бронирования нельзя менять
+      if (requestedTariffId && requestedTariffId !== booking.tariffId) {
+        throw new AppError('Смена тарифа недоступна при переносе места. Выберите место с текущим тарифом.', 400);
+      }
+
+      if (requestedBerthId && requestedBerthId !== booking.berthId) {
+        const berthRepository = AppDataSource.getRepository(Berth);
+        const targetBerth = await berthRepository.findOne({
+          where: { id: requestedBerthId },
+          relations: ['tariffBerths'],
+        });
+
+        if (!targetBerth) {
+          throw new AppError('Новое место не найдено', 404);
+        }
+        if (targetBerth.clubId !== booking.clubId) {
+          throw new AppError('Новое место должно быть в том же клубе', 400);
+        }
+        if (!targetBerth.isAvailable) {
+          throw new AppError('Новое место недоступно', 400);
+        }
+        if (!booking.tariffId) {
+          throw new AppError('У бронирования не найден тариф. Перенос невозможен.', 400);
+        }
+
+        const isTariffLinkedToNewBerth = targetBerth.tariffBerths?.some(
+          (tb) => tb.tariffId === booking.tariffId
+        );
+        if (!isTariffLinkedToNewBerth) {
+          throw new AppError('Новое место не привязано к текущему тарифу бронирования', 400);
+        }
+
+        const toNumber = (value: unknown): number => {
+          if (typeof value === 'number') return value;
+          if (typeof value === 'string') return parseFloat(value.trim().replace(',', '.'));
+          return parseFloat(String(value).trim().replace(',', '.'));
+        };
+
+        const vesselLength = toNumber(booking.vessel.length);
+        const vesselWidth = toNumber(booking.vessel.width);
+        const berthLength = toNumber(targetBerth.length);
+        const berthWidth = toNumber(targetBerth.width);
+
+        if (
+          [vesselLength, vesselWidth, berthLength, berthWidth].some(
+            (num) => Number.isNaN(num) || num <= 0
+          )
+        ) {
+          throw new AppError('Ошибка проверки размеров при переносе места', 500);
+        }
+        if (vesselLength > berthLength) {
+          throw new AppError(
+            `Длина судна (${vesselLength.toFixed(2)} м) превышает длину нового места (${berthLength.toFixed(2)} м)`,
+            400
+          );
+        }
+        if (vesselWidth > berthWidth) {
+          throw new AppError(
+            `Ширина судна (${vesselWidth.toFixed(2)} м) превышает ширину нового места (${berthWidth.toFixed(2)} м)`,
+            400
+          );
+        }
+
+        const conflictingBookings = await bookingRepository
+          .createQueryBuilder('booking')
+          .where('booking.berthId = :berthId', { berthId: targetBerth.id })
+          .andWhere('booking.id != :bookingId', { bookingId: booking.id })
+          .andWhere('booking.status IN (:...statuses)', {
+            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+          })
+          .andWhere('(booking.startDate <= :endDate AND booking.endDate >= :startDate)', {
+            startDate: booking.startDate,
+            endDate: booking.endDate,
+          })
+          .getMany();
+
+        if (conflictingBookings.length > 0) {
+          throw new AppError('Новое место уже занято на период текущего бронирования', 400);
+        }
       }
 
       // Сохраняем старые значения для логирования
@@ -857,6 +958,7 @@ export class BookingsController {
         vesselId: booking.vesselId,
         berthId: booking.berthId,
         clubId: booking.clubId,
+        tariffId: booking.tariffId,
       };
 
       Object.assign(booking, req.body);
@@ -877,6 +979,7 @@ export class BookingsController {
         vesselId: updatedBooking!.vesselId,
         berthId: updatedBooking!.berthId,
         clubId: updatedBooking!.clubId,
+        tariffId: updatedBooking!.tariffId,
       };
 
       // Логируем обновление с детальным описанием изменений
@@ -907,6 +1010,22 @@ export class BookingsController {
       (res as any).locals = { ...(res as any).locals, skipAutoLogging: true };
 
       res.json(updatedBooking);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async transferBerth(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const normalizedBerthId = Number(req.body?.berthId);
+      if (!Number.isInteger(normalizedBerthId) || normalizedBerthId <= 0) {
+        throw new AppError('Укажите корректный ID нового места', 400);
+      }
+
+      // Для операции переноса разрешаем менять только berthId.
+      req.body = { berthId: normalizedBerthId };
+
+      await this.update(req, res, next);
     } catch (error) {
       next(error);
     }

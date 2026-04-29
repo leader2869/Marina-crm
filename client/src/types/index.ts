@@ -187,6 +187,7 @@ export interface Booking {
   endDate: string
   status: BookingStatus
   totalPrice: number
+  tariffId?: number | null
   notes?: string
   contractPath?: string
   autoRenewal: boolean

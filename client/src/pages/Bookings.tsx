@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, Fragment } from 'react'
-import { bookingsService, paymentsService, clubFinanceService } from '../services/api'
+import { bookingsService, paymentsService, clubFinanceService, berthsService } from '../services/api'
 import { Booking, UserRole, BookingStatus, Payment, PaymentStatus, CashPaymentMethod, ClubPartner, ClubPartnerManager } from '../types'
-import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2, CheckCircle2 } from 'lucide-react'
+import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2, CheckCircle2, ArrowRightLeft } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -19,6 +19,11 @@ export default function Bookings() {
   const [clubPartnersByClubId, setClubPartnersByClubId] = useState<Map<number, ClubPartner[]>>(new Map())
   const [partnerManagersByClubId, setPartnerManagersByClubId] = useState<Map<number, ClubPartnerManager[]>>(new Map())
   const [paymentModal, setPaymentModal] = useState<{ booking: Booking; payment: Payment } | null>(null)
+  const [transferBerthModal, setTransferBerthModal] = useState<{ booking: Booking } | null>(null)
+  const [transferBerthOptions, setTransferBerthOptions] = useState<Array<{ id: number; number: string }>>([])
+  const [selectedTransferBerthId, setSelectedTransferBerthId] = useState<string>('')
+  const [transferLoading, setTransferLoading] = useState(false)
+  const [transferSaving, setTransferSaving] = useState(false)
   const [acceptPaymentForm, setAcceptPaymentForm] = useState({
     paymentMethod: CashPaymentMethod.CASH,
     acceptedByPartnerId: '',
@@ -159,6 +164,15 @@ export default function Bookings() {
   const isVesselOwner = user?.role === UserRole.VESSEL_OWNER
   const canViewDetails = isClubOwner || isSuperAdmin || isVesselOwner || isClubStaff
 
+  const canTransferBooking = (booking: Booking) => {
+    const hasManageRole = isClubOwner || isClubStaff || isSuperAdmin || user?.role === UserRole.ADMIN
+    const isTransferableStatus =
+      booking.status === BookingStatus.PENDING ||
+      booking.status === BookingStatus.CONFIRMED ||
+      booking.status === BookingStatus.ACTIVE
+    return hasManageRole && isTransferableStatus && Boolean(booking.tariffId)
+  }
+
   const canCancelBooking = (booking: Booking) => {
     if (isSuperAdmin || user?.role === UserRole.ADMIN) return true
     if (isClubOwner && booking.club?.ownerId === user?.id) return true
@@ -201,6 +215,73 @@ export default function Bookings() {
       alert(error.error || error.message || 'Ошибка удаления бронирования')
     } finally {
       setDeleting(null)
+    }
+  }
+
+  const openTransferBerthModal = async (booking: Booking) => {
+    if (!booking.tariffId) {
+      alert('У бронирования не указан тариф. Перенос места невозможен.')
+      return
+    }
+
+    setTransferBerthModal({ booking })
+    setTransferLoading(true)
+    setTransferBerthOptions([])
+    setSelectedTransferBerthId('')
+
+    try {
+      const response = await berthsService.getAvailableByClub(booking.clubId, {
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+      })
+      const berths = Array.isArray(response) ? response : response.data || []
+
+      const suitableBerths = berths
+        .filter((berth: any) => berth.id !== booking.berthId)
+        .filter((berth: any) =>
+          Array.isArray(berth.tariffBerths) &&
+          berth.tariffBerths.some((tb: any) => Number(tb.tariffId) === Number(booking.tariffId))
+        )
+        .map((berth: any) => ({ id: berth.id, number: berth.number }))
+        .sort((a: { number: string }, b: { number: string }) => a.number.localeCompare(b.number, 'ru'))
+
+      setTransferBerthOptions(suitableBerths)
+      if (suitableBerths.length > 0) {
+        setSelectedTransferBerthId(String(suitableBerths[0].id))
+      }
+    } catch (error: any) {
+      alert(error.error || error.message || 'Ошибка загрузки доступных мест')
+      setTransferBerthModal(null)
+    } finally {
+      setTransferLoading(false)
+    }
+  }
+
+  const closeTransferBerthModal = () => {
+    if (transferSaving) return
+    setTransferBerthModal(null)
+  }
+
+  const handleTransferBerth = async () => {
+    if (!transferBerthModal) return
+    if (!selectedTransferBerthId) {
+      alert('Выберите новое место')
+      return
+    }
+
+    setTransferSaving(true)
+    try {
+      await bookingsService.transferBerth(
+        transferBerthModal.booking.id,
+        Number(selectedTransferBerthId)
+      )
+      await loadBookings()
+      setTransferBerthModal(null)
+      alert('Место в бронировании успешно изменено. Все оплаты сохранены.')
+    } catch (error: any) {
+      alert(error.error || error.message || 'Ошибка переноса места')
+    } finally {
+      setTransferSaving(false)
     }
   }
 
@@ -403,6 +484,18 @@ export default function Bookings() {
                               <X className="h-4 w-4" />
                             </button>
                           )}
+                        {canTransferBooking(booking) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openTransferBerthModal(booking)
+                            }}
+                            className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded"
+                            title="Переставить на другое место (с тем же тарифом)"
+                          >
+                            <ArrowRightLeft className="h-4 w-4" />
+                          </button>
+                        )}
                         {isVesselOwner &&
                           booking.status === BookingStatus.CANCELLED &&
                           booking.vesselOwnerId === user?.id && (
@@ -786,6 +879,73 @@ export default function Bookings() {
                 disabled={confirmingPayment}
               >
                 {confirmingPayment ? 'Сохранение...' : 'Подтвердить оплату'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {transferBerthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-xl shadow-xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Перенос места в бронировании</h3>
+              <button
+                type="button"
+                onClick={closeTransferBerthModal}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={transferSaving}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="text-sm text-gray-600">
+                Текущее место: <span className="font-semibold text-gray-900">{transferBerthModal.booking.berth?.number || `#${transferBerthModal.booking.berthId}`}</span>
+              </div>
+              <div className="text-sm text-gray-600">
+                Тариф сохраняется: <span className="font-semibold text-gray-900">#{transferBerthModal.booking.tariffId}</span>
+              </div>
+              {transferLoading ? (
+                <div className="text-sm text-gray-500">Загрузка доступных мест...</div>
+              ) : transferBerthOptions.length === 0 ? (
+                <div className="text-sm text-red-600">
+                  Нет свободных мест с этим тарифом на выбранный период.
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Новое место</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={selectedTransferBerthId}
+                    onChange={(e) => setSelectedTransferBerthId(e.target.value)}
+                    disabled={transferSaving}
+                  >
+                    {transferBerthOptions.map((berth) => (
+                      <option key={berth.id} value={berth.id}>
+                        {berth.number}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={closeTransferBerthModal}
+                className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                disabled={transferSaving}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleTransferBerth}
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                disabled={transferSaving || transferLoading || transferBerthOptions.length === 0}
+              >
+                {transferSaving ? 'Сохранение...' : 'Перенести'}
               </button>
             </div>
           </div>
