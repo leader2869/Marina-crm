@@ -956,6 +956,12 @@ export class BookingsController {
       };
 
       Object.assign(booking, req.body);
+      if (isTransferBerthEndpoint && requestedBerthId && requestedBerthId !== oldValues.berthId) {
+        // При загруженной relation `berth` TypeORM может сохранить старую связь.
+        // Явно фиксируем новый berthId и сбрасываем relation перед save.
+        booking.berthId = requestedBerthId;
+        (booking as any).berth = undefined;
+      }
       await bookingRepository.save(booking);
 
       if (
