@@ -238,10 +238,6 @@ export default function Bookings() {
 
       const suitableBerths = berths
         .filter((berth: any) => berth.id !== booking.berthId)
-        .filter((berth: any) =>
-          Array.isArray(berth.tariffBerths) &&
-          berth.tariffBerths.some((tb: any) => Number(tb.tariffId) === Number(booking.tariffId))
-        )
         .map((berth: any) => ({ id: berth.id, number: berth.number }))
         .sort((a: { number: string }, b: { number: string }) => a.number.localeCompare(b.number, 'ru'))
 
@@ -524,7 +520,7 @@ export default function Bookings() {
                                 <div>
                                   <h3 className="text-sm font-semibold text-gray-900">Перенос места</h3>
                                   <p className="text-xs text-gray-500 mt-1">
-                                    Можно переставить бронь на другое свободное место с тем же тарифом.
+                                    Можно переставить бронь на любое свободное место с сохранением текущего тарифа.
                                   </p>
                                 </div>
                                 <button
@@ -934,7 +930,7 @@ export default function Bookings() {
                 <div className="text-sm text-gray-500">Загрузка доступных мест...</div>
               ) : transferBerthOptions.length === 0 ? (
                 <div className="text-sm text-red-600">
-                  Нет свободных мест с этим тарифом на выбранный период.
+                  Нет свободных мест на выбранный период.
                 </div>
               ) : (
                 <div>

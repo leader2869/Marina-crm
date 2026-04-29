@@ -8,6 +8,7 @@ import { Tariff } from '../../entities/Tariff';
 import { BookingRule, BookingRuleType } from '../../entities/BookingRule';
 import { Vessel } from '../../entities/Vessel';
 import { Payment } from '../../entities/Payment';
+import { TariffBerth } from '../../entities/TariffBerth';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { BookingStatus, PaymentStatus, UserRole } from '../../types';
@@ -892,13 +893,6 @@ export class BookingsController {
           throw new AppError('У бронирования не найден тариф. Перенос невозможен.', 400);
         }
 
-        const isTariffLinkedToNewBerth = targetBerth.tariffBerths?.some(
-          (tb) => tb.tariffId === booking.tariffId
-        );
-        if (!isTariffLinkedToNewBerth) {
-          throw new AppError('Новое место не привязано к текущему тарифу бронирования', 400);
-        }
-
         const toNumber = (value: unknown): number => {
           if (typeof value === 'number') return value;
           if (typeof value === 'string') return parseFloat(value.trim().replace(',', '.'));
@@ -963,6 +957,37 @@ export class BookingsController {
 
       Object.assign(booking, req.body);
       await bookingRepository.save(booking);
+
+      if (
+        isTransferBerthEndpoint &&
+        requestedBerthId &&
+        requestedBerthId !== oldValues.berthId &&
+        booking.tariffId
+      ) {
+        const tariffBerthRepository = AppDataSource.getRepository(TariffBerth);
+
+        // Старое место теряет этот тариф после переноса брони.
+        await tariffBerthRepository.delete({
+          tariffId: booking.tariffId,
+          berthId: oldValues.berthId,
+        });
+
+        // На новое место добавляем этот тариф, если связи ещё нет.
+        const existingTariffOnNewBerth = await tariffBerthRepository.findOne({
+          where: {
+            tariffId: booking.tariffId,
+            berthId: requestedBerthId,
+          },
+        });
+
+        if (!existingTariffOnNewBerth) {
+          const newTariffBerth = tariffBerthRepository.create({
+            tariffId: booking.tariffId,
+            berthId: requestedBerthId,
+          });
+          await tariffBerthRepository.save(newTariffBerth);
+        }
+      }
 
       const updatedBooking = await bookingRepository.findOne({
         where: { id: booking.id },
