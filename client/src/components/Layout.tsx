@@ -18,9 +18,6 @@ import {
   ShieldCheck,
   Receipt,
   FileText,
-  Edit2,
-  Check,
-  X as XIcon,
   Code,
   ChevronDown,
   ChevronRight,
@@ -40,14 +37,6 @@ export default function Layout() {
   const [newGuestsCount, setNewGuestsCount] = useState(0)
   const [pendingValidationCount, setPendingValidationCount] = useState(0)
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({})
-  // Загружаем сохраненную дату из localStorage или используем текущую
-  const [currentDate, setCurrentDate] = useState(() => {
-    const savedDate = localStorage.getItem('superAdminDate')
-    return savedDate ? new Date(savedDate) : new Date()
-  })
-  const [isEditingDate, setIsEditingDate] = useState(false)
-  const [dateInput, setDateInput] = useState('')
-  const [timeInput, setTimeInput] = useState('')
   
   // Состояние для модального окна редактирования профиля
   const [showProfileModal, setShowProfileModal] = useState(false)
@@ -300,34 +289,6 @@ export default function Layout() {
       setPendingValidationCount(0)
     }
   }, [location.pathname, user])
-
-  // Функция для начала редактирования даты
-  const handleStartEditDate = () => {
-    if (user?.role === UserRole.SUPER_ADMIN) {
-      const dateStr = currentDate.toISOString().split('T')[0]
-      const timeStr = currentDate.toTimeString().slice(0, 5)
-      setDateInput(dateStr)
-      setTimeInput(timeStr)
-      setIsEditingDate(true)
-    }
-  }
-
-  // Функция для сохранения даты
-  const handleSaveDate = () => {
-    if (dateInput && timeInput) {
-      const newDate = new Date(`${dateInput}T${timeInput}`)
-      setCurrentDate(newDate)
-      localStorage.setItem('superAdminDate', newDate.toISOString())
-      setIsEditingDate(false)
-    }
-  }
-
-  // Функция для отмены редактирования
-  const handleCancelEditDate = () => {
-    setIsEditingDate(false)
-    setDateInput('')
-    setTimeInput('')
-  }
 
   // Обработчики для модального окна профиля
   const handleOpenProfileModal = () => {
