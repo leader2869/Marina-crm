@@ -289,7 +289,7 @@ export default function Expenses() {
           <div className="bg-red-50 p-4 rounded-lg">
             <p className="text-sm text-gray-600 mb-2">Общая сумма расходов</p>
             <p className="text-3xl font-bold text-red-600">
-              {Number(totalExpense).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+              {Number(totalExpense).toLocaleString('ru-RU')} ₽
             </p>
             <p className="text-sm text-gray-500 mt-2">
               Всего транзакций: {transactions.length}
@@ -298,7 +298,7 @@ export default function Expenses() {
           <div className="bg-blue-50 p-4 rounded-lg">
             <p className="text-sm text-gray-600 mb-2">С категориями</p>
             <p className="text-3xl font-bold text-blue-600">
-              {Number(totalExpense - uncategorizedTotal).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+              {Number(totalExpense - uncategorizedTotal).toLocaleString('ru-RU')} ₽
             </p>
             <p className="text-sm text-gray-500 mt-2">
               {Object.keys(transactionsByCategory).filter(k => k !== '0').length} категорий
@@ -307,7 +307,7 @@ export default function Expenses() {
           <div className="bg-yellow-50 p-4 rounded-lg">
             <p className="text-sm text-gray-600 mb-2">Без категорий</p>
             <p className="text-3xl font-bold text-yellow-600">
-              {Number(uncategorizedTotal).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+              {Number(uncategorizedTotal).toLocaleString('ru-RU')} ₽
             </p>
             <p className="text-sm text-gray-500 mt-2">
               {transactions.filter(t => !t.expenseCategoryId).length} транзакций
@@ -345,7 +345,7 @@ export default function Expenses() {
                         <p className="text-sm text-gray-600 mt-1">{category.description}</p>
                       )}
                       <p className="text-sm text-red-600 font-semibold mt-2">
-                        {Number(categoryTotal).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+                        {Number(categoryTotal).toLocaleString('ru-RU')} ₽
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         {categoryTransactions.length} транзакций
@@ -501,7 +501,7 @@ export default function Expenses() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      {transaction.amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {transaction.currency}
+                      {transaction.amount.toLocaleString('ru-RU')} {transaction.currency}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {transaction.paymentMethod === CashPaymentMethod.CASH ? 'Наличные' : 'Безналичные'}

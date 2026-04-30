@@ -167,10 +167,7 @@ export default function Finances() {
               {module.showValue && module.value !== undefined && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <p className="text-2xl font-bold text-gray-900">
-                    {Number(module.value).toLocaleString('ru-RU', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{' '}
+                    {Number(module.value).toLocaleString('ru-RU')}{' '}
                     ₽
                   </p>
                 </div>

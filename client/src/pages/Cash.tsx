@@ -556,10 +556,7 @@ export default function Cash() {
                   <span className={`text-sm font-semibold ${
                     vesselBalance >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    ({Number(vesselBalance).toLocaleString('ru-RU', { 
-                      minimumFractionDigits: 2, 
-                      maximumFractionDigits: 2 
-                    })} ₽)
+                    ({Number(vesselBalance).toLocaleString('ru-RU')} ₽)
                   </span>
                 </div>
               )

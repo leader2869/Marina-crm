@@ -11,8 +11,7 @@ export default function ClubExpectedIncomes() {
   const [error, setError] = useState('')
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>('all')
 
-  const formatAmount = (amount: number) =>
-    Number(amount).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const formatAmount = (amount: number) => Number(amount).toLocaleString('ru-RU')
 
   const loadClubs = async () => {
     try {

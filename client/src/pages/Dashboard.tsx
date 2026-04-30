@@ -429,10 +429,7 @@ export default function Dashboard() {
                       <p className={`text-lg font-bold ${
                         vesselBalance >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {Number(vesselBalance).toLocaleString('ru-RU', { 
-                          minimumFractionDigits: 2, 
-                          maximumFractionDigits: 2 
-                        })} ₽
+                        {Number(vesselBalance).toLocaleString('ru-RU')} ₽
                       </p>
                     </div>
                   </div>

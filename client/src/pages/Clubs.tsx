@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { clubsService, bookingsService, berthsService } from '../services/api'
+import { clubsService, bookingsService } from '../services/api'
 import { Club, UserRole, Booking } from '../types'
-import { Anchor, MapPin, Phone, Mail, Globe, Plus, Trash2, Download, X, EyeOff, Eye, ShieldCheck } from 'lucide-react'
+import { MapPin, Phone, Mail, Globe, Plus, Trash2, Download, X, EyeOff, Eye, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
@@ -16,85 +16,31 @@ function FreeBerthsCount({ club, user }: { club: Club; user: any }) {
 
   useEffect(() => {
     const calculateFreeBerths = async () => {
-      if (!club.berths || !Array.isArray(club.berths) || club.berths.length === 0) {
-        setCount(club.totalBerths || 0)
-        setLoading(false)
-        return
-      }
-
       try {
-        // Источник истины по доступным местам — backend endpoint /berths/club/:id/available
-        // (учитывает занятые брони и блокировки по неоплаченным платежам).
-        try {
-          const availableBerthsRes = await berthsService.getAvailableByClub(club.id)
-          const availableBerths = (availableBerthsRes as any)?.data || availableBerthsRes || []
-          if (Array.isArray(availableBerths)) {
-            setCount(availableBerths.length)
-            return
-          }
-        } catch (availableError) {
-          // Если endpoint временно недоступен, используем текущий fallback ниже.
-          console.error(`Ошибка загрузки доступных мест для клуба ${club.id}:`, availableError)
-        }
-
         let clubBookings: Booking[] = []
-        
-        // Для гостя, VESSEL_OWNER и PENDING_VALIDATION загружаем бронирования клуба через getByClub
-        // (так как у них может не быть своих клубов, и getAll не вернет все бронирования клуба)
-        if (user?.role === UserRole.GUEST || user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.PENDING_VALIDATION || !user) {
-          try {
-            const response = await bookingsService.getByClub(club.id)
-            clubBookings = (response as any)?.data || response || []
-            if (!Array.isArray(clubBookings)) {
-              clubBookings = []
-            }
-          } catch (error) {
-            console.error(`Ошибка загрузки бронирований для клуба ${club.id}:`, error)
-            clubBookings = []
-          }
-        } else {
-          // Для других ролей (CLUB_OWNER, SUPER_ADMIN, ADMIN) используем getAll
-          try {
-            const response = await bookingsService.getAll({ limit: 1000 })
-            const allBookings = (response as any)?.data || response || []
-            clubBookings = Array.isArray(allBookings) 
-              ? allBookings.filter((b: Booking) => 
-                  b.clubId === club.id &&
-                  (b.status === 'pending' || b.status === 'confirmed' || b.status === 'active')
-                )
-              : []
-          } catch (error) {
-            console.error('Ошибка загрузки бронирований:', error)
-            clubBookings = []
-          }
+
+        const response = await bookingsService.getByClub(club.id)
+        clubBookings = (response as any)?.data || response || []
+        if (!Array.isArray(clubBookings)) {
+          clubBookings = []
         }
 
-        // Подсчитываем свободные места с учетом бронирований
-        const availableCount = club.berths.filter((berth: any) => {
-          // Проверяем базовую доступность места
-          const isAvail = berth.isAvailable
-          if (!(isAvail === true || isAvail === 'true' || isAvail === 1 || isAvail === '1')) {
-            return false
-          }
-          
-          // Проверяем, есть ли активные бронирования для этого места
-          const hasActiveBooking = clubBookings.some((booking: Booking) => 
-            booking.berthId === berth.id &&
-            (booking.status === 'pending' || booking.status === 'confirmed' || booking.status === 'active')
-          )
-          
-          return !hasActiveBooking
-        }).length
+        const occupiedBerthIds = new Set(
+          clubBookings
+            .filter((booking: Booking) =>
+              booking.status === 'pending' ||
+              booking.status === 'confirmed' ||
+              booking.status === 'active'
+            )
+            .map((booking: Booking) => booking.berthId)
+        )
 
-        setCount(availableCount)
+        const totalBerths = Number(club.totalBerths || 0)
+        const freeBerths = Math.max(0, totalBerths - occupiedBerthIds.size)
+        setCount(freeBerths)
       } catch (error) {
         console.error('Ошибка подсчета свободных мест:', error)
-        // В случае ошибки показываем количество мест с isAvailable = true
-        const availableCount = club.berths.filter((berth: any) => {
-          const isAvail = berth.isAvailable
-          return isAvail === true || isAvail === 'true' || isAvail === 1 || isAvail === '1'
-        }).length
-        setCount(availableCount)
+        setCount(Number(club.totalBerths || 0))
       } finally {
         setLoading(false)
       }
@@ -579,9 +525,8 @@ export default function Clubs() {
               </div>
             )}
             <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center flex-1">
-                <Anchor className="h-8 w-8 text-primary-600 mr-3 flex-shrink-0" />
-                <div className="flex-1 min-h-[80px]">
+              <div className="flex-1">
+                <div className="min-h-[80px] text-center">
                   <h3 className="text-xl font-semibold text-gray-900">
                     {club.name}
                     {club.isActive === false && (
@@ -623,7 +568,7 @@ export default function Clubs() {
                   )}
                   {/* Комментарий об отказе для владельца клуба */}
                   {isClubOwner && club.ownerId === user?.id && club.rejectionComment && (
-                    <div className="mt-2 ml-6 p-3 bg-red-50 border border-red-200 rounded-md">
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md text-left">
                       <p className="text-sm font-semibold text-red-800 mb-1">Комментарий суперадминистратора:</p>
                       <p className="text-sm text-red-700">{club.rejectionComment}</p>
                     </div>

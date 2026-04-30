@@ -82,6 +82,7 @@ export default function ClubDetails() {
     expectedAmount: number
   } | null>(null)
   const [berthsViewMode, setBerthsViewMode] = useState<'scheme' | 'list'>('scheme')
+  const [isMapExpanded, setIsMapExpanded] = useState(false)
   const availableBerthIds = new Set(availableBerths.map((b) => b.id))
   const freeBerthsCount = (club?.berths || []).filter((berth) => availableBerthIds.has(berth.id)).length
 
@@ -1290,30 +1291,56 @@ export default function ClubDetails() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Информация</h2>
-            <div className="space-y-3">
-              <div className="flex items-center">
-                <MapPin className="h-5 w-5 text-gray-400 mr-3" />
-                <span className="text-gray-700">{club.address}</span>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-3">
+                <div className="flex items-center">
+                  <MapPin className="h-5 w-5 text-gray-400 mr-3" />
+                  <span className="text-gray-700">{club.address}</span>
+                </div>
+                {club.phone && (
+                  <div className="flex items-center">
+                    <Phone className="h-5 w-5 text-gray-400 mr-3" />
+                    <span className="text-gray-700">{club.phone}</span>
+                  </div>
+                )}
+                {club.email && (
+                  <div className="flex items-center">
+                    <Mail className="h-5 w-5 text-gray-400 mr-3" />
+                    <span className="text-gray-700">{club.email}</span>
+                  </div>
+                )}
+                {club.website && (
+                  <div className="flex items-center">
+                    <Globe className="h-5 w-5 text-gray-400 mr-3" />
+                    <a href={club.website} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                      {club.website}
+                    </a>
+                  </div>
+                )}
               </div>
-              {club.phone && (
-                <div className="flex items-center">
-                  <Phone className="h-5 w-5 text-gray-400 mr-3" />
-                  <span className="text-gray-700">{club.phone}</span>
-                </div>
-              )}
-              {club.email && (
-                <div className="flex items-center">
-                  <Mail className="h-5 w-5 text-gray-400 mr-3" />
-                  <span className="text-gray-700">{club.email}</span>
-                </div>
-              )}
-              {club.website && (
-                <div className="flex items-center">
-                  <Globe className="h-5 w-5 text-gray-400 mr-3" />
-                  <a href={club.website} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                    {club.website}
-                  </a>
-                </div>
+              {club.latitude && club.longitude && (
+                <button
+                  type="button"
+                  onClick={() => setIsMapExpanded((prev) => !prev)}
+                  className="text-left shrink-0"
+                >
+                  <div
+                    className={`rounded-lg overflow-hidden border border-gray-200 transition-all ${
+                      isMapExpanded ? 'w-96 h-96' : 'w-40 h-40'
+                    }`}
+                  >
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      loading="lazy"
+                      allowFullScreen
+                      referrerPolicy="no-referrer-when-downgrade"
+                      src={`https://www.google.com/maps?q=${parseFloat(club.latitude.toString())},${parseFloat(club.longitude.toString())}&hl=ru&z=15&output=embed`}
+                      title={`Карта расположения ${club.name}`}
+                    />
+                  </div>
+                </button>
               )}
             </div>
           </div>
@@ -1390,38 +1417,7 @@ export default function ClubDetails() {
               })()}
             </div>
           </div>
-        </div>
-      )}
 
-      {club.latitude && club.longitude && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Расположение</h2>
-          <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200">
-            <iframe
-              width="100%"
-              height="100%"
-              style={{ border: 0 }}
-              loading="lazy"
-              allowFullScreen
-              referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.google.com/maps?q=${parseFloat(club.latitude.toString())},${parseFloat(club.longitude.toString())}&hl=ru&z=15&output=embed`}
-              title={`Карта расположения ${club.name}`}
-            />
-          </div>
-          <div className="mt-4 flex items-center text-sm text-gray-600">
-            <MapPin className="h-4 w-4 mr-2" />
-            <span>{club.address}</span>
-          </div>
-          <div className="mt-2">
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${parseFloat(club.latitude.toString())},${parseFloat(club.longitude.toString())}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-            >
-              Открыть в Google Maps →
-            </a>
-          </div>
         </div>
       )}
 
