@@ -2117,17 +2117,10 @@ export default function ClubDetails() {
                     if (availableTariffs.length > 0) {
                       return (
                         <div>
-                          <label htmlFor="booking-tariff" className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-700">
                             Тариф оплаты *
                           </label>
-                          <select
-                            id="booking-tariff"
-                            required
-                            value={bookingForm.tariffId}
-                            onChange={(e) => setBookingForm({ ...bookingForm, tariffId: e.target.value })}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-gray-900 bg-white"
-                          >
-                            <option value="">Выберите тариф</option>
+                          <div className="mt-2 grid grid-cols-1 gap-2">
                             {availableTariffs.map((tb) => {
                               const tariff = tb.tariff!
                               let tariffTypeText = tariff.type === 'season_payment' ? 'за сезон' : 'в месяц'
@@ -2156,14 +2149,26 @@ export default function ClubDetails() {
                               }
                               
                               return (
-                                <option key={tb.id} value={tariff.id}>
-                                  {tariff.name} - {displayAmount.toLocaleString()} ₽ {tariffTypeText}
-                                </option>
+                                <button
+                                  key={tb.id}
+                                  type="button"
+                                  onClick={() => setBookingForm({ ...bookingForm, tariffId: String(tariff.id) })}
+                                  className={`w-full text-left px-3 py-2 border rounded-md transition-colors ${
+                                    bookingForm.tariffId === String(tariff.id)
+                                      ? 'border-primary-600 bg-primary-50 text-primary-800'
+                                      : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <div className="text-sm font-medium">{tariff.name}</div>
+                                  <div className="text-xs text-gray-600">
+                                    {displayAmount.toLocaleString()} ₽ {tariffTypeText}
+                                  </div>
+                                </button>
                               )
                             })}
-                          </select>
+                          </div>
                           <p className="mt-1 text-xs text-gray-500">
-                            Выберите тариф для оплаты бронирования
+                            Выберите тариф кнопкой для оплаты бронирования
                           </p>
                         </div>
                       )
