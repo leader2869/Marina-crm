@@ -26,7 +26,8 @@ import {
   ShoppingCart,
   Route,
   Search,
-  UtensilsCrossed
+  UtensilsCrossed,
+  TrendingUp,
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 
@@ -65,12 +66,12 @@ export default function Layout() {
       roles: UserRole[]
       submenu?: Array<{ name: string; href: string; icon: any }>
     }> = [
-      { name: 'Дашборд', href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.PENDING_VALIDATION] },
+      { name: 'Дашборд', href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.PENDING_VALIDATION] },
       { name: 'Пользователи', href: '/users', icon: Users, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Новые гости', href: '/new-guests', icon: UserCheck, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Валидация', href: '/validation', icon: ShieldCheck, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Логи', href: '/activity-logs', icon: FileText, roles: [UserRole.SUPER_ADMIN] },
-      { name: 'Яхт-клубы', href: '/clubs', icon: Anchor, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
+      { name: 'Яхт-клубы', href: '/clubs', icon: Anchor, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Катера', href: '/vessels', icon: Ship, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER] },
       { name: 'Бронирования', href: '/bookings', icon: Calendar, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER] },
       { name: 'Виджет', href: '/widget', icon: Code, roles: [UserRole.SUPER_ADMIN] },
@@ -78,6 +79,7 @@ export default function Layout() {
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Заполнение договоров', href: '/contract-filling', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.AGENT] },
+      { name: 'Ожидаемые приходы', href: '/club-expected-incomes', icon: TrendingUp, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },
       { name: 'Отчеты', href: '/reports', icon: FileText, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_STAFF] },
       { name: 'Обслуживание катеров', href: '/vessel-maintenance', icon: Wrench, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },

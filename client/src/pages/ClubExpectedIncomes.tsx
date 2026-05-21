@@ -112,6 +112,13 @@ export default function ClubExpectedIncomes() {
 
       {error && <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200">{error}</div>}
 
+      {clubs.length === 0 && !loading && (
+        <div className="p-4 rounded bg-amber-50 text-amber-800 border border-amber-200 text-sm">
+          Нет привязанных яхт-клубов. Обратитесь к владельцу клуба, чтобы вас добавили как сотрудника.
+        </div>
+      )}
+
+      {clubs.length > 0 && (
       <div className="bg-white rounded-lg shadow p-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Клуб</label>
         <select
@@ -126,7 +133,10 @@ export default function ClubExpectedIncomes() {
           ))}
         </select>
       </div>
+      )}
 
+      {clubs.length > 0 && (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg shadow p-4">
           <p className="text-gray-500 text-sm">Всего ожидаем</p>
@@ -210,6 +220,8 @@ export default function ClubExpectedIncomes() {
           </tbody>
         </table>
       </div>
+      </>
+      )}
     </div>
   )
 }
