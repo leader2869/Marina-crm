@@ -28,12 +28,16 @@ import {
   Search,
   UtensilsCrossed,
   TrendingUp,
+  TrendingDown,
+  BarChart,
+  Wallet,
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
+import { ClubStaffPermission } from '../types'
 import {
   staffCanAccessPath,
-  staffCanSeeFinancesMenu,
   staffHasAnyClubAccess,
+  staffHasPermission,
 } from '../utils/clubStaffAccess'
 
 export default function Layout() {
@@ -69,6 +73,7 @@ export default function Layout() {
       href?: string
       icon: any
       roles: UserRole[]
+      staffPermission?: ClubStaffPermission
       submenu?: Array<{ name: string; href: string; icon: any }>
     }> = [
       { name: 'Дашборд', href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.PENDING_VALIDATION] },
@@ -79,13 +84,22 @@ export default function Layout() {
       { name: 'Яхт-клубы', href: '/clubs', icon: Anchor, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Катера', href: '/vessels', icon: Ship, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER] },
       { name: 'Бронирования', href: '/bookings', icon: Calendar, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER] },
+      { name: 'Партнеры', href: '/club-partners', icon: BarChart, roles: [UserRole.CLUB_STAFF], staffPermission: 'club_partners' },
+      { name: 'Касса клуба', href: '/club-cash', icon: Wallet, roles: [UserRole.CLUB_STAFF], staffPermission: 'club_cash' },
+      { name: 'Взаиморасчеты', href: '/club-settlements', icon: TrendingDown, roles: [UserRole.CLUB_STAFF], staffPermission: 'club_settlements' },
       { name: 'Виджет', href: '/widget', icon: Code, roles: [UserRole.SUPER_ADMIN] },
       { name: 'Тарифы', href: '/tariffs', icon: Receipt, roles: [UserRole.CLUB_OWNER] },
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Заполнение договоров', href: '/contract-filling', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Сотрудники', href: '/club-employees', icon: Users, roles: [UserRole.CLUB_OWNER] },
-      { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.AGENT] },
-      { name: 'Ожидаемые приходы', href: '/club-expected-incomes', icon: TrendingUp, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },
+      { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.AGENT] },
+      {
+        name: 'Ожидаемые приходы',
+        href: '/club-expected-incomes',
+        icon: TrendingUp,
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
+        staffPermission: 'club_expected_incomes',
+      },
       { name: 'Отчеты', href: '/reports', icon: FileText, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },
       { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
       { name: 'Обслуживание катеров', href: '/vessel-maintenance', icon: Wrench, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
@@ -123,8 +137,8 @@ export default function Layout() {
 
       if (userRole === UserRole.CLUB_STAFF || String(userRole) === 'club_staff') {
         if (!staffHasAnyClubAccess(user)) return false
-        if (item.href === '/finances') {
-          return staffCanSeeFinancesMenu(user)
+        if (item.staffPermission) {
+          return staffHasPermission(user, item.staffPermission)
         }
         if (item.href) {
           return staffCanAccessPath(user, item.href)
@@ -156,6 +170,25 @@ export default function Layout() {
       })
     }
     
+    if (userRole === UserRole.CLUB_STAFF || String(userRole) === 'club_staff') {
+      const clubStaffOrder: { [key: string]: number } = {
+        '/dashboard': 1,
+        '/clubs': 2,
+        '/bookings': 3,
+        '/club-partners': 4,
+        '/club-cash': 5,
+        '/club-settlements': 6,
+        '/club-expected-incomes': 7,
+        '/reports': 8,
+      }
+
+      filteredItems.sort((a, b) => {
+        const orderA = (a.href && clubStaffOrder[a.href]) ? clubStaffOrder[a.href] : 999
+        const orderB = (b.href && clubStaffOrder[b.href]) ? clubStaffOrder[b.href] : 999
+        return orderA - orderB
+      })
+    }
+
     // Для судовладельца сортируем пункты меню в нужном порядке
     if (userRole === UserRole.VESSEL_OWNER || String(userRole) === 'vessel_owner') {
       const vesselOwnerOrder: { [key: string]: number } = {

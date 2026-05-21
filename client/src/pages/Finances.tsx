@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { CreditCard, Wallet, TrendingUp, TrendingDown, BarChart, DollarSign } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { ClubStaffPermission, UserRole } from '../types'
-import { staffCanSeeFinancesMenu, staffHasPermission } from '../utils/clubStaffAccess'
+import { staffHasPermission } from '../utils/clubStaffAccess'
+import { ROUTE_STAFF_PERMISSION } from '../constants/clubStaffPermissions'
 import { useState, useEffect } from 'react'
 import { vesselOwnerCashesService } from '../services/api'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -142,13 +143,24 @@ export default function Finances() {
   const availableModules = financeModules.filter((module) => {
     if (!user?.role || !module.availableFor.includes(user.role)) return false
     if (user.role === UserRole.CLUB_STAFF) {
-      if (!staffCanSeeFinancesMenu(user)) return false
       if (module.staffPermission) {
         return staffHasPermission(user, module.staffPermission)
       }
+      return false
     }
     return true
   })
+
+  if (user?.role === UserRole.CLUB_STAFF) {
+    const firstModule = availableModules[0]
+    if (firstModule) {
+      return <Navigate to={firstModule.href} replace />
+    }
+    const fallback = Object.keys(ROUTE_STAFF_PERMISSION).find((path) =>
+      staffHasPermission(user, ROUTE_STAFF_PERMISSION[path])
+    )
+    return <Navigate to={fallback || '/dashboard'} replace />
+  }
 
   if (loading) {
     return <LoadingAnimation message="Загрузка финансовых данных..." />
