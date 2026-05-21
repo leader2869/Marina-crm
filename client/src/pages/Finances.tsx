@@ -39,14 +39,6 @@ export default function Finances() {
 
   const financeModules = [
     {
-      name: 'Платежи',
-      href: '/payments',
-      icon: CreditCard,
-      description: 'Управление платежами и оплатами',
-      color: 'bg-blue-500',
-      availableFor: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
-    },
-    {
       name: 'Партнеры',
       href: '/club-partners',
       icon: BarChart,

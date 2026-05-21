@@ -8,7 +8,6 @@ import {
   Ship, 
   Calendar, 
   DollarSign, 
-  CreditCard,
   Users,
   LogOut,
   Menu,
@@ -81,7 +80,6 @@ export default function Layout() {
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.AGENT] },
       { name: 'Ожидаемые приходы', href: '/club-expected-incomes', icon: TrendingUp, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },
       { name: 'Отчеты', href: '/reports', icon: FileText, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },
-      { name: 'Платежи', href: '/payments', icon: CreditCard, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_STAFF] },
       { name: 'Обслуживание катеров', href: '/vessel-maintenance', icon: Wrench, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Агентские заказы', href: '/agent-orders', icon: ShoppingCart, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VESSEL_OWNER, UserRole.AGENT, UserRole.CAPTAIN, UserRole.MECHANIC, UserRole.GUEST, UserRole.PENDING_VALIDATION] },
       { name: 'Мои маршруты', href: '/agent/routes', icon: Route, roles: [UserRole.AGENT] },
@@ -135,7 +133,6 @@ export default function Layout() {
         '/bookings': 6,
         '/finances': 7,
         '/reports': 8,
-        '/payments': 9,
       }
       
       filteredItems.sort((a, b) => {
