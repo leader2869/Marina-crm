@@ -5,7 +5,7 @@ import { clubsService, bookingsService, clubFinanceService, vesselsService, vess
 import { ClubDashboardSummary, UserRole, BookingStatus, Vessel } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet, Receipt } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
-import { staffHasAnyClubAccess } from '../utils/clubStaffAccess'
+import { staffHasAnyClubAccess, staffHasPermission } from '../utils/clubStaffAccess'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -200,7 +200,8 @@ export default function Dashboard() {
   const canViewClubSettlements =
     user?.role === UserRole.CLUB_OWNER ||
     user?.role === UserRole.SUPER_ADMIN ||
-    user?.role === UserRole.ADMIN
+    user?.role === UserRole.ADMIN ||
+    (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements'))
 
   useEffect(() => {
     const loadSettlements = async () => {

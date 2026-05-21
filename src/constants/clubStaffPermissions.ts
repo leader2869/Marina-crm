@@ -7,6 +7,7 @@ export const CLUB_STAFF_PERMISSION_KEYS = [
   'club_partners',
   'club_cash',
   'club_expected_incomes',
+  'club_settlements',
   'reports',
 ] as const;
 
@@ -22,6 +23,7 @@ export const CLUB_STAFF_PERMISSION_LABELS: Record<ClubStaffPermission, string> =
   club_partners: 'Партнёры',
   club_cash: 'Касса клуба',
   club_expected_incomes: 'Ожидаемые приходы',
+  club_settlements: 'Взаиморасчёты',
   reports: 'Отчёты',
 };
 
@@ -34,6 +36,7 @@ export const ROUTE_STAFF_PERMISSION: Record<string, ClubStaffPermission> = {
   '/club-partners': 'club_partners',
   '/club-cash': 'club_cash',
   '/club-expected-incomes': 'club_expected_incomes',
+  '/club-settlements': 'club_settlements',
   '/reports': 'reports',
   '/reports/finance': 'reports',
   '/reports/tenants': 'reports',

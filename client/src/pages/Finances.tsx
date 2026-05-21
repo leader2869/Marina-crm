@@ -81,7 +81,8 @@ export default function Finances() {
       icon: TrendingDown,
       description: 'Расчет между партнерами с учетом долей',
       color: 'bg-red-500',
-      availableFor: [UserRole.CLUB_OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      staffPermission: 'club_settlements',
     },
     {
       name: 'Ожидаемые приходы',

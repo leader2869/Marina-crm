@@ -81,6 +81,7 @@ export type ClubStaffPermission =
   | 'club_partners'
   | 'club_cash'
   | 'club_expected_incomes'
+  | 'club_settlements'
   | 'reports'
 
 export interface ClubStaffAccess {
