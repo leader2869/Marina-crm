@@ -78,6 +78,7 @@ export default function Layout() {
       { name: 'Тарифы', href: '/tariffs', icon: Receipt, roles: [UserRole.CLUB_OWNER] },
       { name: 'Правила бронирования', href: '/booking-rules', icon: FileText, roles: [UserRole.CLUB_OWNER] },
       { name: 'Заполнение договоров', href: '/contract-filling', icon: FileText, roles: [UserRole.CLUB_OWNER] },
+      { name: 'Сотрудники', href: '/club-employees', icon: Users, roles: [UserRole.CLUB_OWNER] },
       { name: 'Финансы', href: '/finances', icon: DollarSign, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.VESSEL_OWNER, UserRole.AGENT] },
       { name: 'Ожидаемые приходы', href: '/club-expected-incomes', icon: TrendingUp, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },
       { name: 'Отчеты', href: '/reports', icon: FileText, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.CLUB_STAFF] },

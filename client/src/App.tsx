@@ -26,6 +26,7 @@ import ClubPartners from './pages/ClubPartners'
 import ClubCashDesk from './pages/ClubCashDesk'
 import ClubSettlements from './pages/ClubSettlements'
 import ClubExpectedIncomes from './pages/ClubExpectedIncomes'
+import ClubEmployees from './pages/ClubEmployees'
 import Reports from './pages/Reports'
 import ReportsFinance from './pages/ReportsFinance'
 import ReportsTenants from './pages/ReportsTenants'
@@ -133,6 +134,14 @@ function App() {
                   <ContractFilling />
                 </RoleProtectedRoute>
               } 
+            />
+            <Route
+              path="club-employees"
+              element={
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER]}>
+                  <ClubEmployees />
+                </RoleProtectedRoute>
+              }
             />
             <Route 
               path="finances" 
