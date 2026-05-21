@@ -174,7 +174,21 @@ function App() {
                 </RoleProtectedRoute>
               } 
             />
-            <Route path="payments" element={<Payments />} />
+            <Route
+              path="payments"
+              element={
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    UserRole.SUPER_ADMIN,
+                    UserRole.ADMIN,
+                    UserRole.CLUB_OWNER,
+                    UserRole.VESSEL_OWNER,
+                  ]}
+                >
+                  <Payments />
+                </RoleProtectedRoute>
+              }
+            />
             <Route
               path="club-partners"
               element={
