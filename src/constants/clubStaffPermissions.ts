@@ -43,8 +43,18 @@ export const ROUTE_STAFF_PERMISSION: Record<string, ClubStaffPermission> = {
 };
 
 export function normalizeStaffPermissions(raw: unknown): ClubStaffPermission[] {
-  if (!Array.isArray(raw)) return [...DEFAULT_CLUB_STAFF_PERMISSIONS];
+  let value = raw;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return [...DEFAULT_CLUB_STAFF_PERMISSIONS];
+    }
+  }
+  if (!Array.isArray(value)) return [...DEFAULT_CLUB_STAFF_PERMISSIONS];
   const allowed = new Set<string>(CLUB_STAFF_PERMISSION_KEYS);
-  const filtered = raw.filter((p): p is ClubStaffPermission => typeof p === 'string' && allowed.has(p));
+  const filtered = value.filter(
+    (p): p is ClubStaffPermission => typeof p === 'string' && allowed.has(p)
+  );
   return filtered.length > 0 ? filtered : [...DEFAULT_CLUB_STAFF_PERMISSIONS];
 }

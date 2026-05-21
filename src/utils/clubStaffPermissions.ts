@@ -73,6 +73,19 @@ export async function staffHasPermission(
   return access.permissions.includes(permission);
 }
 
+export async function staffHasAnyPermission(
+  userId: number,
+  clubId: number,
+  permissions: ClubStaffPermission[]
+): Promise<boolean> {
+  for (const permission of permissions) {
+    if (await staffHasPermission(userId, clubId, permission)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function assertStaffHasPermission(
   userId: number,
   clubId: number,

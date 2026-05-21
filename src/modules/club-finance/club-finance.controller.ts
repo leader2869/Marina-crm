@@ -23,6 +23,7 @@ import {
 import {
   assertStaffHasPermission,
   getStaffClubAccess,
+  staffHasAnyPermission,
 } from '../../utils/clubStaffPermissions';
 
 export class ClubFinanceController {
@@ -59,6 +60,22 @@ export class ClubFinanceController {
     const club = await this.ensureClubAccess(req, clubId);
     if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
       await assertStaffHasPermission(req.userId, clubId, permission);
+    }
+    return club;
+  }
+
+  /** Доступ, если есть хотя бы одно из прав (например, касса без раздела «Партнёры») */
+  private async ensureClubStaffPermissionAny(
+    req: AuthRequest,
+    clubId: number,
+    permissions: ClubStaffPermission[]
+  ): Promise<Club> {
+    const club = await this.ensureClubAccess(req, clubId);
+    if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+      const allowed = await staffHasAnyPermission(req.userId, clubId, permissions);
+      if (!allowed) {
+        throw new AppError('Нет доступа к этому разделу', 403);
+      }
     }
     return club;
   }
@@ -116,7 +133,7 @@ export class ClubFinanceController {
   async getPartners(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubStaffPermission(req, clubId, 'club_partners');
+      await this.ensureClubStaffPermissionAny(req, clubId, ['club_partners', 'club_cash']);
 
       const partnerRepository = AppDataSource.getRepository(ClubPartner);
       const partners = await partnerRepository.find({
@@ -371,7 +388,7 @@ export class ClubFinanceController {
   async getPartnerManagers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubStaffPermission(req, clubId, 'club_partners');
+      await this.ensureClubStaffPermissionAny(req, clubId, ['club_partners', 'club_cash']);
 
       const partnerId = req.query.partnerId ? parseInt(String(req.query.partnerId)) : undefined;
       if (partnerId) {
