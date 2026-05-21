@@ -622,7 +622,7 @@ export class ClubFinanceController {
   async getTenantReport(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubStaffPermission(req, clubId, 'reports');
+      await this.ensureClubStaffPermissionAny(req, clubId, ['reports', 'clubs', 'bookings']);
 
       const berthRepository = AppDataSource.getRepository(Berth);
       const bookingRepository = AppDataSource.getRepository(Booking);

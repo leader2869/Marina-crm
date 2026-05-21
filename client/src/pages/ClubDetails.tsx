@@ -335,28 +335,54 @@ export default function ClubDetails() {
     return berthByNumericNumber.get(75) || null
   }, [sortedBerths, berthByNumericNumber])
 
+  const resolveOccupiedBerthInfo = (berth: Berth) => {
+    const fromReport = tenantByBerthId.get(berth.id)
+    if (fromReport) {
+      return {
+        berthNumber: fromReport.berthNumber,
+        renterFullName: fromReport.renterFullName,
+        renterPhone: fromReport.renterPhone,
+        acceptedAmount: Number(fromReport.acceptedAmount),
+        expectedAmount: Number(fromReport.expectedAmount),
+      }
+    }
+
+    const bookings = berthBookings.get(berth.id)
+    const booking = bookings?.[0]
+    if (!booking) return null
+
+    const owner = booking.vesselOwner
+    const renterFullName = owner
+      ? `${owner.lastName || ''} ${owner.firstName || ''}`.trim() || owner.email
+      : booking.notes || '—'
+
+    return {
+      berthNumber: berth.number,
+      renterFullName: renterFullName || '—',
+      renterPhone: owner?.phone || '—',
+      acceptedAmount: 0,
+      expectedAmount: Number(booking.totalPrice) || 0,
+    }
+  }
+
   const handleBerthSchemeClick = (berth: Berth) => {
     if (isBerthBookable(berth)) {
       handleOpenBookingModalForBerth(berth)
       return
     }
 
-    const isClubOwner = user?.role === UserRole.CLUB_OWNER && club?.ownerId === user?.id
-    if (!isClubOwner) {
+    if (!canViewOccupiedBerthInfo()) {
       setInfoMessage('Место забронировано')
       return
     }
 
-    const info = tenantByBerthId.get(berth.id)
-    if (!info) return
+    const info = resolveOccupiedBerthInfo(berth)
+    if (!info) {
+      setInfoMessage('Место забронировано')
+      return
+    }
 
-    setSelectedOccupiedBerth({
-      berthNumber: info.berthNumber,
-      renterFullName: info.renterFullName,
-      renterPhone: info.renterPhone,
-      acceptedAmount: Number(info.acceptedAmount),
-      expectedAmount: Number(info.expectedAmount),
-    })
+    setSelectedOccupiedBerth(info)
   }
 
   const loadBookingRules = async (clubId: number) => {
@@ -542,6 +568,12 @@ export default function ClubDetails() {
       (user.role === UserRole.CLUB_OWNER && club.ownerId === user.id)
     )
   }
+
+  const isClubOwnerOfClub = () =>
+    !!user && !!club && user.role === UserRole.CLUB_OWNER && club.ownerId === user.id
+
+  const canViewOccupiedBerthInfo = () =>
+    isClubOwnerOfClub() || user?.role === UserRole.CLUB_STAFF || user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN
 
   const handleSubmitForValidation = async () => {
     if (!club) return
