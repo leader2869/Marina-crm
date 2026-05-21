@@ -956,7 +956,7 @@ export class ClubFinanceController {
   async getSettlements(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
 
       const partnerRepository = AppDataSource.getRepository(ClubPartner);
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);

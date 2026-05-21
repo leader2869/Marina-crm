@@ -194,7 +194,7 @@ function App() {
             <Route
               path="club-settlements"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
                   <ClubSettlements />
                 </RoleProtectedRoute>
               }

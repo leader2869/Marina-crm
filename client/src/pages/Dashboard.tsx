@@ -196,9 +196,14 @@ export default function Dashboard() {
     loadStats()
   }, [user])
 
+  const canViewClubSettlements =
+    user?.role === UserRole.CLUB_OWNER ||
+    user?.role === UserRole.SUPER_ADMIN ||
+    user?.role === UserRole.ADMIN
+
   useEffect(() => {
     const loadSettlements = async () => {
-      if (!selectedClubId) return
+      if (!selectedClubId || !canViewClubSettlements) return
       try {
         const response = await clubFinanceService.getSettlements(selectedClubId)
         const data = response as any
@@ -209,7 +214,7 @@ export default function Dashboard() {
       }
     }
     loadSettlements()
-  }, [selectedClubId])
+  }, [selectedClubId, canViewClubSettlements])
 
   const statCards = [
     // Катера не показываем для владельца яхт-клуба
@@ -324,6 +329,7 @@ export default function Dashboard() {
             })}
           </div>
 
+          {canViewClubSettlements && (
           <div
             className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => navigate('/club-settlements')}
@@ -394,6 +400,7 @@ export default function Dashboard() {
               </table>
             </div>
           </div>
+          )}
         </>
       )}
 
