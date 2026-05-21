@@ -381,7 +381,7 @@ export default function Bookings() {
   }
 
   const sortedBookings = useMemo(() => {
-    let list = bookings
+    let list = bookings.filter((booking) => booking.status !== BookingStatus.CANCELLED)
     if (selectedClubId) {
       list = list.filter((booking) => booking.clubId === selectedClubId)
     }
@@ -813,7 +813,7 @@ export default function Bookings() {
         </table>
       </div>
 
-      {bookings.length === 0 && (
+      {sortedBookings.length === 0 && (
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">Бронирования не найдены</p>
