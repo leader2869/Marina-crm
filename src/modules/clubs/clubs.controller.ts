@@ -26,6 +26,7 @@ import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
 import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
+import { staffHasPermission } from '../../utils/clubStaffPermissions';
 
 export class ClubsController {
   private async resolveClubColumnName(queryRunner: QueryRunner, tableName: string): Promise<string | null> {
@@ -196,7 +197,13 @@ export class ClubsController {
         queryBuilder.where('club.ownerId = :ownerId', { ownerId: req.userId });
         console.log('Владелец клуба запросил свои клубы, userId:', req.userId);
       } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
-        staffClubIds = await getClubIdsForStaffUser(req.userId);
+        const allStaffClubIds = await getClubIdsForStaffUser(req.userId);
+        staffClubIds = [];
+        for (const cid of allStaffClubIds) {
+          if (await staffHasPermission(req.userId, cid, 'clubs')) {
+            staffClubIds.push(cid);
+          }
+        }
         if (staffClubIds.length === 0) {
           res.json(createPaginatedResponse([], 0, page, limit));
           return;

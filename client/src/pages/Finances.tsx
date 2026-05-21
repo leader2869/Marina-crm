@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { CreditCard, Wallet, TrendingUp, TrendingDown, BarChart, DollarSign } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { UserRole } from '../types'
+import { ClubStaffPermission, UserRole } from '../types'
+import { staffCanSeeFinancesMenu, staffHasPermission } from '../utils/clubStaffAccess'
 import { useState, useEffect } from 'react'
 import { vesselOwnerCashesService } from '../services/api'
 import { LoadingAnimation } from '../components/LoadingAnimation'
@@ -37,7 +38,17 @@ export default function Finances() {
     }
   }
 
-  const financeModules = [
+  const financeModules: Array<{
+    name: string
+    href: string
+    icon: typeof CreditCard
+    description: string
+    color: string
+    availableFor: UserRole[]
+    staffPermission?: ClubStaffPermission
+    value?: number
+    showValue?: boolean
+  }> = [
     {
       name: 'Платежи',
       href: '/payments',
@@ -53,6 +64,7 @@ export default function Finances() {
       description: 'Настройка партнеров и долей участия',
       color: 'bg-indigo-500',
       availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
+      staffPermission: 'club_partners',
     },
     {
       name: 'Касса клуба',
@@ -61,6 +73,7 @@ export default function Finances() {
       description: 'Приходы/расходы, кто принял и кто оплатил',
       color: 'bg-purple-500',
       availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF],
+      staffPermission: 'club_cash',
     },
     {
       name: 'Взаиморасчеты',
@@ -77,6 +90,7 @@ export default function Finances() {
       description: 'Ожидаемые оплаты по текущим бронированиям',
       color: 'bg-emerald-500',
       availableFor: [UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      staffPermission: 'club_expected_incomes',
     },
     {
       name: 'Платежи за яхт клуб',
@@ -124,9 +138,16 @@ export default function Finances() {
     },
   ]
 
-  const availableModules = financeModules.filter((module) =>
-    user?.role ? module.availableFor.includes(user.role) : false
-  )
+  const availableModules = financeModules.filter((module) => {
+    if (!user?.role || !module.availableFor.includes(user.role)) return false
+    if (user.role === UserRole.CLUB_STAFF) {
+      if (!staffCanSeeFinancesMenu(user)) return false
+      if (module.staffPermission) {
+        return staffHasPermission(user, module.staffPermission)
+      }
+    }
+    return true
+  })
 
   if (loading) {
     return <LoadingAnimation message="Загрузка финансовых данных..." />

@@ -300,6 +300,9 @@ export const clubFinanceService = {
   deletePartner: (clubId: number, partnerId: number) =>
     api.delete(`/club-finance/clubs/${clubId}/partners/${partnerId}`),
   getClubUsers: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/club-users`),
+  getClubStaff: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/staff`),
+  updateClubStaffAccess: (clubId: number, userId: number, data: { accessEnabled?: boolean; permissions?: string[] }) =>
+    api.put(`/club-finance/clubs/${clubId}/staff/${userId}/access`, data),
   getPartnerManagers: (clubId: number, params?: { partnerId?: number }) =>
     api.get(`/club-finance/clubs/${clubId}/partner-managers`, { params }),
   createPartnerManager: (clubId: number, data: any) =>

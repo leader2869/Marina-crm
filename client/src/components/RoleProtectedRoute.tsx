@@ -1,18 +1,26 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { UserRole } from '../types'
+import { ClubStaffPermission, UserRole } from '../types'
 import { LoadingAnimation } from './LoadingAnimation'
+import {
+  staffCanAccessPath,
+  staffHasAnyClubAccess,
+  staffHasPermission,
+} from '../utils/clubStaffAccess'
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode
   allowedRoles: UserRole[]
+  staffPermission?: ClubStaffPermission
 }
 
-export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({ 
-  children, 
-  allowedRoles 
+export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
+  children,
+  allowedRoles,
+  staffPermission,
 }) => {
   const { user, loading } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return <LoadingAnimation message="Загрузка..." fullScreen />
@@ -26,6 +34,18 @@ export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
     return <Navigate to="/dashboard" replace />
   }
 
+  if (user.role === UserRole.CLUB_STAFF) {
+    if (!staffHasAnyClubAccess(user)) {
+      return <Navigate to="/dashboard" replace />
+    }
+    if (staffPermission) {
+      if (!staffHasPermission(user, staffPermission)) {
+        return <Navigate to="/dashboard" replace />
+      }
+    } else if (!staffCanAccessPath(user, location.pathname)) {
+      return <Navigate to="/dashboard" replace />
+    }
+  }
+
   return <>{children}</>
 }
-

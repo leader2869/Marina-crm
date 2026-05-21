@@ -21,6 +21,7 @@ import { getPaginationParams, createPaginatedResponse } from '../../utils/pagina
 import { isAfter } from 'date-fns';
 import { PaymentService } from '../../services/payment.service';
 import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
+import { staffHasPermission } from '../../utils/clubStaffPermissions';
 
 export class PaymentsController {
   /** Просмотр/приём оплат по клубу: владелец, сотрудник клуба (привязка), админы */
@@ -43,6 +44,9 @@ export class PaymentsController {
       const ok = await userHasAccessToClub(req.userId, clubId);
       if (!ok) {
         throw new AppError('Доступ запрещен', 403);
+      }
+      if (!(await staffHasPermission(req.userId, clubId, 'bookings'))) {
+        throw new AppError('Нет доступа к бронированиям', 403);
       }
       return;
     }

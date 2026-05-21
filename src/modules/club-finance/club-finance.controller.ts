@@ -15,6 +15,15 @@ import { Payment } from '../../entities/Payment';
 import { BookingStatus, CashPaymentMethod, CashTransactionType, Currency, PaymentStatus, UserRole } from '../../types';
 import { hashPassword } from '../../utils/password';
 import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
+import {
+  ClubStaffPermission,
+  DEFAULT_CLUB_STAFF_PERMISSIONS,
+  normalizeStaffPermissions,
+} from '../../constants/clubStaffPermissions';
+import {
+  assertStaffHasPermission,
+  getStaffClubAccess,
+} from '../../utils/clubStaffPermissions';
 
 export class ClubFinanceController {
   private async ensureClubAccess(req: AuthRequest, clubId: number): Promise<Club> {
@@ -40,6 +49,18 @@ export class ClubFinanceController {
     }
 
     throw new AppError('Доступ запрещен', 403);
+  }
+
+  private async ensureClubStaffPermission(
+    req: AuthRequest,
+    clubId: number,
+    permission: ClubStaffPermission
+  ): Promise<Club> {
+    const club = await this.ensureClubAccess(req, clubId);
+    if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+      await assertStaffHasPermission(req.userId, clubId, permission);
+    }
+    return club;
   }
 
   /** Только владелец клуба или админ (настройка партнёров, кассовые операции вручную) */
@@ -95,7 +116,7 @@ export class ClubFinanceController {
   async getPartners(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubStaffPermission(req, clubId, 'club_partners');
 
       const partnerRepository = AppDataSource.getRepository(ClubPartner);
       const partners = await partnerRepository.find({
@@ -204,10 +225,117 @@ export class ClubFinanceController {
     }
   }
 
+  async getClubStaff(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
+
+      const userRepository = AppDataSource.getRepository(User);
+      const userClubRepository = AppDataSource.getRepository(UserClub);
+
+      const directUsers = await userRepository.find({
+        where: { managedClubId: clubId, role: UserRole.CLUB_STAFF },
+        select: ['id', 'firstName', 'lastName', 'email', 'phone', 'role', 'isActive'],
+      });
+
+      const linkedUsers = await userClubRepository.find({
+        where: { clubId },
+        relations: ['user'],
+      });
+
+      const staffMap = new Map<number, any>();
+      directUsers.forEach((u) => staffMap.set(u.id, u));
+      linkedUsers.forEach((uc) => {
+        if (uc.user?.role === UserRole.CLUB_STAFF) {
+          staffMap.set(uc.user.id, uc.user);
+        }
+      });
+
+      const result = await Promise.all(
+        Array.from(staffMap.values()).map(async (user) => {
+          const access = await getStaffClubAccess(user.id, clubId);
+          return {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            isActive: user.isActive,
+            accessEnabled: access?.accessEnabled ?? true,
+            permissions: access?.permissions ?? [...DEFAULT_CLUB_STAFF_PERMISSIONS],
+          };
+        })
+      );
+
+      result.sort((a, b) =>
+        `${a.lastName || ''} ${a.firstName || ''}`.localeCompare(`${b.lastName || ''} ${b.firstName || ''}`)
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateClubStaffAccess(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      const staffUserId = parseInt(req.params.userId);
+      await this.ensureClubOwnerOrAdmin(req, clubId);
+
+      const { accessEnabled, permissions } = req.body;
+      const userRepository = AppDataSource.getRepository(User);
+      const staffUser = await userRepository.findOne({ where: { id: staffUserId } });
+      if (!staffUser || staffUser.role !== UserRole.CLUB_STAFF) {
+        throw new AppError('Сотрудник не найден', 404);
+      }
+
+      const userClubRepository = AppDataSource.getRepository(UserClub);
+      let link = await userClubRepository.findOne({ where: { userId: staffUserId, clubId } });
+      const hasClubLink = staffUser.managedClubId === clubId || !!link;
+      if (!hasClubLink) {
+        throw new AppError('Сотрудник не привязан к этому клубу', 400);
+      }
+      if (!link) {
+        link = userClubRepository.create({
+          userId: staffUserId,
+          clubId,
+          accessEnabled: true,
+          permissions: [...DEFAULT_CLUB_STAFF_PERMISSIONS],
+        });
+      }
+
+      if (accessEnabled !== undefined) {
+        link.accessEnabled = Boolean(accessEnabled);
+      }
+      if (permissions !== undefined) {
+        link.permissions = normalizeStaffPermissions(permissions);
+      }
+
+      await userClubRepository.save(link);
+
+      const access = await getStaffClubAccess(staffUserId, clubId);
+      res.json({
+        id: staffUser.id,
+        firstName: staffUser.firstName,
+        lastName: staffUser.lastName,
+        email: staffUser.email,
+        phone: staffUser.phone,
+        role: staffUser.role,
+        isActive: staffUser.isActive,
+        accessEnabled: access?.accessEnabled ?? true,
+        permissions: access?.permissions ?? [...DEFAULT_CLUB_STAFF_PERMISSIONS],
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getClubUsers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubStaffPermission(req, clubId, 'club_partners');
 
       const userRepository = AppDataSource.getRepository(User);
       const userClubRepository = AppDataSource.getRepository(UserClub);
@@ -243,7 +371,7 @@ export class ClubFinanceController {
   async getPartnerManagers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubStaffPermission(req, clubId, 'club_partners');
 
       const partnerId = req.query.partnerId ? parseInt(String(req.query.partnerId)) : undefined;
       if (partnerId) {
@@ -332,7 +460,12 @@ export class ClubFinanceController {
         where: { userId: resolvedUserId, clubId },
       });
       if (!existingUserClub) {
-        const uc = userClubRepository.create({ userId: resolvedUserId, clubId });
+        const uc = userClubRepository.create({
+          userId: resolvedUserId,
+          clubId,
+          accessEnabled: true,
+          permissions: [...DEFAULT_CLUB_STAFF_PERMISSIONS],
+        });
         await userClubRepository.save(uc);
       }
 
@@ -388,7 +521,7 @@ export class ClubFinanceController {
   async getCashTransactions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubStaffPermission(req, clubId, 'club_cash');
 
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
       const transactions = await txRepository.find({
@@ -406,7 +539,7 @@ export class ClubFinanceController {
   async getExpectedIncomes(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubStaffPermission(req, clubId, 'club_expected_incomes');
 
       const paymentRepository = AppDataSource.getRepository(Payment);
       const payments = await paymentRepository
@@ -472,7 +605,7 @@ export class ClubFinanceController {
   async getTenantReport(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubAccess(req, clubId);
+      await this.ensureClubStaffPermission(req, clubId, 'reports');
 
       const berthRepository = AppDataSource.getRepository(Berth);
       const bookingRepository = AppDataSource.getRepository(Booking);
@@ -607,7 +740,17 @@ export class ClubFinanceController {
         const clubs = await clubRepository.find({ where: { ownerId: req.userId }, select: ['id'] });
         clubIds = clubs.map((club) => club.id);
       } else if (req.userRole === UserRole.CLUB_STAFF) {
-        clubIds = await getClubIdsForStaffUser(req.userId);
+        const allClubIds = await getClubIdsForStaffUser(req.userId);
+        const allowed: number[] = [];
+        for (const cid of allClubIds) {
+          try {
+            await assertStaffHasPermission(req.userId, cid, 'dashboard');
+            allowed.push(cid);
+          } catch {
+            /* нет права dashboard для клуба */
+          }
+        }
+        clubIds = allowed;
       } else {
         throw new AppError('Доступ запрещен', 403);
       }

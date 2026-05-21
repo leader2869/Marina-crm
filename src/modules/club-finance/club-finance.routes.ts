@@ -10,6 +10,8 @@ router.post('/clubs/:clubId/partners', authenticate, controller.createPartner.bi
 router.put('/clubs/:clubId/partners/:partnerId', authenticate, controller.updatePartner.bind(controller));
 router.delete('/clubs/:clubId/partners/:partnerId', authenticate, controller.deletePartner.bind(controller));
 router.get('/clubs/:clubId/club-users', authenticate, controller.getClubUsers.bind(controller));
+router.get('/clubs/:clubId/staff', authenticate, controller.getClubStaff.bind(controller));
+router.put('/clubs/:clubId/staff/:userId/access', authenticate, controller.updateClubStaffAccess.bind(controller));
 router.get('/clubs/:clubId/partner-managers', authenticate, controller.getPartnerManagers.bind(controller));
 router.post('/clubs/:clubId/partner-managers', authenticate, controller.createPartnerManager.bind(controller));
 router.delete('/clubs/:clubId/partner-managers/:managerId', authenticate, controller.deletePartnerManager.bind(controller));

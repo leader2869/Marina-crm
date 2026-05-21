@@ -1,0 +1,44 @@
+export const CLUB_STAFF_PERMISSION_KEYS = [
+  'dashboard',
+  'clubs',
+  'bookings',
+  'finances',
+  'club_partners',
+  'club_cash',
+  'club_expected_incomes',
+  'reports',
+] as const
+
+export type ClubStaffPermission = (typeof CLUB_STAFF_PERMISSION_KEYS)[number]
+
+export const DEFAULT_CLUB_STAFF_PERMISSIONS: ClubStaffPermission[] = [...CLUB_STAFF_PERMISSION_KEYS]
+
+export const CLUB_STAFF_PERMISSION_LABELS: Record<ClubStaffPermission, string> = {
+  dashboard: 'Дашборд',
+  clubs: 'Яхт-клубы',
+  bookings: 'Бронирования',
+  finances: 'Финансы (меню)',
+  club_partners: 'Партнёры',
+  club_cash: 'Касса клуба',
+  club_expected_incomes: 'Ожидаемые приходы',
+  reports: 'Отчёты',
+}
+
+export const ROUTE_STAFF_PERMISSION: Record<string, ClubStaffPermission> = {
+  '/dashboard': 'dashboard',
+  '/clubs': 'clubs',
+  '/bookings': 'bookings',
+  '/finances': 'finances',
+  '/club-partners': 'club_partners',
+  '/club-cash': 'club_cash',
+  '/club-expected-incomes': 'club_expected_incomes',
+  '/reports': 'reports',
+  '/reports/finance': 'reports',
+  '/reports/tenants': 'reports',
+}
+
+export const FINANCE_SUB_PERMISSIONS: ClubStaffPermission[] = [
+  'club_partners',
+  'club_cash',
+  'club_expected_incomes',
+]

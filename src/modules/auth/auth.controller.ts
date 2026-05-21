@@ -6,6 +6,7 @@ import { generateToken } from '../../utils/jwt';
 import { AppError } from '../../middleware/errorHandler';
 import { AuthRequest } from '../../middleware/auth';
 import { UserRole } from '../../types';
+import { getAllStaffClubAccesses } from '../../utils/clubStaffPermissions';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
@@ -847,7 +848,7 @@ export class AuthController {
         throw new AppError('Пользователь не найден', 404);
       }
 
-      res.json({
+      const profile: Record<string, unknown> = {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
@@ -860,7 +861,13 @@ export class AuthController {
         vessels: [],
         managedClub: user.managedClub,
         createdAt: user.createdAt,
-      });
+      };
+
+      if (user.role === UserRole.CLUB_STAFF) {
+        profile.clubStaffAccesses = await getAllStaffClubAccesses(user.id);
+      }
+
+      res.json(profile);
     } catch (error) {
       next(error);
     }

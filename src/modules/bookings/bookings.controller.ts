@@ -20,6 +20,7 @@ import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
 import { In } from 'typeorm';
 import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
+import { staffHasPermission } from '../../utils/clubStaffPermissions';
 
 export class BookingsController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -44,11 +45,17 @@ export class BookingsController {
         queryBuilder.where('booking.vesselOwnerId = :userId', { userId: req.userId });
       } else if (req.userRole === 'club_staff' && req.userId) {
         const clubIds = await getClubIdsForStaffUser(req.userId);
-        if (clubIds.length === 0) {
+        const allowedClubIds: number[] = [];
+        for (const cid of clubIds) {
+          if (await staffHasPermission(req.userId, cid, 'bookings')) {
+            allowedClubIds.push(cid);
+          }
+        }
+        if (allowedClubIds.length === 0) {
           res.json(createPaginatedResponse([], 0, page, limit));
           return;
         }
-        queryBuilder.where('booking.clubId IN (:...clubIds)', { clubIds });
+        queryBuilder.where('booking.clubId IN (:...clubIds)', { clubIds: allowedClubIds });
       } else if (req.userRole === 'club_owner') {
         // Владелец клуба видит только бронирования своих клубов
         // Получаем ID всех клубов, принадлежащих пользователю

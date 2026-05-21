@@ -30,6 +30,14 @@ export class UserClub {
   @Column()
   clubId: number;
 
+  /** Доступ сотрудника к клубу (false — вход в разделы клуба закрыт) */
+  @Column({ default: true })
+  accessEnabled: boolean;
+
+  /** Список ключей разрешённых разделов (JSON-массив строк) */
+  @Column({ type: 'jsonb', nullable: true })
+  permissions: string[] | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

@@ -1,18 +1,45 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users } from 'lucide-react'
+import { Settings, Users, X } from 'lucide-react'
 import BackButton from '../components/BackButton'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { clubsService, clubFinanceService } from '../services/api'
-import { Club, User, UserRole } from '../types'
+import {
+  CLUB_STAFF_PERMISSION_KEYS,
+  CLUB_STAFF_PERMISSION_LABELS,
+  DEFAULT_CLUB_STAFF_PERMISSIONS,
+} from '../constants/clubStaffPermissions'
+import { Club, ClubStaffMember, ClubStaffPermission } from '../types'
 
 export default function ClubEmployees() {
   const [clubs, setClubs] = useState<Club[]>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
-  const [employees, setEmployees] = useState<User[]>([])
+  const [employees, setEmployees] = useState<ClubStaffMember[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingStaff, setLoadingStaff] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [editingEmployee, setEditingEmployee] = useState<ClubStaffMember | null>(null)
+  const [editAccessEnabled, setEditAccessEnabled] = useState(true)
+  const [editPermissions, setEditPermissions] = useState<ClubStaffPermission[]>([
+    ...DEFAULT_CLUB_STAFF_PERMISSIONS,
+  ])
+
+  const loadStaff = async (clubId: number) => {
+    try {
+      setLoadingStaff(true)
+      setError('')
+      const response = await clubFinanceService.getClubStaff(clubId)
+      const list = (Array.isArray(response) ? response : response.data || []) as ClubStaffMember[]
+      setEmployees(list)
+    } catch (e: unknown) {
+      const err = e as { error?: string; message?: string }
+      setError(err?.error || err?.message || 'Ошибка загрузки сотрудников')
+      setEmployees([])
+    } finally {
+      setLoadingStaff(false)
+    }
+  }
 
   useEffect(() => {
     const loadClubs = async () => {
@@ -37,23 +64,7 @@ export default function ClubEmployees() {
 
   useEffect(() => {
     if (!selectedClubId) return
-
-    const loadStaff = async () => {
-      try {
-        setLoadingStaff(true)
-        setError('')
-        const response = await clubFinanceService.getClubUsers(selectedClubId)
-        const users = (Array.isArray(response) ? response : response.data || []) as User[]
-        setEmployees(users.filter((u) => u.role === UserRole.CLUB_STAFF))
-      } catch (e: unknown) {
-        const err = e as { error?: string; message?: string }
-        setError(err?.error || err?.message || 'Ошибка загрузки сотрудников')
-        setEmployees([])
-      } finally {
-        setLoadingStaff(false)
-      }
-    }
-    void loadStaff()
+    void loadStaff(selectedClubId)
   }, [selectedClubId])
 
   const sortedEmployees = useMemo(() => {
@@ -63,6 +74,45 @@ export default function ClubEmployees() {
       return nameA.localeCompare(nameB, 'ru')
     })
   }, [employees])
+
+  const openEditModal = (employee: ClubStaffMember) => {
+    setEditingEmployee(employee)
+    setEditAccessEnabled(employee.accessEnabled !== false)
+    setEditPermissions([...employee.permissions])
+  }
+
+  const closeEditModal = () => {
+    setEditingEmployee(null)
+  }
+
+  const togglePermission = (key: ClubStaffPermission) => {
+    setEditPermissions((prev) =>
+      prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]
+    )
+  }
+
+  const handleSaveAccess = async () => {
+    if (!editingEmployee || !selectedClubId) return
+    if (editAccessEnabled && editPermissions.length === 0) {
+      setError('Выберите хотя бы один раздел для доступа')
+      return
+    }
+    try {
+      setSaving(true)
+      setError('')
+      await clubFinanceService.updateClubStaffAccess(selectedClubId, editingEmployee.id, {
+        accessEnabled: editAccessEnabled,
+        permissions: editPermissions,
+      })
+      await loadStaff(selectedClubId)
+      closeEditModal()
+    } catch (e: unknown) {
+      const err = e as { error?: string; message?: string }
+      setError(err?.error || err?.message || 'Ошибка сохранения прав')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (loading) {
     return <LoadingAnimation message="Загрузка..." />
@@ -74,7 +124,9 @@ export default function ClubEmployees() {
         <BackButton />
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Сотрудники</h1>
-          <p className="mt-1 text-sm text-gray-600">Сотрудники яхт-клуба с доступом к системе</p>
+          <p className="mt-1 text-sm text-gray-600">
+            Управление доступом и разделами для сотрудников яхт-клуба
+          </p>
         </div>
       </div>
 
@@ -129,17 +181,20 @@ export default function ClubEmployees() {
                       Email
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Телефон
+                      Доступ
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Статус
+                      Разделы
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Действия
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {!loadingStaff && sortedEmployees.length === 0 && (
+                  {sortedEmployees.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">
+                      <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-500">
                         Сотрудники не найдены
                       </td>
                     </tr>
@@ -147,24 +202,38 @@ export default function ClubEmployees() {
                   {sortedEmployees.map((employee) => {
                     const fullName =
                       `${employee.lastName || ''} ${employee.firstName || ''}`.trim() || '—'
-                    const isActive = employee.isActive !== false
+                    const accessOn = employee.accessEnabled !== false
                     return (
                       <tr key={employee.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {fullName}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{employee.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {employee.phone || '—'}
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                              accessOn ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                             }`}
                           >
-                            {isActive ? 'Активен' : 'Неактивен'}
+                            {accessOn ? 'Открыт' : 'Закрыт'}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {accessOn
+                            ? employee.permissions
+                                .map((p) => CLUB_STAFF_PERMISSION_LABELS[p])
+                                .join(', ')
+                            : '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(employee)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-50 text-gray-700"
+                          >
+                            <Settings className="h-4 w-4" />
+                            Права
+                          </button>
                         </td>
                       </tr>
                     )
@@ -173,8 +242,75 @@ export default function ClubEmployees() {
               </table>
             )}
           </div>
-
         </>
+      )}
+
+      {editingEmployee && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg bg-white rounded-xl shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Права: {editingEmployee.firstName} {editingEmployee.lastName}
+              </h3>
+              <button type="button" onClick={closeEditModal} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-5">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editAccessEnabled}
+                  onChange={(e) => setEditAccessEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                />
+                <span className="text-sm font-medium text-gray-900">Доступ к системе открыт</span>
+              </label>
+              <p className="text-xs text-gray-500">
+                Снимите галочку, чтобы полностью закрыть доступ сотрудника к этому яхт-клубу.
+              </p>
+
+              {editAccessEnabled && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-900">Доступные разделы</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {CLUB_STAFF_PERMISSION_KEYS.map((key) => (
+                      <label
+                        key={key}
+                        className="flex items-center gap-2 p-2 rounded border border-gray-200 cursor-pointer hover:bg-gray-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editPermissions.includes(key)}
+                          onChange={() => togglePermission(key)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                        />
+                        <span className="text-sm text-gray-800">{CLUB_STAFF_PERMISSION_LABELS[key]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAccess}
+                disabled={saving}
+                className="px-4 py-2 text-sm rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {saving ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -68,7 +68,37 @@ export interface UserClub {
   userId: number
   clubId: number
   club?: Club
+  accessEnabled?: boolean
+  permissions?: string[]
   createdAt: string
+}
+
+export type ClubStaffPermission =
+  | 'dashboard'
+  | 'clubs'
+  | 'bookings'
+  | 'finances'
+  | 'club_partners'
+  | 'club_cash'
+  | 'club_expected_incomes'
+  | 'reports'
+
+export interface ClubStaffAccess {
+  clubId: number
+  accessEnabled: boolean
+  permissions: ClubStaffPermission[]
+}
+
+export interface ClubStaffMember {
+  id: number
+  email: string
+  firstName: string
+  lastName: string
+  phone?: string
+  role: UserRole
+  isActive: boolean
+  accessEnabled: boolean
+  permissions: ClubStaffPermission[]
 }
 
 export interface User {
@@ -85,6 +115,7 @@ export interface User {
   vessels?: Vessel[]
   managedClub?: Club
   managedClubs?: UserClub[]
+  clubStaffAccesses?: ClubStaffAccess[]
   createdAt: string
 }
 

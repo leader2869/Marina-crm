@@ -30,6 +30,11 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
+import {
+  staffCanAccessPath,
+  staffCanSeeFinancesMenu,
+  staffHasAnyClubAccess,
+} from '../utils/clubStaffAccess'
 
 export default function Layout() {
   const { user, logout } = useAuth()
@@ -111,18 +116,22 @@ export default function Layout() {
     console.log('Roles match:', userRole === UserRole.CLUB_OWNER, 'String match:', String(userRole) === String(UserRole.CLUB_OWNER))
     
     const filteredItems = allItems.filter(item => {
-      // Проверяем, что роль пользователя есть в списке разрешенных ролей для этого пункта меню
       const hasAccess = item.roles.some(role => {
-        // Сравниваем как enum, так и строковые значения
         return role === userRole || String(role) === String(userRole)
       })
-      if (userRole === UserRole.CLUB_OWNER || String(userRole) === 'club_owner') {
-        console.log(`Item "${item.name}": roles=${JSON.stringify(item.roles)}, hasAccess=${hasAccess}`)
+      if (!hasAccess) return false
+
+      if (userRole === UserRole.CLUB_STAFF || String(userRole) === 'club_staff') {
+        if (!staffHasAnyClubAccess(user)) return false
+        if (item.href === '/finances') {
+          return staffCanSeeFinancesMenu(user)
+        }
+        if (item.href) {
+          return staffCanAccessPath(user, item.href)
+        }
       }
-      if (userRole === UserRole.VESSEL_OWNER || String(userRole) === 'vessel_owner') {
-        console.log(`Item "${item.name}": roles=${JSON.stringify(item.roles)}, hasAccess=${hasAccess}`)
-      }
-      return hasAccess
+
+      return true
     })
     
     // Для владельца яхт-клуба сортируем пункты меню в нужном порядке
@@ -133,10 +142,11 @@ export default function Layout() {
         '/tariffs': 3,
         '/booking-rules': 4,
         '/contract-filling': 5,
-        '/bookings': 6,
-        '/finances': 7,
-        '/reports': 8,
-        '/payments': 9,
+        '/club-employees': 6,
+        '/bookings': 7,
+        '/finances': 8,
+        '/reports': 9,
+        '/payments': 10,
       }
       
       filteredItems.sort((a, b) => {

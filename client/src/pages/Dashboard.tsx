@@ -5,6 +5,7 @@ import { clubsService, bookingsService, clubFinanceService, vesselsService, vess
 import { ClubDashboardSummary, UserRole, BookingStatus, Vessel } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet, Receipt } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import { staffHasAnyClubAccess } from '../utils/clubStaffAccess'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -278,6 +279,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {user?.role === UserRole.CLUB_STAFF && !staffHasAnyClubAccess(user) && (
+        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+          Доступ к яхт-клубу закрыт владельцем. Обратитесь к администратору клуба для восстановления доступа.
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {statCards.map((stat) => {
           const Icon = stat.icon

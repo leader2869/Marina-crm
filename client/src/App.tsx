@@ -97,12 +97,63 @@ function App() {
             }
           >
             <Route index element={<NavigateToDefault />} />
-            <Route path="dashboard" element={<DashboardRedirect />} />
-            <Route path="clubs" element={<Clubs />} />
+            <Route
+              path="dashboard"
+              element={
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    UserRole.SUPER_ADMIN,
+                    UserRole.ADMIN,
+                    UserRole.CLUB_OWNER,
+                    UserRole.CLUB_STAFF,
+                    UserRole.VESSEL_OWNER,
+                    UserRole.PENDING_VALIDATION,
+                  ]}
+                  staffPermission="dashboard"
+                >
+                  <DashboardRedirect />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="clubs"
+              element={
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    UserRole.SUPER_ADMIN,
+                    UserRole.ADMIN,
+                    UserRole.CLUB_OWNER,
+                    UserRole.CLUB_STAFF,
+                    UserRole.VESSEL_OWNER,
+                    UserRole.GUEST,
+                    UserRole.PENDING_VALIDATION,
+                  ]}
+                  staffPermission="clubs"
+                >
+                  <Clubs />
+                </RoleProtectedRoute>
+              }
+            />
             <Route path="clubs/:id" element={<ClubDetails />} />
             <Route path="vessels" element={<Vessels />} />
             <Route path="vessels/:id" element={<VesselDetails />} />
-            <Route path="bookings" element={<Bookings />} />
+            <Route
+              path="bookings"
+              element={
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    UserRole.SUPER_ADMIN,
+                    UserRole.ADMIN,
+                    UserRole.CLUB_OWNER,
+                    UserRole.CLUB_STAFF,
+                    UserRole.VESSEL_OWNER,
+                  ]}
+                  staffPermission="bookings"
+                >
+                  <Bookings />
+                </RoleProtectedRoute>
+              }
+            />
             <Route 
               path="widget" 
               element={
@@ -146,7 +197,16 @@ function App() {
             <Route 
               path="finances" 
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.CLUB_OWNER, UserRole.VESSEL_OWNER, UserRole.AGENT]}>
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    UserRole.SUPER_ADMIN,
+                    UserRole.ADMIN,
+                    UserRole.CLUB_OWNER,
+                    UserRole.CLUB_STAFF,
+                    UserRole.VESSEL_OWNER,
+                    UserRole.AGENT,
+                  ]}
+                >
                   <Finances />
                 </RoleProtectedRoute>
               } 
@@ -201,7 +261,10 @@ function App() {
             <Route
               path="club-partners"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute
+                  allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}
+                  staffPermission="club_partners"
+                >
                   <ClubPartners />
                 </RoleProtectedRoute>
               }
@@ -209,7 +272,10 @@ function App() {
             <Route
               path="club-cash"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute
+                  allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}
+                  staffPermission="club_cash"
+                >
                   <ClubCashDesk />
                 </RoleProtectedRoute>
               }
@@ -225,7 +291,10 @@ function App() {
             <Route
               path="club-expected-incomes"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute
+                  allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}
+                  staffPermission="club_expected_incomes"
+                >
                   <ClubExpectedIncomes />
                 </RoleProtectedRoute>
               }
@@ -233,7 +302,10 @@ function App() {
             <Route
               path="reports"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute
+                  allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}
+                  staffPermission="reports"
+                >
                   <Reports />
                 </RoleProtectedRoute>
               }
@@ -241,7 +313,10 @@ function App() {
             <Route
               path="reports/finance"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute
+                  allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}
+                  staffPermission="reports"
+                >
                   <ReportsFinance />
                 </RoleProtectedRoute>
               }
@@ -249,7 +324,10 @@ function App() {
             <Route
               path="reports/tenants"
               element={
-                <RoleProtectedRoute allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}>
+                <RoleProtectedRoute
+                  allowedRoles={[UserRole.CLUB_OWNER, UserRole.CLUB_STAFF, UserRole.SUPER_ADMIN, UserRole.ADMIN]}
+                  staffPermission="reports"
+                >
                   <ReportsTenants />
                 </RoleProtectedRoute>
               }
