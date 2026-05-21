@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, Fragment } from 'react'
-import { bookingsService, paymentsService, clubFinanceService, berthsService } from '../services/api'
+import { bookingsService, paymentsService, clubFinanceService, berthsService, clubsService } from '../services/api'
 import { Booking, UserRole, BookingStatus, Payment, PaymentStatus, CashPaymentMethod, ClubPartner, ClubPartnerManager } from '../types'
 import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2, CheckCircle2, ArrowRightLeft } from 'lucide-react'
 import { format } from 'date-fns'
@@ -31,10 +31,35 @@ export default function Bookings() {
     paidAmount: '',
   })
   const [confirmingPayment, setConfirmingPayment] = useState(false)
+  const [clubList, setClubList] = useState<Array<{ id: number; name: string }>>([])
+  const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
+
+  const isClubOwner = user?.role === UserRole.CLUB_OWNER
+  const isClubStaff = user?.role === UserRole.CLUB_STAFF
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
 
   useEffect(() => {
     loadBookings()
   }, [])
+
+  useEffect(() => {
+    const loadAccessibleClubs = async () => {
+      try {
+        const params: { limit: number; showHidden?: string } = { limit: 200 }
+        if (isSuperAdmin) params.showHidden = 'true'
+        const response = await clubsService.getAll(params)
+        const clubs = (response.data || []) as Array<{ id: number; name: string }>
+        const mapped = clubs.map((club) => ({ id: club.id, name: club.name }))
+        setClubList(mapped)
+        if (mapped.length > 0) {
+          setSelectedClubId((prev) => prev ?? mapped[0].id)
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки клубов для фильтра бронирований:', error)
+      }
+    }
+    void loadAccessibleClubs()
+  }, [isSuperAdmin])
 
   const loadBookings = async () => {
     try {
@@ -157,10 +182,7 @@ export default function Bookings() {
     return managers
   }
 
-  const isClubOwner = user?.role === UserRole.CLUB_OWNER
-  const isClubStaff = user?.role === UserRole.CLUB_STAFF
   const canManageClubPayments = isClubOwner || isClubStaff
-  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
   const isVesselOwner = user?.role === UserRole.VESSEL_OWNER
   const canViewDetails = isClubOwner || isSuperAdmin || isVesselOwner || isClubStaff
 
@@ -359,7 +381,12 @@ export default function Bookings() {
   }
 
   const sortedBookings = useMemo(() => {
-    return [...bookings].sort((a, b) => {
+    let list = bookings
+    if (selectedClubId) {
+      list = list.filter((booking) => booking.clubId === selectedClubId)
+    }
+
+    return [...list].sort((a, b) => {
       const berthA = a.berth?.number || ''
       const berthB = b.berth?.number || ''
       const numA = extractBerthSortNumber(berthA)
@@ -368,7 +395,9 @@ export default function Bookings() {
       if (numA !== numB) return numA - numB
       return berthA.localeCompare(berthB, 'ru')
     })
-  }, [bookings])
+  }, [bookings, selectedClubId])
+
+  const tableColSpan = 5
 
   if (loading) {
     return <LoadingAnimation message="Загрузка бронирований..." />
@@ -386,13 +415,30 @@ export default function Bookings() {
         </div>
       </div>
 
+      {clubList.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <label htmlFor="bookings-club-filter" className="block text-sm font-medium text-gray-700 mb-1">
+            Яхт-клуб
+          </label>
+          <select
+            id="bookings-club-filter"
+            className="w-full max-w-md border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white"
+            value={selectedClubId || ''}
+            onChange={(e) => setSelectedClubId(Number(e.target.value))}
+          >
+            {clubList.map((club) => (
+              <option key={club.id} value={club.id}>
+                {club.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Клуб
-              </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Место
               </th>
@@ -420,7 +466,7 @@ export default function Bookings() {
                     onClick={() => canViewDetails && toggleBookingDetails(booking.id)}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
+                      <div className="flex items-center text-sm text-gray-900">
                         {canViewDetails && (
                           <span className="mr-2">
                             {isExpanded ? (
@@ -430,11 +476,6 @@ export default function Bookings() {
                             )}
                           </span>
                         )}
-                        <div className="text-sm font-medium text-gray-900">{booking.club?.name}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
                         {booking.berth ? (
                           <span className="font-semibold">{booking.berth.number}</span>
                         ) : (
@@ -512,7 +553,7 @@ export default function Bookings() {
                   </tr>
                   {isExpanded && canViewDetails && (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                      <td colSpan={tableColSpan} className="px-6 py-4 bg-gray-50">
                         <div className="space-y-6">
                           {canTransferBooking(booking) && (
                             <div className="bg-white rounded-lg p-4 shadow-sm">
