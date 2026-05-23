@@ -22,6 +22,7 @@ import { isAfter } from 'date-fns';
 import { PaymentService } from '../../services/payment.service';
 import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
 import { staffHasPermission } from '../../utils/clubStaffPermissions';
+import { assertClubCashPaymentsEnabled } from '../../utils/clubCashSettings';
 
 export class PaymentsController {
   /** Просмотр/приём оплат по клубу: владелец, сотрудник клуба (привязка), админы */
@@ -340,6 +341,7 @@ export class PaymentsController {
         if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
           await this.assertClubPaymentAccess(req, payment.booking.clubId);
         }
+        await assertClubCashPaymentsEnabled(payment.booking.clubId);
         const normalizedAcceptedByPartnerId = Number(acceptedByPartnerId);
         if (!Number.isInteger(normalizedAcceptedByPartnerId) || normalizedAcceptedByPartnerId <= 0) {
           throw new AppError('Укажите партнера, который принял оплату', 400);

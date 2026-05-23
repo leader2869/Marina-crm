@@ -80,6 +80,7 @@ export type ClubStaffPermission =
   | 'finances'
   | 'club_partners'
   | 'club_cash'
+  | 'club_cash_edit'
   | 'club_expected_incomes'
   | 'club_settlements'
   | 'reports'
@@ -140,6 +141,8 @@ export interface Club {
   isValidated?: boolean
   isSubmittedForValidation?: boolean
   rejectionComment?: string | null
+  /** false — владелец закрыл приём платежей в кассу */
+  cashPaymentsEnabled?: boolean
   ownerId: number
   owner?: User
   berths?: Berth[]

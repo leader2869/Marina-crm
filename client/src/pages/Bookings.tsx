@@ -31,7 +31,7 @@ export default function Bookings() {
     paidAmount: '',
   })
   const [confirmingPayment, setConfirmingPayment] = useState(false)
-  const [clubList, setClubList] = useState<Array<{ id: number; name: string }>>([])
+  const [clubList, setClubList] = useState<Array<{ id: number; name: string; cashPaymentsEnabled?: boolean }>>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
 
   const isClubOwner = user?.role === UserRole.CLUB_OWNER
@@ -48,8 +48,12 @@ export default function Bookings() {
         const params: { limit: number; showHidden?: string } = { limit: 200 }
         if (isSuperAdmin) params.showHidden = 'true'
         const response = await clubsService.getAll(params)
-        const clubs = (response.data || []) as Array<{ id: number; name: string }>
-        const mapped = clubs.map((club) => ({ id: club.id, name: club.name }))
+        const clubs = (response.data || []) as Array<{ id: number; name: string; cashPaymentsEnabled?: boolean }>
+        const mapped = clubs.map((club) => ({
+          id: club.id,
+          name: club.name,
+          cashPaymentsEnabled: club.cashPaymentsEnabled,
+        }))
         setClubList(mapped)
         if (mapped.length > 0) {
           setSelectedClubId((prev) => prev ?? mapped[0].id)
@@ -183,6 +187,11 @@ export default function Bookings() {
   }
 
   const canManageClubPayments = isClubOwner || isClubStaff
+  const isClubCashPaymentsOpen = (clubId: number) => {
+    const club = clubList.find((item) => item.id === clubId)
+    return club?.cashPaymentsEnabled !== false
+  }
+  const canAcceptClubPayment = (clubId: number) => canManageClubPayments && isClubCashPaymentsOpen(clubId)
   const isVesselOwner = user?.role === UserRole.VESSEL_OWNER
   const canViewDetails = isClubOwner || isSuperAdmin || isVesselOwner || isClubStaff
 
@@ -679,6 +688,7 @@ export default function Bookings() {
                                               {canManageClubPayments && (
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                   {(payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.OVERDUE) ? (
+                                                    canAcceptClubPayment(booking.clubId) ? (
                                                     <button
                                                       onClick={(e) => {
                                                         e.stopPropagation()
@@ -690,6 +700,11 @@ export default function Bookings() {
                                                       <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                                                       Принять оплату
                                                     </button>
+                                                    ) : (
+                                                      <span className="text-xs text-amber-700" title="Владелец клуба закрыл приём платежей в кассу">
+                                                        Касса закрыта
+                                                      </span>
+                                                    )
                                                   ) : (
                                                     <span className="text-xs text-gray-400">—</span>
                                                   )}

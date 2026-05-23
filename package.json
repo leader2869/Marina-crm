@@ -44,6 +44,7 @@
     "add-previous-season-balance-to-club-partners": "ts-node src/database/add-previous-season-balance-to-club-partners.ts",
     "add-paid-by-manager-to-cash-transactions": "ts-node src/database/add-paid-by-manager-to-cash-transactions.ts",
     "add-user-club-staff-permissions": "ts-node src/database/add-user-club-staff-permissions.ts",
+    "add-club-cash-payments-enabled": "ts-node src/database/add-club-cash-payments-enabled.ts",
     "append-club-settlements-permission": "ts-node src/database/append-club-settlements-permission.ts"
   },
   "keywords": [

@@ -83,6 +83,10 @@ export class Club {
   @Column({ default: false })
   isSubmittedForValidation: boolean; // отправлен ли клуб на валидацию владельцем
 
+  /** Владелец может закрыть приём платежей в кассу (вручную и из бронирований) */
+  @Column({ default: true })
+  cashPaymentsEnabled: boolean;
+
   @Column({ type: 'text', nullable: true })
   rejectionComment: string | null; // комментарий об отказе в валидации
 

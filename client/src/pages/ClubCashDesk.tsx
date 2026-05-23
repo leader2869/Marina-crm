@@ -4,6 +4,7 @@ import { clubsService, clubFinanceService } from '../services/api'
 import { CashPaymentMethod, CashTransactionType, Club, ClubCashTransaction, ClubPartner, ClubPartnerManager, UserRole } from '../types'
 import BackButton from '../components/BackButton'
 import { useAuth } from '../contexts/AuthContext'
+import { staffHasPermission } from '../utils/clubStaffAccess'
 
 export default function ClubCashDesk() {
   const { user } = useAuth()
@@ -11,7 +12,8 @@ export default function ClubCashDesk() {
     !!user &&
     (user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.ADMIN ||
-      user.role === UserRole.CLUB_OWNER)
+      user.role === UserRole.CLUB_OWNER ||
+      (user.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_cash_edit')))
   const [clubs, setClubs] = useState<Club[]>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [partners, setPartners] = useState<ClubPartner[]>([])
@@ -25,6 +27,19 @@ export default function ClubCashDesk() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [savingCashSetting, setSavingCashSetting] = useState(false)
+
+  const selectedClub = useMemo(
+    () => clubs.find((club) => club.id === selectedClubId) ?? null,
+    [clubs, selectedClubId]
+  )
+  const cashPaymentsOpen = selectedClub?.cashPaymentsEnabled !== false
+  const canManageCashSettings =
+    !!user &&
+    !!selectedClub &&
+    (user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.ADMIN ||
+      (user.role === UserRole.CLUB_OWNER && selectedClub.ownerId === user.id))
 
   const toErrorText = (value: unknown, fallback: string): string => {
     if (typeof value === 'string' && value.trim()) return value
@@ -164,7 +179,7 @@ export default function ClubCashDesk() {
   }, [filteredTransactions])
 
   const handleCreate = async () => {
-    if (!selectedClubId) return
+    if (!selectedClubId || !cashPaymentsOpen) return
     try {
       await clubFinanceService.createCashTransaction(selectedClubId, {
         transactionType: form.transactionType,
@@ -208,6 +223,26 @@ export default function ClubCashDesk() {
     }
   }
 
+  const handleToggleCashPayments = async () => {
+    if (!selectedClub || !canManageCashSettings) return
+    setSavingCashSetting(true)
+    setError('')
+    try {
+      const nextValue = !cashPaymentsOpen
+      await clubsService.update(selectedClub.id, { cashPaymentsEnabled: nextValue })
+      setClubs((prev) =>
+        prev.map((club) =>
+          club.id === selectedClub.id ? { ...club, cashPaymentsEnabled: nextValue } : club
+        )
+      )
+    } catch (e: any) {
+      setError(toErrorText(e?.error || e?.message || e, 'Не удалось изменить настройку кассы'))
+    } finally {
+      setSavingCashSetting(false)
+    }
+  }
+
+
   if (loading) return <div className="p-6">Загрузка...</div>
 
   return (
@@ -221,7 +256,7 @@ export default function ClubCashDesk() {
 
       {!canEditCash && (
         <div className="p-3 rounded bg-blue-50 text-blue-800 border border-blue-200 text-sm">
-          Режим просмотра: добавлять и менять операции вручную может только владелец клуба или администратор. Приём оплат по бронированиям доступен в разделе «Бронирования».
+          Режим просмотра: вносить приходы и расходы могут владелец клуба или сотрудник с правом «Касса: приходы и расходы». Приём оплат по бронированиям — в разделе «Бронирования» (отдельное право).
         </div>
       )}
 
@@ -241,7 +276,40 @@ export default function ClubCashDesk() {
           </select>
         </div>
 
-        {canEditCash && (
+        {canManageCashSettings && (
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded border border-gray-200 bg-gray-50">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Приём платежей в кассу</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {cashPaymentsOpen
+                  ? 'Можно принимать оплаты по бронированиям и добавлять операции вручную'
+                  : 'Новые платежи и операции временно недоступны'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleCashPayments}
+              disabled={savingCashSetting}
+              className={`px-4 py-2 rounded text-sm font-medium text-white disabled:opacity-60 ${
+                cashPaymentsOpen ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              {savingCashSetting
+                ? 'Сохранение...'
+                : cashPaymentsOpen
+                ? 'Закрыть приём платежей'
+                : 'Открыть приём платежей'}
+            </button>
+          </div>
+        )}
+
+        {!cashPaymentsOpen && (
+          <div className="p-3 rounded bg-amber-50 text-amber-900 border border-amber-200 text-sm">
+            Приём платежей в кассу закрыт владельцем клуба. Просмотр истории доступен, новые операции и приём оплат по бронированиям недоступны.
+          </div>
+        )}
+
+        {canEditCash && cashPaymentsOpen && (
         <>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <select

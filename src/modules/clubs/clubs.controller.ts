@@ -141,6 +141,7 @@ export class ClubsController {
       isValidated: Boolean(row.isValidated),
       isSubmittedForValidation: Boolean(row.isSubmittedForValidation),
       rejectionComment: row.rejectionComment ?? null,
+      cashPaymentsEnabled: row.cashPaymentsEnabled !== false,
       ownerId: Number(row.ownerId),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -181,6 +182,7 @@ export class ClubsController {
           'club.isValidated AS "isValidated"',
           'club.isSubmittedForValidation AS "isSubmittedForValidation"',
           'club.rejectionComment AS "rejectionComment"',
+          'club.cashPaymentsEnabled AS "cashPaymentsEnabled"',
           'club.ownerId AS "ownerId"',
           'club.createdAt AS "createdAt"',
           'club.updatedAt AS "updatedAt"',
@@ -656,6 +658,17 @@ export class ClubsController {
       // Владелец клуба может снимать клуб с публикации (устанавливать isActive = false)
       if (req.userRole === UserRole.CLUB_OWNER && req.userId === club.ownerId && req.body.isActive !== undefined) {
         club.isActive = req.body.isActive === true || req.body.isActive === 'true';
+      }
+      // Владелец клуба может открывать/закрывать приём платежей в кассу
+      if (
+        (req.userRole === UserRole.CLUB_OWNER && req.userId === club.ownerId) ||
+        isSuperAdmin ||
+        isAdmin
+      ) {
+        if (req.body.cashPaymentsEnabled !== undefined) {
+          club.cashPaymentsEnabled =
+            req.body.cashPaymentsEnabled === true || req.body.cashPaymentsEnabled === 'true';
+        }
       }
 
       // totalBerths теперь автоматически подсчитывается на основе добавленных мест

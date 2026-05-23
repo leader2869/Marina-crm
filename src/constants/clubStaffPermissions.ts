@@ -6,6 +6,7 @@ export const CLUB_STAFF_PERMISSION_KEYS = [
   'finances',
   'club_partners',
   'club_cash',
+  'club_cash_edit',
   'club_expected_incomes',
   'club_settlements',
   'reports',
@@ -13,7 +14,9 @@ export const CLUB_STAFF_PERMISSION_KEYS = [
 
 export type ClubStaffPermission = (typeof CLUB_STAFF_PERMISSION_KEYS)[number];
 
-export const DEFAULT_CLUB_STAFF_PERMISSIONS: ClubStaffPermission[] = [...CLUB_STAFF_PERMISSION_KEYS];
+export const DEFAULT_CLUB_STAFF_PERMISSIONS: ClubStaffPermission[] = CLUB_STAFF_PERMISSION_KEYS.filter(
+  (key) => key !== 'club_cash_edit'
+);
 
 export const CLUB_STAFF_PERMISSION_LABELS: Record<ClubStaffPermission, string> = {
   dashboard: 'Дашборд',
@@ -21,7 +24,8 @@ export const CLUB_STAFF_PERMISSION_LABELS: Record<ClubStaffPermission, string> =
   bookings: 'Бронирования',
   finances: 'Финансы (меню)',
   club_partners: 'Партнёры',
-  club_cash: 'Касса клуба',
+  club_cash: 'Касса клуба (просмотр)',
+  club_cash_edit: 'Касса: приходы и расходы',
   club_expected_incomes: 'Ожидаемые приходы',
   club_settlements: 'Взаиморасчёты',
   reports: 'Отчёты',

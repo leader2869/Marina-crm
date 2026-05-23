@@ -25,6 +25,7 @@ import {
   getStaffClubAccess,
   staffHasAnyPermission,
 } from '../../utils/clubStaffPermissions';
+import { assertClubCashPaymentsEnabled } from '../../utils/clubCashSettings';
 
 export class ClubFinanceController {
   private async ensureClubAccess(req: AuthRequest, clubId: number): Promise<Club> {
@@ -80,7 +81,7 @@ export class ClubFinanceController {
     return club;
   }
 
-  /** Только владелец клуба или админ (настройка партнёров, кассовые операции вручную) */
+  /** Только владелец клуба или админ (настройка партнёров) */
   private async ensureClubOwnerOrAdmin(req: AuthRequest, clubId: number): Promise<Club> {
     if (!req.userId) {
       throw new AppError('Требуется аутентификация', 401);
@@ -98,6 +99,20 @@ export class ClubFinanceController {
     }
 
     throw new AppError('Доступ запрещен', 403);
+  }
+
+  /** Владелец, админ или сотрудник с правом club_cash_edit */
+  private async ensureClubCashEditAccess(req: AuthRequest, clubId: number): Promise<Club> {
+    const club = await this.ensureClubAccess(req, clubId);
+    const isAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === UserRole.ADMIN;
+    if (isAdmin || club.ownerId === req.userId) {
+      return club;
+    }
+    if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
+      await assertStaffHasPermission(req.userId, clubId, 'club_cash_edit');
+      return club;
+    }
+    throw new AppError('Нет права на внесение операций в кассу', 403);
   }
 
   private async ensurePartnerInClub(clubId: number, partnerId: number): Promise<ClubPartner> {
@@ -133,7 +148,7 @@ export class ClubFinanceController {
   async getPartners(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubStaffPermissionAny(req, clubId, ['club_partners', 'club_cash']);
+      await this.ensureClubStaffPermissionAny(req, clubId, ['club_partners', 'club_cash', 'club_cash_edit']);
 
       const partnerRepository = AppDataSource.getRepository(ClubPartner);
       const partners = await partnerRepository.find({
@@ -388,7 +403,7 @@ export class ClubFinanceController {
   async getPartnerManagers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubStaffPermissionAny(req, clubId, ['club_partners', 'club_cash']);
+      await this.ensureClubStaffPermissionAny(req, clubId, ['club_partners', 'club_cash', 'club_cash_edit']);
 
       const partnerId = req.query.partnerId ? parseInt(String(req.query.partnerId)) : undefined;
       if (partnerId) {
@@ -895,7 +910,8 @@ export class ClubFinanceController {
   async createCashTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const clubId = parseInt(req.params.clubId);
-      await this.ensureClubOwnerOrAdmin(req, clubId);
+      await this.ensureClubCashEditAccess(req, clubId);
+      await assertClubCashPaymentsEnabled(clubId);
       const {
         transactionType,
         amount,
@@ -1011,7 +1027,8 @@ export class ClubFinanceController {
     try {
       const clubId = parseInt(req.params.clubId);
       const transactionId = parseInt(req.params.transactionId);
-      await this.ensureClubOwnerOrAdmin(req, clubId);
+      await this.ensureClubCashEditAccess(req, clubId);
+      await assertClubCashPaymentsEnabled(clubId);
 
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
       const tx = await txRepository.findOne({ where: { id: transactionId, clubId } });
@@ -1099,7 +1116,8 @@ export class ClubFinanceController {
     try {
       const clubId = parseInt(req.params.clubId);
       const transactionId = parseInt(req.params.transactionId);
-      await this.ensureClubOwnerOrAdmin(req, clubId);
+      await this.ensureClubCashEditAccess(req, clubId);
+      await assertClubCashPaymentsEnabled(clubId);
 
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
       const tx = await txRepository.findOne({ where: { id: transactionId, clubId } });
