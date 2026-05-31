@@ -31,13 +31,13 @@ dotenv.config();
 
 const isPersistentServer = !process.env.VERCEL && !process.env.VERCEL_ENV;
 
-// VPS: меньше соединений в пуле — Supabase лимитирует; Vercel: 2.
+// VPS: max 3 — Supabase session pooler лимит ~15 на весь проект (VPS+Vercel+dev).
 const pgPoolExtra = {
   connectionTimeoutMillis: 20000,
   query_timeout: isPersistentServer ? 120000 : 60000,
   statement_timeout: isPersistentServer ? 120000 : 60000,
   idle_in_transaction_session_timeout: 30000,
-  max: isPersistentServer ? 5 : 2,
+  max: isPersistentServer ? 3 : 2,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 };
@@ -99,7 +99,7 @@ const shouldSynchronize = process.env.NODE_ENV === 'development' && !process.env
 
 export const AppDataSource = new DataSource({
   ...getDatabaseConfig(),
-  poolSize: isPersistentServer ? 5 : 2,
+  poolSize: isPersistentServer ? 3 : 2,
   synchronize: shouldSynchronize,
   logging: process.env.NODE_ENV === 'development',
   entities: [
