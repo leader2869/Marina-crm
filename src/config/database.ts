@@ -31,8 +31,8 @@ dotenv.config();
 
 const isPersistentServer = !process.env.VERCEL && !process.env.VERCEL_ENV;
 
-// Supabase Pro + один PM2-процесс: 8 соединений (раньше 3 — «timeout exceeded when trying to connect»).
-const pgPoolMax = parseInt(process.env.PG_POOL_MAX || '', 10) || (isPersistentServer ? 8 : 2);
+// Supabase Pro + один PM2-процесс: 15 соединений (настраивается PG_POOL_MAX).
+const pgPoolMax = parseInt(process.env.PG_POOL_MAX || '', 10) || (isPersistentServer ? 15 : 2);
 
 const pgPoolExtra = {
   connectionTimeoutMillis: 45000,

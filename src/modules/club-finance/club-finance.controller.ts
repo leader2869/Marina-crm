@@ -1174,6 +1174,11 @@ export class ClubFinanceController {
           .getRawOne<{ totalIncome: string; totalExpense: string }>(),
         AppDataSource.query(
           `
+          WITH club_tx AS (
+            SELECT "transactionType", amount, "acceptedByPartnerId", "paidByPartnerId"
+            FROM club_cash_transactions
+            WHERE "clubId" = $1
+          )
           SELECT
             p.id AS "partnerId",
             p.name AS "partnerName",
@@ -1192,9 +1197,10 @@ export class ClubFinanceController {
               WHEN t."transactionType" = $4 AND t."paidByPartnerId" = p.id
               THEN t.amount ELSE 0 END), 0) AS "transferredOut"
           FROM club_partners p
-          LEFT JOIN club_cash_transactions t ON t."clubId" = p."clubId"
+          LEFT JOIN club_tx t
+            ON t."acceptedByPartnerId" = p.id OR t."paidByPartnerId" = p.id
           WHERE p."clubId" = $1 AND p."isActive" = true
-          GROUP BY p.id
+          GROUP BY p.id, p.name, p."sharePercent", p."previousSeasonBalance"
           ORDER BY p.name ASC
           `,
           [
