@@ -875,35 +875,8 @@ export class ContractFillingController {
         throw new AppError('База данных не подключена', 503);
       }
 
-      // Проверяем существование таблицы
-      try {
-        const queryRunner = AppDataSource.createQueryRunner();
-        const tableExists = await queryRunner.hasTable('contragents');
-        await queryRunner.release();
-        
-        if (!tableExists) {
-          console.warn('[ContractFilling] Таблица contragents не существует, возвращаем пустой список');
-          // Возвращаем пустой список вместо ошибки
-        res.json({ contragents: [] });
-        return;
-        }
-      } catch (tableCheckError: any) {
-        console.error('[ContractFilling] Ошибка при проверке таблицы:', tableCheckError.message);
-        // Если не можем проверить таблицу, пробуем выполнить запрос
-      }
-
-      // Проверяем, что entity Contragent зарегистрирована
-      let contragentRepository;
-      try {
-        contragentRepository = AppDataSource.getRepository(Contragent);
-      } catch (repoError: any) {
-        console.error('[ContractFilling] Ошибка при получении репозитория Contragent:', repoError.message);
-        // Если репозиторий недоступен, возвращаем пустой список
-        res.json({ contragents: [] });
-        return;
-      }
-      
       // Получаем контрагентов пользователя, а для владельца клуба также клубные контрагенты.
+      const contragentRepository = AppDataSource.getRepository(Contragent);
       const where: any = {};
       if (req.userId) {
         where.userId = req.userId;
@@ -943,7 +916,12 @@ export class ContractFillingController {
       });
       
       // Если таблица не существует, возвращаем пустой список
-      if (error.message && (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01')) {
+      if (error.message && (
+        error.message.includes('does not exist') ||
+        error.message.includes('relation') ||
+        error.message.includes('No metadata for "Contragent"') ||
+        error.code === '42P01'
+      )) {
         console.warn('[ContractFilling] Таблица не существует, возвращаем пустой список');
         res.json({ contragents: [] });
         return;

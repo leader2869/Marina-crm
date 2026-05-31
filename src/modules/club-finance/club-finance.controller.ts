@@ -22,6 +22,7 @@ import {
 } from '../../constants/clubStaffPermissions';
 import {
   assertStaffHasPermission,
+  getAllStaffClubAccesses,
   getStaffClubAccess,
   staffHasAnyPermission,
 } from '../../utils/clubStaffPermissions';
@@ -780,17 +781,10 @@ export class ClubFinanceController {
         const clubs = await clubRepository.find({ where: { ownerId: req.userId }, select: ['id'] });
         clubIds = clubs.map((club) => club.id);
       } else if (req.userRole === UserRole.CLUB_STAFF) {
-        const allClubIds = await getClubIdsForStaffUser(req.userId);
-        const allowed: number[] = [];
-        for (const cid of allClubIds) {
-          try {
-            await assertStaffHasPermission(req.userId, cid, 'dashboard');
-            allowed.push(cid);
-          } catch {
-            /* нет права dashboard для клуба */
-          }
-        }
-        clubIds = allowed;
+        const accesses = await getAllStaffClubAccesses(req.userId);
+        clubIds = accesses
+          .filter((a) => a.accessEnabled && a.permissions.includes('dashboard'))
+          .map((a) => a.clubId);
       } else {
         throw new AppError('Доступ запрещен', 403);
       }
@@ -817,8 +811,7 @@ export class ClubFinanceController {
       today.setHours(0, 0, 0, 0);
       const todayIso = today.toISOString().slice(0, 10);
 
-      const [totalsRow, partnerIncomeRows, partners, paymentTotals, availableBerths, occupiedBerthRows] =
-        await Promise.all([
+      const [totalsRow, partnerIncomeRows, partners] = await Promise.all([
           txRepository
             .createQueryBuilder('tx')
             .select(
@@ -847,6 +840,9 @@ export class ClubFinanceController {
           partnerRepository.find({
             where: { clubId: In(clubIds), isActive: true },
           }),
+        ]);
+
+      const [paymentTotals, availableBerths, occupiedBerthRows] = await Promise.all([
           paymentRepository
             .createQueryBuilder('payment')
             .innerJoin('payment.booking', 'booking')

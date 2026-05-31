@@ -33,7 +33,6 @@ export default function Dashboard() {
         setStats(data.stats)
         setClubList(data.clubList)
         setSelectedClubId(data.defaultClubId)
-        setClubDashboard(data.clubDashboard)
         setVessels(data.vessels as Vessel[])
         setVesselBalances(data.vesselBalances)
       } catch (error) {
@@ -44,6 +43,28 @@ export default function Dashboard() {
     }
     loadStats()
   }, [user])
+
+  const isClubDashboardRole =
+    user?.role === UserRole.CLUB_OWNER ||
+    user?.role === UserRole.CLUB_STAFF ||
+    user?.role === UserRole.SUPER_ADMIN ||
+    user?.role === UserRole.ADMIN
+
+  useEffect(() => {
+    const loadClubDashboard = async () => {
+      if (!isClubDashboardRole) {
+        setClubDashboard(null)
+        return
+      }
+      try {
+        const data = (await clubFinanceService.getDashboardSummary()) as unknown as ClubDashboardSummary
+        setClubDashboard(data)
+      } catch (error) {
+        console.error('Ошибка загрузки сводки клуба:', error)
+      }
+    }
+    loadClubDashboard()
+  }, [user, isClubDashboardRole])
 
   const canViewClubSettlements =
     user?.role === UserRole.CLUB_OWNER ||

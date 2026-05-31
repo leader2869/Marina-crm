@@ -1,8 +1,6 @@
-import { NextFunction, Response } from 'express';
 import { In } from 'typeorm';
 import { AppDataSource } from '../../config/database';
 import { AuthRequest } from '../../middleware/auth';
-import { ClubFinanceController } from '../club-finance/club-finance.controller';
 import { Club } from '../../entities/Club';
 import { Booking } from '../../entities/Booking';
 import { Vessel } from '../../entities/Vessel';
@@ -12,8 +10,7 @@ import {
   CashTransactionType,
   UserRole,
 } from '../../types';
-import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
-import { assertStaffHasPermission, staffHasPermission } from '../../utils/clubStaffPermissions';
+import { getAllStaffClubAccesses } from '../../utils/clubStaffPermissions';
 
 export interface DashboardStats {
   clubs: number;
@@ -42,26 +39,6 @@ export interface DashboardStatsResult {
   vessels: DashboardVesselItem[];
   vesselBalances: Record<number, number>;
   settlements: Record<string, unknown>[];
-}
-
-const clubFinanceController = new ClubFinanceController();
-
-async function invokeControllerJson<T>(
-  fn: (req: AuthRequest, res: Response, next: NextFunction) => Promise<void>,
-  req: AuthRequest,
-  params?: Record<string, string>
-): Promise<T | null> {
-  const request = { ...req, params: { ...req.params, ...params } } as AuthRequest;
-
-  return new Promise<T | null>((resolve) => {
-    const res = {
-      json: (body: T) => resolve(body),
-      status: () => res,
-      send: () => resolve(null),
-    } as unknown as Response;
-
-    void fn(request, res, () => resolve(null));
-  });
 }
 
 export class DashboardService {
@@ -99,16 +76,10 @@ export class DashboardService {
     }
 
     if (req.userRole === UserRole.CLUB_STAFF) {
-      const allClubIds = await getClubIdsForStaffUser(req.userId);
-      const allowedIds: number[] = [];
-      for (const clubId of allClubIds) {
-        try {
-          await assertStaffHasPermission(req.userId, clubId, 'dashboard');
-          allowedIds.push(clubId);
-        } catch {
-          /* нет права dashboard для клуба */
-        }
-      }
+      const accesses = await getAllStaffClubAccesses(req.userId);
+      const allowedIds = accesses
+        .filter((a) => a.accessEnabled && a.permissions.includes('dashboard'))
+        .map((a) => a.clubId);
       if (allowedIds.length === 0) {
         return [];
       }
@@ -150,13 +121,10 @@ export class DashboardService {
     }
 
     if (req.userRole === UserRole.CLUB_STAFF) {
-      const clubIds = await getClubIdsForStaffUser(req.userId);
-      const allowedClubIds: number[] = [];
-      for (const clubId of clubIds) {
-        if (await staffHasPermission(req.userId, clubId, 'bookings')) {
-          allowedClubIds.push(clubId);
-        }
-      }
+      const accesses = await getAllStaffClubAccesses(req.userId);
+      const allowedClubIds = accesses
+        .filter((a) => a.accessEnabled && a.permissions.includes('bookings'))
+        .map((a) => a.clubId);
       if (allowedClubIds.length === 0) {
         return 0;
       }
@@ -324,21 +292,13 @@ export class DashboardService {
 
     const defaultClubId = clubList.length > 0 ? clubList[0].id : null;
 
-    const clubDashboard = this.isClubRole(req.userRole)
-      ? await invokeControllerJson<Record<string, unknown>>(
-          clubFinanceController.getDashboardSummary.bind(clubFinanceController),
-          req
-        )
-      : null;
-
     return {
       stats,
       clubList,
       defaultClubId,
-      clubDashboard,
+      clubDashboard: null,
       vessels,
       vesselBalances,
-      // Взаиморасчёты грузятся отдельно через GET /club-finance/clubs/:id/settlements
       settlements: [],
     };
   }
