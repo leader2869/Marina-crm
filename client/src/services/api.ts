@@ -1,9 +1,11 @@
 import axios from 'axios'
 import type { DashboardStatsResponse } from '../types'
 import { isRequestAborted, type RequestOptions } from '../utils/request'
+import { getNavigationAbortSignal, mergeAbortSignals } from '../utils/navigationAbort'
 
 export type { RequestOptions } from '../utils/request'
 export { isRequestAborted } from '../utils/request'
+export { abortInflightRequests } from '../utils/navigationAbort'
 
 // Определяем URL API: если VITE_API_URL не установлен, используем относительный путь для production
 // или localhost для development
@@ -31,23 +33,34 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 60000, // 60 секунд таймаут
+  timeout: 30000,
 })
 
-// Добавляем токен к каждому запросу
+// Добавляем токен и signal отмены при навигации
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
-  const fullURL = config.baseURL ? `${config.baseURL}${config.url}` : config.url
-  console.log('[API Request]', {
-    method: config.method?.toUpperCase(),
-    url: config.url,
-    baseURL: config.baseURL,
-    fullURL: fullURL,
-    headers: config.headers,
-  })
+  const navSignal = getNavigationAbortSignal()
+  const requestSignal = config.signal as AbortSignal | undefined
+  config.signal = requestSignal
+    ? mergeAbortSignals(requestSignal, navSignal)
+    : navSignal
+  return config
+})
+
+// Лог запросов только в dev (отдельный interceptor после signal)
+api.interceptors.request.use((config) => {
+  if (import.meta.env.DEV) {
+    const fullURL = config.baseURL ? `${config.baseURL}${config.url}` : config.url
+    console.log('[API Request]', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: fullURL,
+    })
+  }
   return config
 })
 

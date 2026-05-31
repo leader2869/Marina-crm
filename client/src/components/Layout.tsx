@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
-import { usersService, authService } from '../services/api'
+import { usersService, authService, isRequestAborted } from '../services/api'
 import { 
   LayoutDashboard, 
   Anchor, 
@@ -39,10 +39,12 @@ import {
   staffHasAnyClubAccess,
   staffHasPermission,
 } from '../utils/clubStaffAccess'
+import { useAbortInflightOnNavigate } from '../hooks/useAbortInflightOnNavigate'
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const location = useLocation()
+  useAbortInflightOnNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [newGuestsCount, setNewGuestsCount] = useState(0)
   const [pendingValidationCount, setPendingValidationCount] = useState(0)
@@ -273,18 +275,19 @@ export default function Layout() {
             setNewGuestsCount(data?.count || 0)
           }
         } catch (error) {
-          console.error('Ошибка загрузки счетчика новых гостей:', error)
+          if (!isRequestAborted(error)) {
+            console.error('Ошибка загрузки счетчика новых гостей:', error)
+          }
         }
       }
     }
 
     loadNewGuestsCount()
-    
-    // Обновляем счетчик каждые 30 секунд
-    const interval = setInterval(loadNewGuestsCount, 30000)
+
+    const interval = setInterval(loadNewGuestsCount, 60000)
 
     return () => clearInterval(interval)
-  }, [user, location.pathname])
+  }, [user])
 
   // Обновляем счетчик при посещении страницы новых гостей
   useEffect(() => {
