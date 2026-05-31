@@ -546,6 +546,22 @@ export interface ClubDashboardSummary {
   clubsCount: number
 }
 
+export interface DashboardStatsResponse {
+  stats: {
+    clubs: number
+    vessels: number
+    bookings: number
+    totalIncome: number
+    totalExpense: number
+  }
+  clubList: Array<{ id: number; name: string }>
+  defaultClubId: number | null
+  clubDashboard: ClubDashboardSummary | null
+  vessels: Array<{ id: number; name: string; type: string }>
+  vesselBalances: Record<number, number>
+  settlements: Array<Record<string, unknown>>
+}
+
 export interface ClubTenantReportItem {
   berthId: number
   berthNumber: string

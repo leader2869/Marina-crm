@@ -24,6 +24,7 @@ import incomesRoutes from './modules/incomes/incomes.routes';
 import agentOrdersRoutes from './modules/agent-orders/agent-orders.routes';
 import contractFillingRoutes from './modules/contract-filling/contract-filling.routes';
 import clubFinanceRoutes from './modules/club-finance/club-finance.routes';
+import dashboardRoutes from './modules/dashboard/dashboard.routes';
 
 const app: Express = express();
 let dbInitPromise: Promise<void> | null = null;
@@ -167,6 +168,7 @@ app.use('/api/agent-orders', (req, res, next) => {
 }, autoActivityLogger, agentOrdersRoutes);
 app.use('/api/contract-filling', autoActivityLogger, contractFillingRoutes);
 app.use('/api/club-finance', autoActivityLogger, clubFinanceRoutes);
+app.use('/api/dashboard', autoActivityLogger, dashboardRoutes);
 
 // Error handler
 app.use(errorHandler);

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { clubsService, bookingsService, clubFinanceService, vesselsService, vesselOwnerCashesService } from '../services/api'
-import { ClubDashboardSummary, UserRole, BookingStatus, Vessel, VesselOwnerCash } from '../types'
+import { dashboardService, clubFinanceService } from '../services/api'
+import { ClubDashboardSummary, UserRole, Vessel } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet, Receipt } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { staffHasAnyClubAccess, staffHasPermission } from '../utils/clubStaffAccess'
@@ -21,175 +21,23 @@ export default function Dashboard() {
   const [clubList, setClubList] = useState<Array<{ id: number; name: string }>>([])
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [clubSettlements, setClubSettlements] = useState<any[]>([])
+  const [settlementsLoadedClubId, setSettlementsLoadedClubId] = useState<number | null>(null)
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
 
-  // Функция для загрузки баланса катера
-  const loadVesselBalance = async (vesselId: number): Promise<number> => {
-    try {
-      // Загружаем все кассы катера
-      const cashesResponse = await vesselOwnerCashesService.getAll({ 
-        limit: 100, 
-        vesselId: vesselId 
-      })
-      const vesselCashes: VesselOwnerCash[] = cashesResponse.data || []
-      
-      const cashBalances = await Promise.all(
-        vesselCashes.map(async (cash: VesselOwnerCash) => {
-          try {
-            const balanceResponse: any = await vesselOwnerCashesService.getBalance(cash.id)
-            if (balanceResponse && typeof balanceResponse.balance === 'number') {
-              return balanceResponse.balance
-            }
-          } catch (error) {
-            console.error(`Ошибка загрузки баланса кассы ${cash.id}:`, error)
-          }
-          return 0
-        })
-      )
-
-      return cashBalances.reduce((sum, balance) => sum + balance, 0)
-    } catch (error) {
-      console.error(`Ошибка загрузки баланса катера ${vesselId}:`, error)
-      return 0
-    }
-  }
-
   useEffect(() => {
     const loadStats = async () => {
       try {
-        // Для суперадмина и администратора загружаем все опубликованные клубы
-        // Для остальных ролей загружаем с минимальным лимитом (нужен только total)
-        const isSuperAdminOrAdmin = user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN
-        const isClubRole =
-          user?.role === UserRole.CLUB_OWNER ||
-          user?.role === UserRole.CLUB_STAFF ||
-          isSuperAdminOrAdmin
-        const clubsParams = isClubRole ? { limit: 200 } : isSuperAdminOrAdmin ? { limit: 1000 } : { limit: 1 }
-        
-        const [clubsRes, bookingsRes] = await Promise.all([
-          clubsService.getAll(clubsParams),
-          bookingsService.getAll({ limit: 1000 }), // Загружаем все бронирования для подсчета уникальных клубов
-        ])
-
-        if (isClubRole) {
-          const allClubs = (clubsRes as any)?.data || []
-          const mapped = (Array.isArray(allClubs) ? allClubs : []).map((c: any) => ({ id: c.id, name: c.name }))
-          setClubList(mapped)
-          if (mapped.length > 0) {
-            setSelectedClubId((prev) => prev ?? mapped[0].id)
-          }
-        } else {
-          setClubList([])
-          setSelectedClubId(null)
-        }
-
-        // Для супер-администратора загружаем все судна, для остальных - только свои
-        let vesselsCount = 0
-        let userVessels: Vessel[] = []
-        if (user?.role === UserRole.SUPER_ADMIN) {
-          const vesselsRes = await vesselsService.getAll({ limit: 1 })
-          vesselsCount = (vesselsRes as any)?.data?.total || (vesselsRes as any)?.total || 0
-        } else {
-          // Загружаем катера пользователя
-          if (user?.role === UserRole.VESSEL_OWNER) {
-            const vesselsRes = await vesselsService.getAll({ limit: 100 })
-            const allVessels = (vesselsRes as any)?.data || []
-            userVessels = allVessels.filter((vessel: Vessel) => vessel.ownerId === user?.id)
-            setVessels(userVessels)
-            vesselsCount = userVessels.length
-            
-            const balanceEntries = await Promise.all(
-              userVessels.map(async (vessel) => {
-                const balance = await loadVesselBalance(vessel.id)
-                return [vessel.id, balance] as const
-              })
-            )
-            setVesselBalances(Object.fromEntries(balanceEntries))
-          } else {
-            vesselsCount = user?.vessels?.length || 0
-          }
-        }
-
-        // Подсчет яхт-клубов
-        let clubsCount = 0
-        if (user?.role === UserRole.VESSEL_OWNER) {
-          // Для судовладельца считаем уникальные яхт-клубы из его активных бронирований
-          const allBookings = (bookingsRes as any)?.data || []
-          const activeBookings = allBookings.filter((booking: any) => booking.status !== BookingStatus.CANCELLED)
-          const uniqueClubIds = new Set<number>()
-          activeBookings.forEach((booking: any) => {
-            if (booking.clubId) {
-              uniqueClubIds.add(booking.clubId)
-            }
-          })
-          clubsCount = uniqueClubIds.size
-        } else if (user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN) {
-          // Для суперадмина и администратора считаем все опубликованные клубы (активные, валидированные, отправленные на валидацию)
-          const allClubs = (clubsRes as any)?.data || []
-          const publishedClubs = allClubs.filter((club: any) => 
-            club.isActive === true && 
-            club.isValidated === true && 
-            club.isSubmittedForValidation === true
-          )
-          clubsCount = publishedClubs.length
-        } else {
-          // Для остальных ролей используем общее количество клубов из ответа
-          clubsCount = (clubsRes as any)?.data?.total || (clubsRes as any)?.total || 0
-        }
-
-        // Для судовладельца загружаем приходы и расходы из касс
-        let totalIncome = 0
-        let totalExpense = 0
-        
-        if (user?.role === UserRole.VESSEL_OWNER) {
-          try {
-            const [incomeRes, expenseRes] = await Promise.all([
-              vesselOwnerCashesService.getTotalIncome(),
-              vesselOwnerCashesService.getTotalExpense(),
-            ])
-            totalIncome = (incomeRes as any)?.totalIncome || 0
-            totalExpense = (expenseRes as any)?.totalExpense || 0
-          } catch (error) {
-            console.error('Ошибка загрузки доходов/расходов:', error)
-          }
-        }
-
-        // Подсчет бронирований
-        let bookingsCount = 0
-        if (user?.role === UserRole.VESSEL_OWNER) {
-          // Для судовладельца считаем количество только активных бронирований (исключаем отмененные)
-          const allBookings = (bookingsRes as any)?.data || []
-          const activeBookings = allBookings.filter((booking: any) => booking.status !== BookingStatus.CANCELLED)
-          bookingsCount = activeBookings.length
-        } else {
-          // Для остальных ролей используем total из ответа
-          bookingsCount = (bookingsRes as any)?.data?.total || (bookingsRes as any)?.total || 0
-        }
-
-        setStats({
-          clubs: clubsCount,
-          vessels: vesselsCount,
-          bookings: bookingsCount,
-          totalIncome,
-          totalExpense,
-        })
-
-        if (
-          user?.role === UserRole.CLUB_OWNER ||
-          user?.role === UserRole.CLUB_STAFF ||
-          user?.role === UserRole.SUPER_ADMIN ||
-          user?.role === UserRole.ADMIN
-        ) {
-          try {
-            const summary = await clubFinanceService.getDashboardSummary()
-            setClubDashboard(summary as unknown as ClubDashboardSummary)
-          } catch (error) {
-            console.error('Ошибка загрузки клубной сводки дашборда:', error)
-            setClubDashboard(null)
-          }
-        }
+        const data = await dashboardService.getStats()
+        setStats(data.stats)
+        setClubList(data.clubList)
+        setSelectedClubId(data.defaultClubId)
+        setClubDashboard(data.clubDashboard)
+        setClubSettlements(data.settlements as any[])
+        setSettlementsLoadedClubId(data.defaultClubId)
+        setVessels(data.vessels as Vessel[])
+        setVesselBalances(data.vesselBalances)
       } catch (error) {
         console.error('Ошибка загрузки статистики:', error)
       } finally {
@@ -208,20 +56,21 @@ export default function Dashboard() {
   useEffect(() => {
     const loadSettlements = async () => {
       if (!selectedClubId || !canViewClubSettlements) return
+      if (selectedClubId === settlementsLoadedClubId) return
       try {
         const response = await clubFinanceService.getSettlements(selectedClubId)
         const data = response as any
         setClubSettlements(data?.settlements || [])
+        setSettlementsLoadedClubId(selectedClubId)
       } catch (error) {
         console.error('Ошибка загрузки взаиморасчетов для дашборда:', error)
         setClubSettlements([])
       }
     }
     loadSettlements()
-  }, [selectedClubId, canViewClubSettlements])
+  }, [selectedClubId, canViewClubSettlements, settlementsLoadedClubId])
 
   const statCards = [
-    // Катера не показываем для владельца яхт-клуба
     ...(user?.role !== UserRole.CLUB_OWNER ? [{
       name: 'Катера',
       value: stats.vessels,
@@ -413,7 +262,6 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Балансы катеров для судовладельца */}
       {user?.role === UserRole.VESSEL_OWNER && vessels.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
@@ -459,4 +307,3 @@ export default function Dashboard() {
     </div>
   )
 }
-

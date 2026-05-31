@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { DashboardStatsResponse } from '../types'
 
 // Определяем URL API: если VITE_API_URL не установлен, используем относительный путь для production
 // или localhost для development
@@ -289,6 +290,11 @@ export const agentOrdersService = {
   respond: (orderId: number, data: any) => api.post(`/agent-orders/${orderId}/respond`, data),
   selectVessel: (orderId: number, data: { responseId: number }) => api.post(`/agent-orders/${orderId}/select-vessel`, data),
   cancel: (orderId: number) => api.post(`/agent-orders/${orderId}/cancel`),
+}
+
+export const dashboardService = {
+  getStats: (params?: { settlementsClubId?: number }) =>
+    api.get('/dashboard/stats', { params }) as Promise<DashboardStatsResponse>,
 }
 
 export const clubFinanceService = {
