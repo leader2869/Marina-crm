@@ -13,7 +13,7 @@ import {
   UserRole,
 } from '../../types';
 import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
-import { assertStaffHasPermission, staffHasAnyPermission, staffHasPermission } from '../../utils/clubStaffPermissions';
+import { assertStaffHasPermission, staffHasPermission } from '../../utils/clubStaffPermissions';
 
 export interface DashboardStats {
   clubs: number;
@@ -279,27 +279,7 @@ export class DashboardService {
     };
   }
 
-  private async canViewSettlements(req: AuthRequest, clubId: number): Promise<boolean> {
-    if (!req.userRole || !req.userId) {
-      return false;
-    }
-
-    if (
-      req.userRole === UserRole.CLUB_OWNER ||
-      req.userRole === UserRole.SUPER_ADMIN ||
-      req.userRole === UserRole.ADMIN
-    ) {
-      return true;
-    }
-
-    if (req.userRole === UserRole.CLUB_STAFF) {
-      return staffHasAnyPermission(req.userId, clubId, ['club_settlements']);
-    }
-
-    return false;
-  }
-
-  async getStats(req: AuthRequest, settlementsClubId?: number): Promise<DashboardStatsResult> {
+  async getStats(req: AuthRequest): Promise<DashboardStatsResult> {
     if (!req.userId || !req.userRole) {
       throw new Error('Требуется аутентификация');
     }
@@ -343,23 +323,13 @@ export class DashboardService {
     }
 
     const defaultClubId = clubList.length > 0 ? clubList[0].id : null;
-    const targetClubId = settlementsClubId ?? defaultClubId;
 
-    const [clubDashboard, settlementsResponse] = await Promise.all([
-      this.isClubRole(req.userRole)
-        ? invokeControllerJson<Record<string, unknown>>(
-            clubFinanceController.getDashboardSummary.bind(clubFinanceController),
-            req
-          )
-        : Promise.resolve(null),
-      targetClubId && (await this.canViewSettlements(req, targetClubId))
-        ? invokeControllerJson<{ settlements?: Record<string, unknown>[] }>(
-            clubFinanceController.getSettlements.bind(clubFinanceController),
-            req,
-            { clubId: String(targetClubId) }
-          )
-        : Promise.resolve(null),
-    ]);
+    const clubDashboard = this.isClubRole(req.userRole)
+      ? await invokeControllerJson<Record<string, unknown>>(
+          clubFinanceController.getDashboardSummary.bind(clubFinanceController),
+          req
+        )
+      : null;
 
     return {
       stats,
@@ -368,7 +338,8 @@ export class DashboardService {
       clubDashboard,
       vessels,
       vesselBalances,
-      settlements: settlementsResponse?.settlements || [],
+      // Взаиморасчёты грузятся отдельно через GET /club-finance/clubs/:id/settlements
+      settlements: [],
     };
   }
 }

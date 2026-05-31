@@ -34,8 +34,6 @@ export default function Dashboard() {
         setClubList(data.clubList)
         setSelectedClubId(data.defaultClubId)
         setClubDashboard(data.clubDashboard)
-        setClubSettlements(data.settlements as any[])
-        setSettlementsLoadedClubId(data.defaultClubId)
         setVessels(data.vessels as Vessel[])
         setVesselBalances(data.vesselBalances)
       } catch (error) {

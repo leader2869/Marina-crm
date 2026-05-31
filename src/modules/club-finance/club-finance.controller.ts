@@ -805,75 +805,72 @@ export class ClubFinanceController {
       const berthRepository = AppDataSource.getRepository(Berth);
       const bookingRepository = AppDataSource.getRepository(Booking);
 
-      const transactions = await txRepository.find({
-        where: { clubId: In(clubIds) },
-      });
-      const partners = await partnerRepository.find({
-        where: { clubId: In(clubIds), isActive: true },
-      });
-
-      const totalIncome = transactions
-        .filter((tx) => tx.transactionType === CashTransactionType.INCOME)
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-      const totalExpense = transactions
-        .filter((tx) => tx.transactionType === CashTransactionType.EXPENSE)
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-      const partnerIncomes = partners
-        .map((partner) => {
-          const incomeAmount = transactions
-            .filter(
-              (tx) =>
-                tx.transactionType === CashTransactionType.INCOME &&
-                tx.acceptedByPartnerId === partner.id
-            )
-            .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-          return {
-            partnerId: partner.id,
-            partnerName: partner.name,
-            clubId: partner.clubId,
-            incomeAmount,
-          };
-        })
-        .sort((a, b) => b.incomeAmount - a.incomeAmount);
-
-      const expectedPayments = await paymentRepository
-        .createQueryBuilder('payment')
-        .leftJoin('payment.booking', 'booking')
-        .where('booking.clubId IN (:...clubIds)', { clubIds })
-        .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
-        .andWhere('payment.status IN (:...paymentStatuses)', {
-          paymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
-        })
-        .getMany();
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const todayIso = today.toISOString().slice(0, 10);
 
-      const expectedIncomeAmount = expectedPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-      const receivablesAmount = expectedPayments
-        .filter((payment) => {
-          const dueDate = new Date(payment.dueDate);
-          dueDate.setHours(0, 0, 0, 0);
-          return payment.status === PaymentStatus.OVERDUE || dueDate < today;
-        })
-        .reduce((sum, payment) => sum + Number(payment.amount), 0);
-
-      const availableBerths = await berthRepository.count({
-        where: {
-          clubId: In(clubIds),
-          isAvailable: true,
-        },
-      });
-
-      const occupiedBerthRows = await bookingRepository
-        .createQueryBuilder('booking')
-        .select('booking.berthId', 'berthId')
-        .where('booking.clubId IN (:...clubIds)', { clubIds })
-        .andWhere(
-          `(
+      const [totalsRow, partnerIncomeRows, partners, paymentTotals, availableBerths, occupiedBerthRows] =
+        await Promise.all([
+          txRepository
+            .createQueryBuilder('tx')
+            .select(
+              `COALESCE(SUM(CASE WHEN tx.transactionType = :incomeType THEN tx.amount ELSE 0 END), 0)`,
+              'totalIncome'
+            )
+            .addSelect(
+              `COALESCE(SUM(CASE WHEN tx.transactionType = :expenseType THEN tx.amount ELSE 0 END), 0)`,
+              'totalExpense'
+            )
+            .where('tx.clubId IN (:...clubIds)', { clubIds })
+            .setParameters({
+              incomeType: CashTransactionType.INCOME,
+              expenseType: CashTransactionType.EXPENSE,
+            })
+            .getRawOne<{ totalIncome: string; totalExpense: string }>(),
+          txRepository
+            .createQueryBuilder('tx')
+            .select('tx.acceptedByPartnerId', 'partnerId')
+            .addSelect('SUM(tx.amount)', 'incomeAmount')
+            .where('tx.clubId IN (:...clubIds)', { clubIds })
+            .andWhere('tx.transactionType = :incomeType', { incomeType: CashTransactionType.INCOME })
+            .andWhere('tx.acceptedByPartnerId IS NOT NULL')
+            .groupBy('tx.acceptedByPartnerId')
+            .getRawMany<{ partnerId: string; incomeAmount: string }>(),
+          partnerRepository.find({
+            where: { clubId: In(clubIds), isActive: true },
+          }),
+          paymentRepository
+            .createQueryBuilder('payment')
+            .innerJoin('payment.booking', 'booking')
+            .select('COALESCE(SUM(payment.amount), 0)', 'expectedIncomeAmount')
+            .addSelect(
+              `COALESCE(SUM(CASE
+                WHEN payment.status = :overdueStatus OR payment.dueDate < :today
+                THEN payment.amount ELSE 0 END), 0)`,
+              'receivablesAmount'
+            )
+            .where('booking.clubId IN (:...clubIds)', { clubIds })
+            .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
+            .andWhere('payment.status IN (:...paymentStatuses)', {
+              paymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+            })
+            .setParameters({
+              overdueStatus: PaymentStatus.OVERDUE,
+              today: todayIso,
+            })
+            .getRawOne<{ expectedIncomeAmount: string; receivablesAmount: string }>(),
+          berthRepository.count({
+            where: {
+              clubId: In(clubIds),
+              isAvailable: true,
+            },
+          }),
+          bookingRepository
+            .createQueryBuilder('booking')
+            .select('booking.berthId', 'berthId')
+            .where('booking.clubId IN (:...clubIds)', { clubIds })
+            .andWhere(
+              `(
             booking.status IN (:...statuses)
             OR EXISTS (
               SELECT 1
@@ -882,13 +879,33 @@ export class ClubFinanceController {
                 AND p.status IN (:...blockingPaymentStatuses)
             )
           )`,
-          {
-            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
-            blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
-          }
-        )
-        .groupBy('booking.berthId')
-        .getRawMany();
+              {
+                statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+                blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+              }
+            )
+            .groupBy('booking.berthId')
+            .getRawMany(),
+        ]);
+
+      const totalIncome = parseFloat(totalsRow?.totalIncome || '0');
+      const totalExpense = parseFloat(totalsRow?.totalExpense || '0');
+
+      const incomeByPartnerId = new Map(
+        partnerIncomeRows.map((row) => [Number(row.partnerId), parseFloat(row.incomeAmount || '0')])
+      );
+
+      const partnerIncomes = partners
+        .map((partner) => ({
+          partnerId: partner.id,
+          partnerName: partner.name,
+          clubId: partner.clubId,
+          incomeAmount: incomeByPartnerId.get(partner.id) || 0,
+        }))
+        .sort((a, b) => b.incomeAmount - a.incomeAmount);
+
+      const expectedIncomeAmount = parseFloat(paymentTotals?.expectedIncomeAmount || '0');
+      const receivablesAmount = parseFloat(paymentTotals?.receivablesAmount || '0');
 
       const occupiedBerthsCount = occupiedBerthRows.length;
       const freeBerthsCount = Math.max(0, availableBerths - occupiedBerthsCount);
@@ -1136,63 +1153,90 @@ export class ClubFinanceController {
       const clubId = parseInt(req.params.clubId);
       await this.ensureClubStaffPermission(req, clubId, 'club_settlements');
 
-      const partnerRepository = AppDataSource.getRepository(ClubPartner);
       const txRepository = AppDataSource.getRepository(ClubCashTransaction);
 
-      const partners = await partnerRepository.find({ where: { clubId, isActive: true } });
-      const transactions = await txRepository.find({ where: { clubId } });
+      const [totalsRow, partnerRows] = await Promise.all([
+        txRepository
+          .createQueryBuilder('tx')
+          .select(
+            `COALESCE(SUM(CASE WHEN tx.transactionType = :incomeType THEN tx.amount ELSE 0 END), 0)`,
+            'totalIncome'
+          )
+          .addSelect(
+            `COALESCE(SUM(CASE WHEN tx.transactionType = :expenseType THEN tx.amount ELSE 0 END), 0)`,
+            'totalExpense'
+          )
+          .where('tx.clubId = :clubId', { clubId })
+          .setParameters({
+            incomeType: CashTransactionType.INCOME,
+            expenseType: CashTransactionType.EXPENSE,
+          })
+          .getRawOne<{ totalIncome: string; totalExpense: string }>(),
+        AppDataSource.query(
+          `
+          SELECT
+            p.id AS "partnerId",
+            p.name AS "partnerName",
+            p."sharePercent" AS "sharePercent",
+            p."previousSeasonBalance" AS "previousSeasonBalance",
+            COALESCE(SUM(CASE
+              WHEN t."transactionType" = $2 AND t."acceptedByPartnerId" = p.id
+              THEN t.amount ELSE 0 END), 0) AS "incomeAccepted",
+            COALESCE(SUM(CASE
+              WHEN t."transactionType" = $3 AND t."paidByPartnerId" = p.id
+              THEN t.amount ELSE 0 END), 0) AS "expensesPaid",
+            COALESCE(SUM(CASE
+              WHEN t."transactionType" = $4 AND t."acceptedByPartnerId" = p.id
+              THEN t.amount ELSE 0 END), 0) AS "transferredIn",
+            COALESCE(SUM(CASE
+              WHEN t."transactionType" = $4 AND t."paidByPartnerId" = p.id
+              THEN t.amount ELSE 0 END), 0) AS "transferredOut"
+          FROM club_partners p
+          LEFT JOIN club_cash_transactions t ON t."clubId" = p."clubId"
+          WHERE p."clubId" = $1 AND p."isActive" = true
+          GROUP BY p.id
+          ORDER BY p.name ASC
+          `,
+          [
+            clubId,
+            CashTransactionType.INCOME,
+            CashTransactionType.EXPENSE,
+            CashTransactionType.TRANSFER,
+          ]
+        ) as Promise<
+          Array<{
+            partnerId: number;
+            partnerName: string;
+            sharePercent: string;
+            previousSeasonBalance: string;
+            incomeAccepted: string;
+            expensesPaid: string;
+            transferredIn: string;
+            transferredOut: string;
+          }>
+        >,
+      ]);
 
-      const totalIncome = transactions
-        .filter((tx) => tx.transactionType === CashTransactionType.INCOME)
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-      const totalExpense = transactions
-        .filter((tx) => tx.transactionType === CashTransactionType.EXPENSE)
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
+      const totalIncome = parseFloat(totalsRow?.totalIncome || '0');
+      const totalExpense = parseFloat(totalsRow?.totalExpense || '0');
       const netProfit = totalIncome - totalExpense;
 
-      const settlements = partners.map((partner) => {
-        const incomeAccepted = transactions
-          .filter(
-            (tx) =>
-              tx.transactionType === CashTransactionType.INCOME &&
-              tx.acceptedByPartnerId === partner.id
-          )
-          .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-        const expensesPaid = transactions
-          .filter(
-            (tx) =>
-              tx.transactionType === CashTransactionType.EXPENSE &&
-              tx.paidByPartnerId === partner.id
-          )
-          .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-        const transferredIn = transactions
-          .filter(
-            (tx) =>
-              tx.transactionType === CashTransactionType.TRANSFER &&
-              tx.acceptedByPartnerId === partner.id
-          )
-          .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-        const transferredOut = transactions
-          .filter(
-            (tx) =>
-              tx.transactionType === CashTransactionType.TRANSFER &&
-              tx.paidByPartnerId === partner.id
-          )
-          .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-        const entitled = (netProfit * Number(partner.sharePercent)) / 100;
+      const settlements = partnerRows.map((row) => {
+        const incomeAccepted = parseFloat(row.incomeAccepted || '0');
+        const expensesPaid = parseFloat(row.expensesPaid || '0');
+        const transferredIn = parseFloat(row.transferredIn || '0');
+        const transferredOut = parseFloat(row.transferredOut || '0');
+        const sharePercent = parseFloat(row.sharePercent || '0');
+        const previousSeasonBalance = parseFloat(row.previousSeasonBalance || '0');
+        const entitled = (netProfit * sharePercent) / 100;
         const actualPosition = incomeAccepted + transferredIn - expensesPaid - transferredOut;
         const settlementAmount = entitled - actualPosition;
-        const previousSeasonBalance = Number(partner.previousSeasonBalance || 0);
         const settlementWithPreviousSeason = settlementAmount + previousSeasonBalance;
 
         return {
-          partnerId: partner.id,
-          partnerName: partner.name,
-          sharePercent: Number(partner.sharePercent),
+          partnerId: Number(row.partnerId),
+          partnerName: row.partnerName,
+          sharePercent,
           incomeAccepted,
           expensesPaid,
           transferredIn,

@@ -12,16 +12,7 @@ export class DashboardController {
         throw new AppError('Требуется аутентификация', 401);
       }
 
-      const settlementsClubIdRaw = req.query.settlementsClubId;
-      const settlementsClubId =
-        typeof settlementsClubIdRaw === 'string' && settlementsClubIdRaw
-          ? parseInt(settlementsClubIdRaw, 10)
-          : undefined;
-
-      const data = await dashboardService.getStats(
-        req,
-        Number.isFinite(settlementsClubId) ? settlementsClubId : undefined
-      );
+      const data = await dashboardService.getStats(req);
 
       res.json(data);
     } catch (error) {
