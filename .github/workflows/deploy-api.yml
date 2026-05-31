@@ -13,7 +13,12 @@ on:
       - '.github/workflows/deploy-api.yml'
   workflow_dispatch:
 
-# Secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY_B64 (рекомендуется) или VPS_SSH_KEY
+# Secrets: VPS_SSH_KEY_B64 (рекомендуется) или VPS_SSH_KEY
+# VPS: 185.46.11.187 (reg.ru), user root — IP зафиксирован, не используйте старый hostname cv7100943
+
+env:
+  VPS_IP: '185.46.11.187'
+  VPS_USER: root
 
 jobs:
   deploy-api:
@@ -21,22 +26,12 @@ jobs:
     steps:
       - name: Deploy via SSH
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
         run: |
           set -eu
           KEY_FILE=/tmp/vps_deploy_key
-
-          if [ -z "$VPS_HOST" ]; then
-            echo "::error::Нет secret VPS_HOST"
-            exit 1
-          fi
-          if [ -z "$VPS_USER" ]; then
-            echo "::error::Нет secret VPS_USER"
-            exit 1
-          fi
+          VPS_HOST="${VPS_IP}"
 
           rm -f "$KEY_FILE"
 
@@ -48,24 +43,53 @@ jobs:
             printf '%s' "$VPS_SSH_KEY" > "$KEY_FILE"
           else
             echo "::error::Нет VPS_SSH_KEY_B64 / VPS_SSH_KEY"
-            echo "Mac: base64 < ~/.ssh/marina_vps | tr -d '\\n' | pbcopy → secret VPS_SSH_KEY_B64"
+            echo "Mac: bash scripts/vps/print-github-deploy-key-b64.sh | pbcopy"
             exit 1
           fi
 
           chmod 600 "$KEY_FILE"
 
           if ! grep -q "BEGIN.*PRIVATE KEY" "$KEY_FILE"; then
-            echo "::error::Не приватный ключ OpenSSH. Нужен marina_vps, не .pub"
+            echo "::error::Не приватный ключ OpenSSH"
             exit 1
           fi
 
           PUB=$(ssh-keygen -y -f "$KEY_FILE")
-          echo "Публичный ключ из secret: ${PUB}"
+          FP=$(ssh-keygen -lf "$KEY_FILE" | awk '{print $2}')
+          echo "Подключение: ${VPS_USER}@${VPS_HOST}"
+          echo "Публичный ключ: ${PUB}"
+          echo "Fingerprint: ${FP}"
+
+          RESOLVED=$(getent ahosts "$VPS_HOST" | awk '/STREAM/ {print $1; exit}')
+          echo "DNS/IP: ${RESOLVED:-не резолвится}"
+
+          if ! ssh -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=accept-new \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            -o IdentitiesOnly=yes \
+            "${VPS_USER}@${VPS_HOST}" \
+            'echo SSH_OK'; then
+            echo "::error::SSH отклонён на ${VPS_HOST}"
+            echo "Fingerprint из secret: ${FP}"
+            echo "Ожидается github-actions-deploy: SHA256:xbgDZQRTV5qeUU6/f/zWxSsprIMnCuzxMroyS0GwHeE"
+            echo "Или marina-vps: SHA256:3/zs7EUidGv9f8OCTtRy4EJ3bfIHyCdJk3VuRidHxFg"
+            echo "Обновить secret: bash scripts/vps/print-github-deploy-key-b64.sh"
+            ssh -vvv -i "$KEY_FILE" \
+              -o StrictHostKeyChecking=accept-new \
+              -o BatchMode=yes \
+              -o ConnectTimeout=15 \
+              -o IdentitiesOnly=yes \
+              "${VPS_USER}@${VPS_HOST}" \
+              'true' 2>&1 | tail -25 || true
+            exit 255
+          fi
 
           ssh -i "$KEY_FILE" \
             -o StrictHostKeyChecking=accept-new \
             -o BatchMode=yes \
-            -o ConnectTimeout=30 \
+            -o ConnectTimeout=60 \
+            -o IdentitiesOnly=yes \
             "${VPS_USER}@${VPS_HOST}" \
             'curl -fsSL "https://raw.githubusercontent.com/leader2869/Marina-crm/main/scripts/vps/repair-and-deploy.sh" | sed "s/\r$//" | bash'
 
