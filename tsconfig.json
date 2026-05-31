@@ -19,8 +19,8 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "api/**/*"],
-  "exclude": ["node_modules", "dist", "client"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "client", "api"]
 }
 
 

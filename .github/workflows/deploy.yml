@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   sftp-deploy:
@@ -15,10 +16,9 @@ jobs:
       SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD || secrets.FTP_PASSWORD }}
       SFTP_PORT: ${{ secrets.SFTP_PORT != '' && secrets.SFTP_PORT || vars.SFTP_PORT }}
       SFTP_TARGET_DIR: ${{ secrets.SFTP_TARGET_DIR != '' && secrets.SFTP_TARGET_DIR || vars.SFTP_TARGET_DIR }}
-      # Для production-сборки фронтенда используем backend на Vercel.
-      VITE_API_URL: ${{ vars.VITE_API_URL != '' && vars.VITE_API_URL || 'https://marina-crm.vercel.app/api' }}
-      # Site key для отображения reCAPTCHA в клиенте.
-      VITE_RECAPTCHA_SITE_KEY: ${{ vars.VITE_RECAPTCHA_SITE_KEY }}
+      # API: Variable переопределяет; иначе VPS (не Vercel).
+      VITE_API_URL: ${{ vars.VITE_API_URL != '' && vars.VITE_API_URL || 'https://api.1marina.ru/api' }}
+      VITE_RECAPTCHA_SITE_KEY: ${{ vars.VITE_RECAPTCHA_SITE_KEY != '' && vars.VITE_RECAPTCHA_SITE_KEY || secrets.VITE_RECAPTCHA_SITE_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
