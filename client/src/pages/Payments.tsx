@@ -1,33 +1,37 @@
-import { useEffect, useState } from 'react'
-import { paymentsService } from '../services/api'
+import { useState } from 'react'
+import { paymentsService, isRequestAborted } from '../services/api'
 import { Payment, UserRole } from '../types'
 import { CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 import { useAuth } from '../contexts/AuthContext'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function Payments() {
   const { user } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
-  
+  const [error, setError] = useState('')
+
   const isVesselOwner = user?.role === UserRole.VESSEL_OWNER
 
-  useEffect(() => {
-    loadPayments()
-  }, [])
-
-  const loadPayments = async () => {
+  useCancellableEffect(async (signal) => {
+    setLoading(true)
+    setError('')
     try {
-      const response = await paymentsService.getAll({ limit: 100 })
+      const response = await paymentsService.getAll({ limit: 100 }, { signal })
+      if (signal.aborted) return
       setPayments(response.data || [])
-    } catch (error) {
-      console.error('Ошибка загрузки платежей:', error)
+    } catch (err: any) {
+      if (!isRequestAborted(err)) {
+        console.error('Ошибка загрузки платежей:', err)
+        setError(err?.error || err?.message || 'Не удалось загрузить платежи')
+      }
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }
+  }, [user])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -70,13 +74,16 @@ export default function Payments() {
             {isVesselOwner ? 'Платежи за яхт клуб' : 'Платежи'}
           </h1>
           <p className="mt-2 text-gray-600">
-            {isVesselOwner 
+            {isVesselOwner
               ? 'Здесь отображаются все платежи за стоянку в яхт-клубе'
-              : 'Управление платежами'
-            }
+              : 'Управление платежами'}
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200">{error}</div>
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
@@ -135,7 +142,7 @@ export default function Payments() {
         </table>
       </div>
 
-      {payments.length === 0 && (
+      {payments.length === 0 && !error && (
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">Платежи не найдены</p>
@@ -144,4 +151,3 @@ export default function Payments() {
     </div>
   )
 }
-

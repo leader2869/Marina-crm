@@ -225,7 +225,7 @@ export const vesselOwnerCashesService = {
 }
 
 export const paymentsService = {
-  getAll: (params?: any) => api.get('/payments', { params }),
+  getAll: (params?: any, options?: RequestOptions) => api.get('/payments', { params, signal: options?.signal }),
   getById: (id: number) => api.get(`/payments/${id}`),
   create: (data: any) => api.post('/payments', data),
   updateStatus: (id: number, data: any) => api.put(`/payments/${id}/status`, data),

@@ -20,8 +20,8 @@ import {
 import { getPaginationParams, createPaginatedResponse } from '../../utils/pagination';
 import { isAfter } from 'date-fns';
 import { PaymentService } from '../../services/payment.service';
-import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
-import { staffHasPermission } from '../../utils/clubStaffPermissions';
+import { userHasAccessToClub } from '../../utils/clubStaffAccess';
+import { getAllStaffClubAccesses, staffHasPermission } from '../../utils/clubStaffPermissions';
 import { assertClubCashPaymentsEnabled } from '../../utils/clubCashSettings';
 
 export class PaymentsController {
@@ -67,48 +67,37 @@ export class PaymentsController {
       const { clubId, bookingId, status } = req.query;
 
       const paymentRepository = AppDataSource.getRepository(Payment);
-      const queryBuilder = paymentRepository
-        .createQueryBuilder('payment')
-        .innerJoinAndSelect('payment.booking', 'booking')
-        .leftJoinAndSelect('payment.payer', 'payer')
-        .innerJoinAndSelect('booking.club', 'club');
+      const queryBuilder = paymentRepository.createQueryBuilder('payment');
 
-      // Фильтрация по ролям - применяется первой и всегда
+      // Фильтрация по ролям — join только для WHERE, без загрузки связанных сущностей
       if (req.userRole === UserRole.VESSEL_OWNER) {
-        // Судовладелец видит только платежи своих бронирований
-        queryBuilder.where('booking.vesselOwnerId = :vesselOwnerId', { vesselOwnerId: req.userId });
+        queryBuilder
+          .innerJoin('payment.booking', 'booking')
+          .where('booking.vesselOwnerId = :vesselOwnerId', { vesselOwnerId: req.userId });
       } else if (req.userRole === UserRole.CLUB_OWNER) {
-        // Владелец клуба видит только платежи своих клубов
-        const clubRepository = AppDataSource.getRepository(Club);
-        const userClubs = await clubRepository.find({
-          where: { ownerId: req.userId },
-          select: ['id'],
-        });
-        
-        if (userClubs.length === 0) {
-          // Если у пользователя нет клубов, возвращаем пустой результат
-          res.json(createPaginatedResponse([], 0, page, limit));
-          return;
-        }
-        
-        const clubIds = userClubs.map(club => club.id);
-        queryBuilder.where('club.id IN (:...clubIds)', { clubIds });
+        queryBuilder
+          .innerJoin('payment.booking', 'booking')
+          .innerJoin('booking.club', 'club')
+          .where('club.ownerId = :ownerId', { ownerId: req.userId });
       } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
-        const clubIds = await getClubIdsForStaffUser(req.userId);
+        const accesses = await getAllStaffClubAccesses(req.userId);
+        const clubIds = accesses.filter((a) => a.accessEnabled).map((a) => a.clubId);
         if (clubIds.length === 0) {
           res.json(createPaginatedResponse([], 0, page, limit));
           return;
         }
-        queryBuilder.where('club.id IN (:...clubIds)', { clubIds });
+        queryBuilder
+          .innerJoin('payment.booking', 'booking')
+          .where('booking.clubId IN (:...clubIds)', { clubIds });
       } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
-        // Для других ролей (guest и т.д.) показываем только свои платежи
         queryBuilder.where('payment.payerId = :payerId', { payerId: req.userId });
       }
-      // Для SUPER_ADMIN и ADMIN показываем все платежи без дополнительной фильтрации
 
-      // Дополнительные фильтры применяются через andWhere
       if (clubId) {
-        queryBuilder.andWhere('club.id = :clubId', { clubId: parseInt(clubId as string) });
+        if (!queryBuilder.expressionMap.aliases.some((a) => a.name === 'booking')) {
+          queryBuilder.innerJoin('payment.booking', 'booking');
+        }
+        queryBuilder.andWhere('booking.clubId = :filterClubId', { filterClubId: parseInt(clubId as string) });
       }
 
       if (bookingId) {
@@ -120,9 +109,9 @@ export class PaymentsController {
       }
 
       const [payments, total] = await queryBuilder
+        .orderBy('payment.dueDate', 'ASC')
         .skip((page - 1) * limit)
         .take(limit)
-        .orderBy('payment.dueDate', 'ASC') // Сначала ближайший платеж, в конце последний
         .getManyAndCount();
 
       res.json(createPaginatedResponse(payments, total, page, limit));
@@ -442,45 +431,33 @@ export class PaymentsController {
       const paymentRepository = AppDataSource.getRepository(Payment);
       const queryBuilder = paymentRepository
         .createQueryBuilder('payment')
-        .leftJoinAndSelect('payment.booking', 'booking')
-        .leftJoinAndSelect('payment.payer', 'payer')
-        .leftJoinAndSelect('booking.club', 'club')
+        .innerJoin('payment.booking', 'booking')
         .where('payment.status = :status', { status: PaymentStatus.PENDING })
         .andWhere('payment.dueDate < :today', { today: new Date() });
 
-      // Фильтрация по ролям
       if (req.userRole === UserRole.VESSEL_OWNER) {
-        // Судовладелец видит только просроченные платежи своих бронирований
         queryBuilder.andWhere('booking.vesselOwnerId = :userId', { userId: req.userId });
       } else if (req.userRole === UserRole.CLUB_OWNER) {
-        // Владелец клуба видит только просроченные платежи своих клубов
-        const clubRepository = AppDataSource.getRepository(Club);
-        const userClubs = await clubRepository.find({
-          where: { ownerId: req.userId },
-          select: ['id'],
-        });
-        
-        if (userClubs.length === 0) {
-          res.json([]);
-          return;
-        }
-        
-        const clubIds = userClubs.map(club => club.id);
-        queryBuilder.andWhere('club.id IN (:...clubIds)', { clubIds });
+        queryBuilder
+          .innerJoin('booking.club', 'club')
+          .andWhere('club.ownerId = :ownerId', { ownerId: req.userId });
       } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
-        const clubIds = await getClubIdsForStaffUser(req.userId);
+        const accesses = await getAllStaffClubAccesses(req.userId);
+        const clubIds = accesses.filter((a) => a.accessEnabled).map((a) => a.clubId);
         if (clubIds.length === 0) {
           res.json([]);
           return;
         }
-        queryBuilder.andWhere('club.id IN (:...clubIds)', { clubIds });
+        queryBuilder.andWhere('booking.clubId IN (:...clubIds)', { clubIds });
       } else if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
-        // Для других ролей показываем только свои просроченные платежи
         queryBuilder.andWhere('payment.payerId = :userId', { userId: req.userId });
       }
 
       if (clubId) {
-        queryBuilder.andWhere('club.id = :clubId', { clubId: parseInt(clubId as string) });
+        if (!queryBuilder.expressionMap.aliases.some((a) => a.name === 'club')) {
+          queryBuilder.innerJoin('booking.club', 'club');
+        }
+        queryBuilder.andWhere('club.id = :filterClubId', { filterClubId: parseInt(clubId as string) });
       }
 
       const overduePayments = await queryBuilder.getMany();
