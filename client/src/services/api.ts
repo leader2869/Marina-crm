@@ -226,6 +226,8 @@ export const paymentsService = {
 export const usersService = {
   getAll: (params?: any) => api.get('/users', { params }),
   getGuests: (params?: any) => api.get('/users/guests', { params }),
+  getPendingValidationCount: (): Promise<{ count: number }> =>
+    api.get('/users/pending-validation-count') as Promise<{ count: number }>,
   getById: (id: number) => api.get(`/users/${id}`),
   create: (data: any) => api.post('/users', data),
   update: (id: number, data: any) => api.put(`/users/${id}`, data),

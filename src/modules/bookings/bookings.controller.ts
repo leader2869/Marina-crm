@@ -21,8 +21,37 @@ import { generateActivityDescription } from '../../utils/activityLogDescription'
 import { In } from 'typeorm';
 import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
 import { staffHasPermission } from '../../utils/clubStaffPermissions';
+import { mapBookingListItem } from '../../utils/listResponseMappers';
+import { SelectQueryBuilder } from 'typeorm';
 
 export class BookingsController {
+  /** Список бронирований без base64-фото судов (главный источник egress) */
+  private applyBookingListJoins(
+    queryBuilder: SelectQueryBuilder<Booking>
+  ): SelectQueryBuilder<Booking> {
+    return queryBuilder
+      .leftJoin('booking.vessel', 'vessel')
+      .addSelect([
+        'vessel.id',
+        'vessel.name',
+        'vessel.type',
+        'vessel.length',
+        'vessel.ownerId',
+      ])
+      .leftJoin('booking.club', 'club')
+      .addSelect(['club.id', 'club.name', 'club.ownerId', 'club.cashPaymentsEnabled'])
+      .leftJoin('booking.berth', 'berth')
+      .addSelect(['berth.id', 'berth.number'])
+      .leftJoin('booking.vesselOwner', 'vesselOwner')
+      .addSelect([
+        'vesselOwner.id',
+        'vesselOwner.firstName',
+        'vesselOwner.lastName',
+        'vesselOwner.email',
+        'vesselOwner.phone',
+      ]);
+  }
+
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { page, limit } = getPaginationParams(
@@ -31,12 +60,9 @@ export class BookingsController {
       );
 
       const bookingRepository = AppDataSource.getRepository(Booking);
-      const queryBuilder = bookingRepository
-        .createQueryBuilder('booking')
-        .leftJoinAndSelect('booking.club', 'club')
-        .leftJoinAndSelect('booking.berth', 'berth')
-        .leftJoinAndSelect('booking.vessel', 'vessel')
-        .leftJoinAndSelect('booking.vesselOwner', 'vesselOwner');
+      const queryBuilder = this.applyBookingListJoins(
+        bookingRepository.createQueryBuilder('booking')
+      );
 
       // Фильтрация по ролям
       console.log(`[Bookings] Getting bookings for user ID ${req.userId} with role ${req.userRole}`);
@@ -95,7 +121,8 @@ export class BookingsController {
         .orderBy('booking.createdAt', 'DESC')
         .getManyAndCount();
 
-      res.json(createPaginatedResponse(bookings, total, page, limit));
+      const listItems = bookings.map(mapBookingListItem);
+      res.json(createPaginatedResponse(listItems, total, page, limit));
     } catch (error) {
       next(error);
     }
@@ -110,21 +137,28 @@ export class BookingsController {
         throw new AppError('ID клуба обязателен', 400);
       }
 
+      const { page, limit } = getPaginationParams(
+        parseInt(req.query.page as string),
+        parseInt(req.query.limit as string)
+      );
+
       const bookingRepository = AppDataSource.getRepository(Booking);
-      const bookings = await bookingRepository
-        .createQueryBuilder('booking')
-        .leftJoinAndSelect('booking.club', 'club')
-        .leftJoinAndSelect('booking.berth', 'berth')
-        .leftJoinAndSelect('booking.vessel', 'vessel')
-        .leftJoinAndSelect('booking.vesselOwner', 'vesselOwner')
+      const queryBuilder = this.applyBookingListJoins(
+        bookingRepository.createQueryBuilder('booking')
+      )
         .where('booking.clubId = :clubId', { clubId: parseInt(clubId) })
         .andWhere('booking.status IN (:...statuses)', {
           statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
         })
-        .orderBy('booking.createdAt', 'DESC')
-        .getMany();
+        .orderBy('booking.createdAt', 'DESC');
 
-      res.json(bookings);
+      const [bookings, total] = await queryBuilder
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      const listItems = bookings.map(mapBookingListItem);
+      res.json(createPaginatedResponse(listItems, total, page, limit));
     } catch (error) {
       next(error);
     }

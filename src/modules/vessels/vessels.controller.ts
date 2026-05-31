@@ -35,7 +35,6 @@ export class VesselsController {
           'vessel.registrationNumber',
           'vessel.documentPath',
           'vessel.technicalSpecs',
-          'vessel.photos',
           'vessel.mainPhotoIndex',
           'vessel.sortOrder',
           'vessel.isActive',
@@ -62,33 +61,12 @@ export class VesselsController {
         .take(limit)
         .getManyAndCount();
 
-      // Преобразуем JSON строки в массивы для фотографий
-      const vesselsWithPhotos = vessels.map((vessel: any) => {
-        if (vessel.photos) {
-          try {
-            vessel.photos = JSON.parse(vessel.photos);
-          } catch (e) {
-            vessel.photos = [];
-          }
-        } else {
-          vessel.photos = [];
-        }
-        // Убеждаемся, что passengerCapacity всегда присутствует
-        if (vessel.passengerCapacity === undefined || vessel.passengerCapacity === null) {
-          console.warn(`⚠️  Катер ID ${vessel.id} (${vessel.name}) не имеет пассажировместимости`);
-        } else {
-          console.log(`✅ Катер ID ${vessel.id} (${vessel.name}) имеет пассажировместимость: ${vessel.passengerCapacity}`);
-        }
-        return vessel;
-      });
-      
-      console.log(`[Vessel GetAll] Возвращаем ${vesselsWithPhotos.length} катеров, пример первого:`, {
-        id: vesselsWithPhotos[0]?.id,
-        name: vesselsWithPhotos[0]?.name,
-        passengerCapacity: vesselsWithPhotos[0]?.passengerCapacity,
-      });
+      const vesselsForList = vessels.map((vessel) => ({
+        ...vessel,
+        photos: null,
+      }));
 
-      res.json(createPaginatedResponse(vesselsWithPhotos, total, page, limit));
+      res.json(createPaginatedResponse(vesselsForList, total, page, limit));
     } catch (error) {
       next(error);
     }

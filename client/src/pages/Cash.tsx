@@ -119,14 +119,8 @@ export default function Cash() {
       // Фильтруем только катера текущего пользователя
       const userVessels = vesselsData.filter((vessel: Vessel) => vessel.ownerId === user?.id)
       setVessels(userVessels)
-      
-      const balanceEntries = await Promise.all(
-        userVessels.map(async (vessel: Vessel) => {
-          const balance = await loadVesselBalance(vessel.id)
-          return [vessel.id, balance] as const
-        })
-      )
-      setVesselBalances(Object.fromEntries(balanceEntries))
+
+      // Балансы загружаются при выборе катера, не на mount (N×M запросов)
       
       // Проверяем, есть ли vesselId в URL параметрах
       const vesselIdParam = searchParams.get('vesselId')

@@ -27,6 +27,7 @@ import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
 import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
 import { staffHasPermission } from '../../utils/clubStaffPermissions';
+import { getFreeBerthsCountsByClubIds } from '../../utils/freeBerths';
 
 export class ClubsController {
   private async resolveClubColumnName(queryRunner: QueryRunner, tableName: string): Promise<string | null> {
@@ -301,7 +302,16 @@ export class ClubsController {
         console.log('Скрытых клубов:', hiddenCount);
       }
 
-      res.json(createPaginatedResponse(filteredClubs, filteredClubs.length, page, limit));
+      let responseClubs = filteredClubs;
+      if (req.query.includeFreeBerths === 'true' && filteredClubs.length > 0) {
+        const freeBerthsCounts = await getFreeBerthsCountsByClubIds(filteredClubs);
+        responseClubs = filteredClubs.map((club) => ({
+          ...club,
+          freeBerthsCount: freeBerthsCounts[club.id] ?? club.totalBerths,
+        }));
+      }
+
+      res.json(createPaginatedResponse(responseClubs, responseClubs.length, page, limit));
     } catch (error) {
       next(error);
     }

@@ -22,6 +22,13 @@ router.get(
   usersController.getGuests.bind(usersController)
 );
 
+router.get(
+  '/pending-validation-count',
+  authenticate,
+  authorize(UserRole.SUPER_ADMIN),
+  usersController.getPendingValidationCount.bind(usersController)
+);
+
 // Только супер-администратор может получить детали пользователя
 router.get(
   '/:id',

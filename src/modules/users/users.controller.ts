@@ -187,6 +187,32 @@ export class UsersController {
     }
   }
 
+  /** Лёгкий счётчик для бейджа в меню — без загрузки 1000 пользователей и клубов */
+  async getPendingValidationCount(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        throw new AppError('Недостаточно прав доступа', 403);
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const clubRepository = AppDataSource.getRepository(Club);
+
+      const [pendingUsers, pendingClubs] = await Promise.all([
+        userRepository.count({ where: { role: UserRole.PENDING_VALIDATION } }),
+        clubRepository
+          .createQueryBuilder('club')
+          .where('club.isSubmittedForValidation = :submitted', { submitted: true })
+          .andWhere('club.isValidated = :validated', { validated: false })
+          .andWhere('(club.rejectionComment IS NULL OR club.rejectionComment = :empty)', { empty: '' })
+          .getCount(),
+      ]);
+
+      res.json({ count: pendingUsers + pendingClubs });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       // Только супер-администратор и администратор могут видеть детали пользователя

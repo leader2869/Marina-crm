@@ -39,31 +39,50 @@ export default function Bookings() {
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
 
   useEffect(() => {
-    loadBookings()
-  }, [])
-
-  useEffect(() => {
-    const loadAccessibleClubs = async () => {
+    const loadPageData = async () => {
+      setLoading(true)
       try {
-        const params: { limit: number; showHidden?: string } = { limit: 200 }
-        if (isSuperAdmin) params.showHidden = 'true'
-        const response = await clubsService.getAll(params)
-        const clubs = (response.data || []) as Array<{ id: number; name: string; cashPaymentsEnabled?: boolean }>
-        const mapped = clubs.map((club) => ({
-          id: club.id,
-          name: club.name,
-          cashPaymentsEnabled: club.cashPaymentsEnabled,
-        }))
-        setClubList(mapped)
-        if (mapped.length > 0) {
-          setSelectedClubId((prev) => prev ?? mapped[0].id)
+        const needsClubFilter = isClubOwner || isClubStaff || isSuperAdmin
+        const bookingsPromise = bookingsService.getAll({ limit: 100 })
+        const clubsPromise = needsClubFilter
+          ? clubsService.getAll({
+              limit: 200,
+              ...(isSuperAdmin ? { showHidden: 'true' } : {}),
+            })
+          : null
+
+        const [bookingsResponse, clubsResponse] = await Promise.all([
+          bookingsPromise,
+          clubsPromise ?? Promise.resolve(null),
+        ])
+
+        setBookings(bookingsResponse.data || [])
+
+        if (clubsResponse) {
+          const clubs = (clubsResponse.data || []) as Array<{
+            id: number
+            name: string
+            cashPaymentsEnabled?: boolean
+          }>
+          const mapped = clubs.map((club) => ({
+            id: club.id,
+            name: club.name,
+            cashPaymentsEnabled: club.cashPaymentsEnabled,
+          }))
+          setClubList(mapped)
+          if (mapped.length > 0) {
+            setSelectedClubId((prev) => prev ?? mapped[0].id)
+          }
         }
       } catch (error) {
-        console.error('Ошибка загрузки клубов для фильтра бронирований:', error)
+        console.error('Ошибка загрузки бронирований:', error)
+      } finally {
+        setLoading(false)
       }
     }
-    void loadAccessibleClubs()
-  }, [isSuperAdmin])
+
+    void loadPageData()
+  }, [isClubOwner, isClubStaff, isSuperAdmin])
 
   const loadBookings = async () => {
     try {
@@ -71,8 +90,6 @@ export default function Bookings() {
       setBookings(response.data || [])
     } catch (error) {
       console.error('Ошибка загрузки бронирований:', error)
-    } finally {
-      setLoading(false)
     }
   }
 

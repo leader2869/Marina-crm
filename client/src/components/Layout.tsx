@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
-import { usersService, clubsService, authService } from '../services/api'
+import { usersService, authService } from '../services/api'
 import { 
   LayoutDashboard, 
   Anchor, 
@@ -300,21 +300,8 @@ export default function Layout() {
     const loadPendingValidationCount = async () => {
       if (user?.role === UserRole.SUPER_ADMIN) {
         try {
-          // Получаем всех пользователей с ролью PENDING_VALIDATION
-          const usersResponse = await usersService.getAll({ limit: 1000 })
-          const allUsers = usersResponse.data || usersResponse || []
-          const pendingUsers = (Array.isArray(allUsers) ? allUsers : []).filter((user: any) => 
-            user.role === UserRole.PENDING_VALIDATION
-          )
-          
-          // Получаем все клубы, отправленные на валидацию, но еще не валидированные (исключая отклоненные)
-          const clubsResponse = await clubsService.getAll({ limit: 1000, showHidden: 'true' })
-          const allClubs = clubsResponse.data || []
-          const pendingClubs = (Array.isArray(allClubs) ? allClubs : []).filter((club: any) => 
-            club.isSubmittedForValidation === true && club.isValidated === false && !club.rejectionComment
-          )
-          
-          setPendingValidationCount(pendingUsers.length + pendingClubs.length)
+          const data = await usersService.getPendingValidationCount()
+          setPendingValidationCount(data?.count || 0)
         } catch (error) {
           console.error('Ошибка загрузки счетчика ожидающих валидацию:', error)
         }
@@ -323,8 +310,8 @@ export default function Layout() {
 
     loadPendingValidationCount()
     
-    // Обновляем счетчик каждые 30 секунд
-    const interval = setInterval(loadPendingValidationCount, 30000)
+    // Обновляем счетчик каждые 5 минут (раньше — 30 сек + 2000 записей)
+    const interval = setInterval(loadPendingValidationCount, 300000)
 
     return () => clearInterval(interval)
   }, [user, location.pathname])

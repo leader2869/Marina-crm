@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { clubsService, bookingsService } from '../services/api'
-import { Club, UserRole, Booking } from '../types'
+import { clubsService } from '../services/api'
+import { Club, UserRole } from '../types'
 import { Anchor, MapPin, Phone, Mail, Globe, Plus, Trash2, Download, X, EyeOff, Eye, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
@@ -9,39 +9,10 @@ import * as XLSX from 'xlsx'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 
-const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'confirmed', 'active'])
-
-function calculateFreeBerths(club: Club, clubBookings: Booking[]): number {
-  const occupiedBerthIds = new Set(
-    clubBookings
-      .filter((booking) => ACTIVE_BOOKING_STATUSES.has(booking.status))
-      .map((booking) => booking.berthId)
-  )
-  return Math.max(0, Number(club.totalBerths || 0) - occupiedBerthIds.size)
-}
-
-async function loadFreeBerthsCounts(clubsToLoad: Club[]): Promise<Record<number, number>> {
-  const entries = await Promise.all(
-    clubsToLoad.map(async (club) => {
-      try {
-        const response = await bookingsService.getByClub(club.id)
-        const clubBookings = (response as any)?.data || response || []
-        const bookings = Array.isArray(clubBookings) ? clubBookings : []
-        return [club.id, calculateFreeBerths(club, bookings)] as const
-      } catch (error) {
-        console.error(`Ошибка подсчета свободных мест для клуба ${club.id}:`, error)
-        return [club.id, Number(club.totalBerths || 0)] as const
-      }
-    })
-  )
-  return Object.fromEntries(entries)
-}
-
 export default function Clubs() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [clubs, setClubs] = useState<Club[]>([])
-  const [freeBerthsByClubId, setFreeBerthsByClubId] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -74,7 +45,7 @@ export default function Clubs() {
       setLoading(true)
       const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
       const isClubOwner = user?.role === UserRole.CLUB_OWNER
-      const params: any = { limit: 100 }
+      const params: any = { limit: 100, includeFreeBerths: 'true' }
       if (showHidden && isSuperAdmin) {
         params.showHidden = 'true'
       }
@@ -103,8 +74,6 @@ export default function Clubs() {
       }
       
       setClubs(filteredClubs)
-      setFreeBerthsByClubId({})
-      void loadFreeBerthsCounts(filteredClubs).then(setFreeBerthsByClubId)
     } catch (error) {
       console.error('Ошибка загрузки клубов:', error)
     } finally {
@@ -640,7 +609,7 @@ export default function Clubs() {
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-gray-600">Свободных мест:</span>
                   <span className="font-semibold text-green-600">
-                    {freeBerthsByClubId[club.id] ?? '—'}
+                    {(club as Club & { freeBerthsCount?: number }).freeBerthsCount ?? '—'}
                   </span>
                 </div>
                 {/* Кнопка "Опубликовать" для владельца клуба, если клуб еще не отправлен или был отклонен */}

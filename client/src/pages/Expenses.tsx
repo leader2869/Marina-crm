@@ -42,26 +42,12 @@ export default function Expenses() {
   })
 
   useEffect(() => {
-    loadData()
+    void loadCategories().finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
     loadTransactions()
   }, [selectedCategory, dateFrom, dateTo])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      await Promise.all([
-        loadCategories(),
-        loadTransactions(),
-      ])
-    } catch (error) {
-      console.error('Ошибка загрузки данных:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const loadCategories = async () => {
     try {
@@ -87,7 +73,7 @@ export default function Expenses() {
         cashes.map(async (cash: VesselOwnerCash) => {
           try {
             const params: any = {
-              limit: 1000,
+              limit: 200,
               transactionType: CashTransactionType.EXPENSE,
             }
             if (selectedCategory) params.expenseCategoryId = selectedCategory
