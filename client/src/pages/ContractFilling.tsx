@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { FileText, Upload, Download, Save, X } from 'lucide-react'
+import { getApiUrl } from '../services/api'
 
 interface Contragent {
   filename: string
@@ -21,8 +22,20 @@ export default function ContractFilling() {
   const [showSaveContragentModal, setShowSaveContragentModal] = useState(false)
   const [contragentName, setContragentName] = useState('')
 
-  // URL для API
-  const API_URL = '/api/contract-filling'
+  const API_URL = `${getApiUrl()}/contract-filling`
+
+  const parseJsonResponse = async (response: Response) => {
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      const text = await response.text()
+      throw new Error(
+        text.startsWith('<')
+          ? 'Сервер вернул HTML вместо JSON. Проверьте VITE_API_URL (должен быть https://api.1marina.ru/api).'
+          : `Неверный ответ сервера: ${text.slice(0, 120)}`
+      )
+    }
+    return response.json()
+  }
 
   useEffect(() => {
     loadContragents()
@@ -46,7 +59,7 @@ export default function ContractFilling() {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
       console.log('[ContractFilling] Получены контрагенты:', data)
       console.log('[ContractFilling] Количество контрагентов:', data.contragents?.length || 0)
       
@@ -95,7 +108,7 @@ export default function ContractFilling() {
         return
       }
 
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
 
       if (data.success) {
         setUploadedFilename(data.filename)
@@ -136,7 +149,7 @@ export default function ContractFilling() {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
       console.log('[ContractFilling] Получены данные контрагента:', data)
       
       if (data.data) {
@@ -216,7 +229,7 @@ export default function ContractFilling() {
         return
       }
 
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
 
       if (data.success) {
         showMessage('success', data.message || 'Контрагент сохранен')
@@ -271,7 +284,7 @@ export default function ContractFilling() {
         return
       }
 
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
 
       if (data.success) {
         showMessage('success', 'Контрагент удален')
@@ -332,7 +345,7 @@ export default function ContractFilling() {
         return
       }
 
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
 
       if (data.success) {
         setFilledFilename(data.filename)

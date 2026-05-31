@@ -7,13 +7,13 @@ const getApiUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL
   }
-  // Если мы на production (Vercel), используем относительный путь
   if (import.meta.env.PROD) {
     return '/api'
   }
-  // Для development используем localhost
   return 'http://localhost:3001/api'
 }
+
+export { getApiUrl }
 
 const API_URL = getApiUrl()
 
