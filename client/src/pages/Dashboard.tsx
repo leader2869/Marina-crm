@@ -24,17 +24,21 @@ export default function Dashboard() {
   const [clubSettlements, setClubSettlements] = useState<any[]>([])
   const [settlementsLoadedClubId, setSettlementsLoadedClubId] = useState<number | null>(null)
   const [settlementsLoading, setSettlementsLoading] = useState(false)
-  const [settlementsRequested, setSettlementsRequested] = useState(false)
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
-  const [summaryRequested, setSummaryRequested] = useState(false)
 
   const isClubDashboardRole =
     user?.role === UserRole.CLUB_OWNER ||
     user?.role === UserRole.CLUB_STAFF ||
     user?.role === UserRole.SUPER_ADMIN ||
     user?.role === UserRole.ADMIN
+
+  const canViewClubSettlements =
+    user?.role === UserRole.CLUB_OWNER ||
+    user?.role === UserRole.SUPER_ADMIN ||
+    user?.role === UserRole.ADMIN ||
+    (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements'))
 
   useCancellableEffect(async (signal) => {
     setLoading(true)
@@ -48,13 +52,28 @@ export default function Dashboard() {
       setVessels(data.vessels as Vessel[])
       setVesselBalances(data.vesselBalances)
 
-      if (isClubDashboardRole && summaryRequested) {
+      if (isClubDashboardRole) {
         try {
           const summary = (await clubFinanceService.getDashboardSummary({ signal })) as unknown as ClubDashboardSummary
           if (!signal.aborted) setClubDashboard(summary)
         } catch (error) {
           if (!isRequestAborted(error)) {
             console.error('Ошибка загрузки сводки клуба:', error)
+          }
+        }
+      }
+
+      if (canViewClubSettlements && clubId) {
+        try {
+          const response = await clubFinanceService.getSettlements(clubId, { signal })
+          if (signal.aborted) return
+          const settlementData = response as { settlements?: unknown[] }
+          setClubSettlements(settlementData?.settlements || [])
+          setSettlementsLoadedClubId(clubId)
+        } catch (error) {
+          if (!isRequestAborted(error)) {
+            console.error('Ошибка загрузки взаиморасчетов для дашборда:', error)
+            setClubSettlements([])
           }
         }
       }
@@ -65,27 +84,11 @@ export default function Dashboard() {
     } finally {
       if (!signal.aborted) setLoading(false)
     }
-  }, [user, isClubDashboardRole, summaryRequested])
-
-  const canViewClubSettlements =
-    user?.role === UserRole.CLUB_OWNER ||
-    user?.role === UserRole.SUPER_ADMIN ||
-    user?.role === UserRole.ADMIN ||
-    (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements'))
+  }, [user, isClubDashboardRole, canViewClubSettlements])
 
   useCancellableEffect(async (signal) => {
-    if (!settlementsRequested || !selectedClubId || !canViewClubSettlements) return
+    if (!selectedClubId || !canViewClubSettlements) return
     if (selectedClubId === settlementsLoadedClubId) return
-
-    await new Promise<void>((resolve) => {
-      if (signal.aborted) {
-        resolve()
-        return
-      }
-      const timer = setTimeout(resolve, 800)
-      signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
-    })
-    if (signal.aborted) return
 
     setSettlementsLoading(true)
     try {
@@ -102,7 +105,7 @@ export default function Dashboard() {
     } finally {
       if (!signal.aborted) setSettlementsLoading(false)
     }
-  }, [settlementsRequested, selectedClubId, canViewClubSettlements, settlementsLoadedClubId])
+  }, [selectedClubId, canViewClubSettlements, settlementsLoadedClubId])
 
   const statCards = [
     ...(user?.role !== UserRole.CLUB_OWNER ? [{
@@ -198,15 +201,6 @@ export default function Dashboard() {
         user?.role === UserRole.SUPER_ADMIN ||
         user?.role === UserRole.ADMIN) && (
         <>
-          {!summaryRequested && isClubDashboardRole && (
-            <button
-              type="button"
-              className="mb-4 text-sm text-primary-600 hover:text-primary-800"
-              onClick={() => setSummaryRequested(true)}
-            >
-              Загрузить финансовую сводку клуба
-            </button>
-          )}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
             {clubFinanceCards.map((stat) => {
               const Icon = stat.icon
@@ -259,24 +253,9 @@ export default function Dashboard() {
               )}
             </div>
 
-            {!settlementsRequested && !settlementsLoading && (
-              <button
-                type="button"
-                className="text-sm text-primary-600 hover:text-primary-800 mb-4"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setSettlementsRequested(true)
-                }}
-              >
-                Загрузить взаиморасчёты
-              </button>
-            )}
-
             <div className="overflow-x-auto">
               {settlementsLoading ? (
                 <p className="text-sm text-gray-500 py-4">Загрузка взаиморасчётов…</p>
-              ) : !settlementsRequested ? (
-                <p className="text-sm text-gray-500 py-4">Нажмите «Загрузить взаиморасчёты» для просмотра таблицы</p>
               ) : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
