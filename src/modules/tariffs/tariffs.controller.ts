@@ -39,11 +39,14 @@ export class TariffsController {
       }
 
       const tariffRepository = AppDataSource.getRepository(Tariff);
-      const tariffs = await tariffRepository.find({
-        where: { clubId: parseInt(clubId) },
-        relations: ['tariffBerths', 'tariffBerths.berth'],
-        order: { createdAt: 'DESC' },
-      });
+      const tariffs = await tariffRepository
+        .createQueryBuilder('tariff')
+        .leftJoinAndSelect('tariff.tariffBerths', 'tariffBerth')
+        .leftJoin('tariffBerth.berth', 'berth')
+        .addSelect(['berth.id', 'berth.number', 'berth.clubId', 'berth.isAvailable'])
+        .where('tariff.clubId = :clubId', { clubId: parseInt(clubId) })
+        .orderBy('tariff.createdAt', 'DESC')
+        .getMany();
 
       // Преобразуем данные для удобства
       const tariffsWithBerths = tariffs.map((tariff) => ({

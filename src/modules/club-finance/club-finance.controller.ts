@@ -650,9 +650,17 @@ export class ClubFinanceController {
 
       const occupiedBookings = await bookingRepository
         .createQueryBuilder('booking')
-        .leftJoinAndSelect('booking.berth', 'berth')
-        .leftJoinAndSelect('booking.vessel', 'vessel')
-        .leftJoinAndSelect('booking.vesselOwner', 'vesselOwner')
+        .leftJoin('booking.berth', 'berth')
+        .addSelect(['berth.id', 'berth.number'])
+        .leftJoin('booking.vessel', 'vessel')
+        .addSelect(['vessel.id', 'vessel.type', 'vessel.technicalSpecs'])
+        .leftJoin('booking.vesselOwner', 'vesselOwner')
+        .addSelect([
+          'vesselOwner.id',
+          'vesselOwner.firstName',
+          'vesselOwner.lastName',
+          'vesselOwner.phone',
+        ])
         .where('booking.clubId = :clubId', { clubId })
         .andWhere(
           `(
