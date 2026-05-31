@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usersService, clubsService } from '../services/api'
-import { UserRole, Club } from '../types'
+import { usersService, clubsService, isRequestAborted } from '../services/api'
+import { UserRole } from '../types'
 import { CheckCircle, XCircle, User as UserIcon, Phone, Mail, Calendar, Anchor } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 interface PendingUser {
   id: number
@@ -48,26 +49,21 @@ export default function Validation() {
   const [rejectComment, setRejectComment] = useState('')
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      await Promise.all([loadPendingUsers(), loadPendingClubs()])
-      setLoading(false)
-    }
-    loadData()
+  useCancellableEffect(async (signal) => {
+    setLoading(true)
+    await loadPendingUsers(signal)
+    await loadPendingClubs(signal)
+    if (!signal.aborted) setLoading(false)
   }, [])
 
-  const loadPendingUsers = async () => {
+  const loadPendingUsers = async (signal?: AbortSignal) => {
     try {
       setError('')
-      // Получаем всех пользователей с ролью PENDING_VALIDATION
-      const response = await usersService.getAll({ limit: 1000 })
-      const allUsers = response.data || response || []
-      const pendingUsers = (Array.isArray(allUsers) ? allUsers : []).filter((user: any) => 
-        user.role === UserRole.PENDING_VALIDATION
-      )
-      setUsers(pendingUsers)
+      const response = await usersService.getPendingValidation({ signal })
+      if (signal?.aborted) return
+      setUsers((response as { data?: PendingUser[] }).data || [])
     } catch (err: any) {
+      if (isRequestAborted(err)) return
       console.error('Ошибка загрузки пользователей:', err)
       setError(err.error || err.message || 'Ошибка загрузки пользователей')
     }
@@ -85,7 +81,8 @@ export default function Validation() {
         role: UserRole.CLUB_OWNER,
         isValidated: true 
       })
-      await Promise.all([loadPendingUsers(), loadPendingClubs()])
+      await loadPendingUsers()
+      await loadPendingClubs()
       alert('Пользователь успешно валидирован. Роль изменена на "Владелец клуба".')
     } catch (err: any) {
       alert(err.error || err.message || 'Ошибка валидации пользователя')
@@ -94,17 +91,14 @@ export default function Validation() {
     }
   }
 
-  const loadPendingClubs = async () => {
+  const loadPendingClubs = async (signal?: AbortSignal) => {
     try {
       setError('')
-      // Получаем все клубы, отправленные на валидацию, но еще не валидированные (исключая отклоненные)
-      const response = await clubsService.getAll({ limit: 1000, showHidden: 'true' })
-      const allClubs = response.data || []
-      const pendingClubs = (Array.isArray(allClubs) ? allClubs : []).filter((club: Club) => 
-        club.isSubmittedForValidation === true && club.isValidated === false && !club.rejectionComment
-      )
-      setClubs(pendingClubs)
+      const response = await clubsService.getPendingValidation({ signal })
+      if (signal?.aborted) return
+      setClubs((response as { data?: PendingClub[] }).data || [])
     } catch (err: any) {
+      if (isRequestAborted(err)) return
       console.error('Ошибка загрузки клубов:', err)
       setError(err.error || err.message || 'Ошибка загрузки клубов')
     }
@@ -118,7 +112,8 @@ export default function Validation() {
     setValidatingClub(clubId)
     try {
       await clubsService.update(clubId, { isValidated: true, rejectionComment: null })
-      await Promise.all([loadPendingUsers(), loadPendingClubs()])
+      await loadPendingUsers()
+      await loadPendingClubs()
       alert('Яхт-клуб успешно валидирован')
     } catch (err: any) {
       alert(err.error || err.message || 'Ошибка валидации яхт-клуба')
@@ -158,7 +153,8 @@ export default function Validation() {
         isSubmittedForValidation: false,
         rejectionComment: rejectComment.trim()
       })
-      await Promise.all([loadPendingUsers(), loadPendingClubs()])
+      await loadPendingUsers()
+      await loadPendingClubs()
       alert('Отказ в валидации отправлен владельцу клуба')
       handleRejectClose()
     } catch (err: any) {

@@ -4,6 +4,8 @@ import { config } from './config/env';
 import { AppDataSource } from './config/database';
 import { errorHandler } from './middleware/errorHandler';
 import { autoActivityLogger } from './middleware/autoActivityLogger';
+import { requestLifecycle } from './middleware/requestLifecycle';
+import { dbRequestGate, ignoreClientDisconnect } from './middleware/dbRequestGate';
 
 // Routes
 import authRoutes from './modules/auth/auth.routes';
@@ -80,6 +82,9 @@ app.options('*', (req: Request, res: Response) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Закрытие HTTP → abortSignal; слот пула БД освобождается при finish/close
+app.use(requestLifecycle);
+
 // Глобальный предохранитель пагинации: не позволяем тяжелые limit=1000/10000 на проде.
 app.use('/api', (req: Request, _res: Response, next: NextFunction) => {
   const limitRaw = req.query.limit;
@@ -91,6 +96,8 @@ app.use('/api', (req: Request, _res: Response, next: NextFunction) => {
   }
   next();
 });
+
+app.use('/api', dbRequestGate);
 
 app.use(async (req: Request, res: Response, next: NextFunction) => {
   if (req.path === '/health') {
@@ -175,6 +182,7 @@ app.use('/api/contract-filling', autoActivityLogger, contractFillingRoutes);
 app.use('/api/club-finance', autoActivityLogger, clubFinanceRoutes);
 app.use('/api/dashboard', autoActivityLogger, dashboardRoutes);
 
+app.use(ignoreClientDisconnect);
 // Error handler
 app.use(errorHandler);
 

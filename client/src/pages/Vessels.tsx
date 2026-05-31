@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { vesselsService, usersService } from '../services/api'
+import { vesselsService, usersService, isRequestAborted } from '../services/api'
 import { Vessel, UserRole } from '../types'
 import { Ship, Plus, Trash2, Search, Download, X, EyeOff, Eye, ArrowUp, ArrowDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function Vessels() {
   const { user } = useAuth()
@@ -34,10 +35,47 @@ export default function Vessels() {
   })
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
 
-  useEffect(() => {
-    loadVessels()
-    if (isSuperAdmin) {
-      loadUsers()
+  useCancellableEffect(async (signal) => {
+    try {
+      setLoading(true)
+      const response = await vesselsService.getAll({ limit: 100 }, { signal })
+      if (signal.aborted) return
+      let vesselsData = response.data || []
+
+      if (vesselsData.length > 0) {
+        console.log('📊 Загружены катера:', vesselsData.map((v: Vessel) => ({
+          id: v.id,
+          name: v.name,
+          passengerCapacity: v.passengerCapacity
+        })))
+      }
+
+      if (!showHiddenVessels) {
+        vesselsData = vesselsData.filter((v: Vessel) => v.isActive !== false)
+      }
+
+      vesselsData.sort((a: Vessel, b: Vessel) => {
+        if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+          if (a.sortOrder !== b.sortOrder) {
+            return a.sortOrder - b.sortOrder
+          }
+        }
+        if (a.isActive && !b.isActive) return -1
+        if (!a.isActive && b.isActive) return 1
+        return a.id - b.id
+      })
+
+      setVessels(vesselsData)
+
+      if (isSuperAdmin) {
+        await usersService.getAll({ limit: 100 }, { signal })
+      }
+    } catch (error) {
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки катеров:', error)
+      }
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
   }, [isSuperAdmin, showHiddenVessels])
 
@@ -80,16 +118,6 @@ export default function Vessels() {
       console.error('Ошибка загрузки катеров:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadUsers = async () => {
-    try {
-      // Загружаем пользователей для будущего использования (например, выбор владельца катера)
-      await usersService.getAll({ limit: 100 })
-      // setUsers(response.data || []) // Пока не используется, но оставляем для будущего
-    } catch (error) {
-      console.error('Ошибка загрузки пользователей:', error)
     }
   }
 

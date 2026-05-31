@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import BackButton from '../components/BackButton'
-import { clubsService, clubFinanceService } from '../services/api'
+import { clubsService, clubFinanceService, isRequestAborted } from '../services/api'
 import { CashTransactionType, Club, ClubCashTransaction } from '../types'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 type ReportType = 'all' | CashTransactionType.INCOME | CashTransactionType.EXPENSE
 
@@ -15,39 +16,39 @@ export default function ReportsFinance() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  useEffect(() => {
-    const loadClubs = async () => {
-      try {
-        const response = await clubsService.getAll({ limit: 200 })
-        const allClubs = response.data || []
-        setClubs(allClubs)
-        if (allClubs.length > 0) {
-          setSelectedClubId(allClubs[0].id)
-        }
-      } catch (e: any) {
-        setError(e?.error || e?.message || 'Ошибка загрузки клубов')
-      } finally {
-        setLoading(false)
+  useCancellableEffect(async (signal) => {
+    try {
+      const response = await clubsService.getAll({ limit: 200 }, { signal })
+      if (signal.aborted) return
+      const allClubs = response.data || []
+      setClubs(allClubs)
+      if (allClubs.length > 0) {
+        setSelectedClubId(allClubs[0].id)
       }
+    } catch (e: any) {
+      if (!isRequestAborted(e)) {
+        setError(e?.error || e?.message || 'Ошибка загрузки клубов')
+      }
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
-    loadClubs()
   }, [])
 
-  useEffect(() => {
-    const loadTransactions = async () => {
-      if (!selectedClubId) return
-      try {
-        setLoading(true)
-        const response = await clubFinanceService.getCashTransactions(selectedClubId)
-        const items = Array.isArray(response) ? response : response.data || []
-        setTransactions(items)
-      } catch (e: any) {
+  useCancellableEffect(async (signal) => {
+    if (!selectedClubId) return
+    try {
+      setLoading(true)
+      const response = await clubFinanceService.getCashTransactions(selectedClubId, { signal })
+      if (signal.aborted) return
+      const items = Array.isArray(response) ? response : response.data || []
+      setTransactions(items)
+    } catch (e: any) {
+      if (!isRequestAborted(e)) {
         setError(e?.error || e?.message || 'Ошибка загрузки операций')
-      } finally {
-        setLoading(false)
       }
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
-    loadTransactions()
   }, [selectedClubId])
 
   const filteredTransactions = useMemo(() => {

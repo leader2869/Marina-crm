@@ -43,16 +43,21 @@ const pgPoolMax =
   parseInt(process.env.PG_POOL_MAX || '', 10) ||
   (isPersistentServer ? (isTransactionPooler ? 3 : 4) : 2);
 
+export function getPgPoolMax(): number {
+  return pgPoolMax;
+}
+
 const pgPoolExtra: Record<string, unknown> = {
-  connectionTimeoutMillis: 15000,
-  query_timeout: isPersistentServer ? 30000 : 20000,
-  statement_timeout: isPersistentServer ? 30000 : 20000,
-  idle_in_transaction_session_timeout: 10000,
-  idleTimeoutMillis: 5000,
-  maxUses: 500,
+  connectionTimeoutMillis: 10000,
+  query_timeout: isPersistentServer ? 15000 : 20000,
+  statement_timeout: isPersistentServer ? 15000 : 20000,
+  idle_in_transaction_session_timeout: 5000,
+  idleTimeoutMillis: 3000,
+  maxUses: 300,
   max: pgPoolMax,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
+  allowExitOnIdle: true,
 };
 
 // PgBouncer/Supavisor transaction mode не поддерживает prepared statements

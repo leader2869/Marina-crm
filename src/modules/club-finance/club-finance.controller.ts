@@ -28,6 +28,7 @@ import {
   staffHasAnyPermission,
 } from '../../utils/clubStaffPermissions';
 import { assertClubCashPaymentsEnabled } from '../../utils/clubCashSettings';
+import { assertClientConnected } from '../../utils/requestContext';
 
 export class ClubFinanceController {
   private async ensureClubAccess(req: AuthRequest, clubId: number): Promise<Club> {
@@ -887,6 +888,8 @@ export class ClubFinanceController {
         })
         .getRawOne<{ totalIncome: string; totalExpense: string }>();
 
+      assertClientConnected();
+
       const partnerIncomeRows = await txRepository
         .createQueryBuilder('tx')
         .select('tx.acceptedByPartnerId', 'partnerId')
@@ -897,10 +900,14 @@ export class ClubFinanceController {
         .groupBy('tx.acceptedByPartnerId')
         .getRawMany<{ partnerId: string; incomeAmount: string }>();
 
+      assertClientConnected();
+
       const partners = await partnerRepository.find({
         where: { clubId: In(clubIds), isActive: true },
         select: ['id', 'name', 'clubId'],
       });
+
+      assertClientConnected();
 
       const paymentTotals = await paymentRepository
         .createQueryBuilder('payment')
@@ -923,12 +930,16 @@ export class ClubFinanceController {
         })
         .getRawOne<{ expectedIncomeAmount: string; receivablesAmount: string }>();
 
+      assertClientConnected();
+
       const availableBerths = await berthRepository.count({
         where: {
           clubId: In(clubIds),
           isAvailable: true,
         },
       });
+
+      assertClientConnected();
 
       const occupiedBerthRows = await bookingRepository
         .createQueryBuilder('booking')

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
-import { usersService } from '../services/api'
+import { useState } from 'react'
+import { usersService, isRequestAborted } from '../services/api'
 import { UserCheck, Phone, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 interface GuestData {
   id: number
@@ -19,23 +20,21 @@ export default function NewGuests() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    loadGuests()
-  }, [])
-
-  const loadGuests = async () => {
+  useCancellableEffect(async (signal) => {
     try {
       setLoading(true)
       setError('')
-      const response = await usersService.getGuests({ limit: 1000 })
+      const response = await usersService.getGuests({ limit: 100 }, { signal })
+      if (signal.aborted) return
       setGuests(response.data || [])
     } catch (err: any) {
+      if (isRequestAborted(err)) return
       console.error('Ошибка загрузки гостей:', err)
       setError(err.error || err.message || 'Ошибка загрузки гостей')
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }
+  }, [])
 
   if (loading) {
     return <LoadingAnimation message="Загрузка гостей..." />

@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { DashboardStatsResponse } from '../types'
 import { isRequestAborted, type RequestOptions } from '../utils/request'
 import { getNavigationAbortSignal, mergeAbortSignals } from '../utils/navigationAbort'
+import { apiQueue } from '../utils/apiQueue'
 
 export type { RequestOptions } from '../utils/request'
 export { isRequestAborted } from '../utils/request'
@@ -36,17 +37,25 @@ const api = axios.create({
   timeout: 30000,
 })
 
-// Добавляем токен и signal отмены при навигации
-api.interceptors.request.use((config) => {
+type ApiRequestConfig = import('axios').InternalAxiosRequestConfig & {
+  _queueAcquired?: boolean
+}
+
+// Токен + отмена при навигации + очередь (max 2 параллельно)
+api.interceptors.request.use(async (config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
   const navSignal = getNavigationAbortSignal()
   const requestSignal = config.signal as AbortSignal | undefined
-  config.signal = requestSignal
-    ? mergeAbortSignals(requestSignal, navSignal)
-    : navSignal
+  const merged = mergeAbortSignals(navSignal, requestSignal)
+  config.signal = merged
+
+  await apiQueue.acquire(merged)
+  ;(config as ApiRequestConfig)._queueAcquired = true
+
   return config
 })
 
@@ -66,8 +75,19 @@ api.interceptors.request.use((config) => {
 
 // Обработка ошибок
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const cfg = response.config as ApiRequestConfig
+    if (cfg._queueAcquired) {
+      apiQueue.release()
+    }
+    return response.data
+  },
   (error) => {
+    const cfg = error.config as ApiRequestConfig | undefined
+    if (cfg?._queueAcquired) {
+      apiQueue.release()
+    }
+
     if (isRequestAborted(error)) {
       return Promise.reject(error)
     }
@@ -180,6 +200,8 @@ export const clubsService = {
     api.get(`/clubs/${id}`, { params: options?.params, signal: options?.signal }),
   getMedia: (id: number, options?: RequestOptions) =>
     api.get(`/clubs/${id}/media`, { signal: options?.signal }),
+  getPendingValidation: (options?: RequestOptions) =>
+    api.get('/clubs/pending-validation', { signal: options?.signal }),
   create: (data: any) => api.post('/clubs', data),
   update: (id: number, data: any) => api.put(`/clubs/${id}`, data),
   hide: (id: number) => api.post(`/clubs/${id}/hide`),
@@ -199,7 +221,7 @@ export const vesselsService = {
 }
 
 export const bookingsService = {
-  getAll: (params?: any) => api.get('/bookings', { params }),
+  getAll: (params?: any, options?: RequestOptions) => api.get('/bookings', { params, signal: options?.signal }),
   getByClub: (clubId: number, params?: { page?: number; limit?: number }, options?: RequestOptions) =>
     api.get(`/bookings/club/${clubId}`, { params, signal: options?.signal }),
   getById: (id: number) => api.get(`/bookings/${id}`),
@@ -249,10 +271,12 @@ export const paymentsService = {
 }
 
 export const usersService = {
-  getAll: (params?: any) => api.get('/users', { params }),
-  getGuests: (params?: any) => api.get('/users/guests', { params }),
-  getPendingValidationCount: (): Promise<{ count: number }> =>
-    api.get('/users/pending-validation-count') as Promise<{ count: number }>,
+  getAll: (params?: any, options?: RequestOptions) => api.get('/users', { params, signal: options?.signal }),
+  getGuests: (params?: any, options?: RequestOptions) => api.get('/users/guests', { params, signal: options?.signal }),
+  getPendingValidationCount: (options?: RequestOptions): Promise<{ count: number }> =>
+    api.get('/users/pending-validation-count', { signal: options?.signal }) as Promise<{ count: number }>,
+  getPendingValidation: (options?: RequestOptions) =>
+    api.get('/users/pending-validation', { signal: options?.signal }),
   getById: (id: number) => api.get(`/users/${id}`),
   create: (data: any) => api.post('/users', data),
   update: (id: number, data: any) => api.put(`/users/${id}`, data),
@@ -285,7 +309,7 @@ export const bookingRulesService = {
 }
 
 export const activityLogsService = {
-  getAll: (params?: any) => api.get('/activity-logs', { params }),
+  getAll: (params?: any, options?: RequestOptions) => api.get('/activity-logs', { params, signal: options?.signal }),
 }
 
 export const incomeCategoriesService = {
@@ -351,7 +375,8 @@ export const clubFinanceService = {
     api.get(`/club-finance/clubs/${clubId}/cash-transactions`, { signal: options?.signal }),
   getCashDesk: (clubId: number, options?: RequestOptions) =>
     api.get(`/club-finance/clubs/${clubId}/cash-desk`, { signal: options?.signal }),
-  getExpectedIncomes: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/expected-incomes`),
+  getExpectedIncomes: (clubId: number, options?: RequestOptions) =>
+    api.get(`/club-finance/clubs/${clubId}/expected-incomes`, { signal: options?.signal }),
   getTenantReport: (clubId: number, options?: RequestOptions) =>
     api.get(`/club-finance/clubs/${clubId}/tenant-report`, { signal: options?.signal }),
   createCashTransaction: (clubId: number, data: any) =>

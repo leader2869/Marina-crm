@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import BackButton from '../components/BackButton'
-import { clubsService, clubFinanceService } from '../services/api'
+import { clubsService, clubFinanceService, isRequestAborted } from '../services/api'
 import { Club, ClubTenantReportResponse } from '../types'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function ReportsTenants() {
   const [clubs, setClubs] = useState<Club[]>([])
@@ -10,39 +11,39 @@ export default function ReportsTenants() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    const loadClubs = async () => {
-      try {
-        const response = await clubsService.getAll({ limit: 200 })
-        const allClubs = response.data || []
-        setClubs(allClubs)
-        if (allClubs.length > 0) {
-          setSelectedClubId(allClubs[0].id)
-        }
-      } catch (e: any) {
-        setError(e?.error || e?.message || 'Ошибка загрузки клубов')
-      } finally {
-        setLoading(false)
+  useCancellableEffect(async (signal) => {
+    try {
+      const response = await clubsService.getAll({ limit: 200 }, { signal })
+      if (signal.aborted) return
+      const allClubs = response.data || []
+      setClubs(allClubs)
+      if (allClubs.length > 0) {
+        setSelectedClubId(allClubs[0].id)
       }
+    } catch (e: any) {
+      if (!isRequestAborted(e)) {
+        setError(e?.error || e?.message || 'Ошибка загрузки клубов')
+      }
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
-    loadClubs()
   }, [])
 
-  useEffect(() => {
-    const loadTenantReport = async () => {
-      if (!selectedClubId) return
-      try {
-        setLoading(true)
-        const response = await clubFinanceService.getTenantReport(selectedClubId)
-        setTenantReport(response as unknown as ClubTenantReportResponse)
-      } catch (e: any) {
+  useCancellableEffect(async (signal) => {
+    if (!selectedClubId) return
+    try {
+      setLoading(true)
+      const response = await clubFinanceService.getTenantReport(selectedClubId, { signal })
+      if (signal.aborted) return
+      setTenantReport(response as unknown as ClubTenantReportResponse)
+    } catch (e: any) {
+      if (!isRequestAborted(e)) {
         setError(e?.error || e?.message || 'Ошибка загрузки отчета')
-        setTenantReport(null)
-      } finally {
-        setLoading(false)
       }
+      setTenantReport(null)
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
-    loadTenantReport()
   }, [selectedClubId])
 
   const occupiedItems = tenantReport?.occupiedItems || []

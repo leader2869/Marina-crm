@@ -28,6 +28,7 @@ import { generateActivityDescription } from '../../utils/activityLogDescription'
 import { getAllStaffClubAccesses } from '../../utils/clubStaffPermissions';
 import { getFreeBerthsCountsByClubIds } from '../../utils/freeBerths';
 import { getActiveBerthBookingSummaries, getOccupiedBerthIds } from '../../utils/berthOccupancy';
+import { assertClientConnected } from '../../utils/requestContext';
 
 export class ClubsController {
   private async resolveClubColumnName(queryRunner: QueryRunner, tableName: string): Promise<string | null> {
@@ -166,6 +167,41 @@ export class ClubsController {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
+  }
+
+  async getPendingValidation(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        throw new AppError('Недостаточно прав доступа', 403);
+      }
+
+      const clubRepository = AppDataSource.getRepository(Club);
+      const clubs = await clubRepository
+        .createQueryBuilder('club')
+        .leftJoinAndSelect('club.owner', 'owner')
+        .select([
+          'club.id',
+          'club.name',
+          'club.address',
+          'club.ownerId',
+          'club.createdAt',
+          'club.isValidated',
+          'club.isSubmittedForValidation',
+          'club.rejectionComment',
+          'owner.id',
+          'owner.firstName',
+          'owner.lastName',
+        ])
+        .where('club.isSubmittedForValidation = :submitted', { submitted: true })
+        .andWhere('club.isValidated = :validated', { validated: false })
+        .andWhere('(club.rejectionComment IS NULL OR club.rejectionComment = :empty)', { empty: '' })
+        .orderBy('club.createdAt', 'DESC')
+        .getMany();
+
+      res.json({ data: clubs });
+    } catch (error) {
+      next(error);
+    }
   }
 
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -408,7 +444,7 @@ export class ClubsController {
         throw new AppError('Яхт-клуб не найден', 404);
       }
 
-      // Гость и PENDING_VALIDATION могут видеть только активные И валидированные клубы
+      assertClientConnected();
       const isGuest = !req.userId || req.userRole === UserRole.GUEST;
       const isPendingValidation = req.userRole === UserRole.PENDING_VALIDATION;
       const isSuperAdmin = req.userRole === UserRole.SUPER_ADMIN;
@@ -457,6 +493,8 @@ export class ClubsController {
         )
         .addOrderBy('berth.number', 'ASC')
         .getMany();
+
+      assertClientConnected();
 
       if (berths.length > 0) {
         const berthIds = berths.map((b) => b.id);
@@ -515,7 +553,9 @@ export class ClubsController {
       // Добавляем отсортированные места к клубу
       club.berths = berths;
 
+      assertClientConnected();
       const occupiedBerthIds = await getOccupiedBerthIds(club.id);
+      assertClientConnected();
       const availableBerthIds = berths
         .filter((berth) => berth.isAvailable && !occupiedBerthIds.has(berth.id))
         .map((berth) => berth.id);

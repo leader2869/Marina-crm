@@ -74,6 +74,15 @@ fi
 cd "$REPO_ROOT"
 echo "==> Рабочая директория: $(pwd)"
 
+# git 2.35+: rsync/scp могли оставить файлы с uid ≠ root → dubious ownership
+ensure_git_repo_ready() {
+  git config --global --add safe.directory "$REPO_ROOT"
+  if [ "$(id -u)" -eq 0 ] && [ -d "$REPO_ROOT/.git" ]; then
+    chown -R root:root "$REPO_ROOT"
+  fi
+}
+ensure_git_repo_ready
+
 if [ ! -f .env ]; then
   echo ""
   echo "ERROR: Нет файла .env в $REPO_ROOT"

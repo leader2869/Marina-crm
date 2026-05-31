@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState, Fragment } from 'react'
-import { bookingsService, paymentsService, clubFinanceService, berthsService, clubsService } from '../services/api'
+import { useMemo, useState, Fragment } from 'react'
+import { bookingsService, paymentsService, clubFinanceService, berthsService, clubsService, isRequestAborted } from '../services/api'
 import { Booking, UserRole, BookingStatus, Payment, PaymentStatus, CashPaymentMethod, ClubPartner, ClubPartnerManager } from '../types'
 import { Calendar, ChevronDown, ChevronUp, User, Ship, Phone, Mail, X, CreditCard, Trash2, CheckCircle2, ArrowRightLeft } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function Bookings() {
   const { user } = useAuth()
@@ -38,58 +39,62 @@ export default function Bookings() {
   const isClubStaff = user?.role === UserRole.CLUB_STAFF
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
 
-  useEffect(() => {
-    const loadPageData = async () => {
-      setLoading(true)
-      try {
-        const needsClubFilter = isClubOwner || isClubStaff || isSuperAdmin
-        const bookingsPromise = bookingsService.getAll({ limit: 100 })
-        const clubsPromise = needsClubFilter
-          ? clubsService.getAll({
-              limit: 200,
-              ...(isSuperAdmin ? { showHidden: 'true' } : {}),
-            })
-          : null
+  useCancellableEffect(async (signal) => {
+    if (!user?.role) return
 
-        const [bookingsResponse, clubsResponse] = await Promise.all([
-          bookingsPromise,
-          clubsPromise ?? Promise.resolve(null),
-        ])
+    setLoading(true)
+    try {
+      const role = user.role
+      const needsClubFilter =
+        role === UserRole.CLUB_OWNER ||
+        role === UserRole.CLUB_STAFF ||
+        role === UserRole.SUPER_ADMIN ||
+        role === UserRole.ADMIN
 
-        setBookings(bookingsResponse.data || [])
+      const bookingsResponse = await bookingsService.getAll({ limit: 100 }, { signal })
+      if (signal.aborted) return
+      setBookings(bookingsResponse.data || [])
 
-        if (clubsResponse) {
-          const clubs = (clubsResponse.data || []) as Array<{
-            id: number
-            name: string
-            cashPaymentsEnabled?: boolean
-          }>
-          const mapped = clubs.map((club) => ({
-            id: club.id,
-            name: club.name,
-            cashPaymentsEnabled: club.cashPaymentsEnabled,
-          }))
-          setClubList(mapped)
-          if (mapped.length > 0) {
-            setSelectedClubId((prev) => prev ?? mapped[0].id)
-          }
+      if (needsClubFilter) {
+        const clubsResponse = await clubsService.getAll(
+          {
+            limit: 200,
+            ...(role === UserRole.SUPER_ADMIN ? { showHidden: 'true' } : {}),
+          },
+          { signal }
+        )
+        if (signal.aborted) return
+        const clubs = (clubsResponse.data || []) as Array<{
+          id: number
+          name: string
+          cashPaymentsEnabled?: boolean
+        }>
+        const mapped = clubs.map((club) => ({
+          id: club.id,
+          name: club.name,
+          cashPaymentsEnabled: club.cashPaymentsEnabled,
+        }))
+        setClubList(mapped)
+        if (mapped.length > 0) {
+          setSelectedClubId((prev) => prev ?? mapped[0].id)
         }
-      } catch (error) {
-        console.error('Ошибка загрузки бронирований:', error)
-      } finally {
-        setLoading(false)
       }
+    } catch (error) {
+      if (isRequestAborted(error)) return
+      console.error('Ошибка загрузки бронирований:', error)
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
-
-    void loadPageData()
-  }, [isClubOwner, isClubStaff, isSuperAdmin])
+  }, [user?.role, user?.id])
 
   const loadBookings = async () => {
     try {
       const response = await bookingsService.getAll({ limit: 100 })
       setBookings(response.data || [])
     } catch (error) {
-      console.error('Ошибка загрузки бронирований:', error)
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки бронирований:', error)
+      }
     }
   }
 

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usersService, clubsService } from '../services/api'
+import { usersService, clubsService, isRequestAborted } from '../services/api'
 import { UserRole, Club, Vessel } from '../types'
 import { Users, Edit2, X, Plus, Trash2, Search, Ship, Download, ArrowUp, ArrowDown, ChevronsUpDown, User } from 'lucide-react'
 import { format } from 'date-fns'
@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import * as XLSX from 'xlsx'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 interface UserData {
   id: number
@@ -59,9 +60,29 @@ export default function UsersPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
 
-  useEffect(() => {
-    loadUsers()
-    loadClubs()
+  useCancellableEffect(async (signal) => {
+    try {
+      setLoading(true)
+      setError('')
+      const response = await usersService.getAll({ limit: 100 }, { signal })
+      if (signal.aborted) return
+      const loadedUsers = response.data || []
+      setUsers(loadedUsers)
+      setSelectedUserIds((prev) =>
+        prev.filter((id) => loadedUsers.some((u: UserData) => u.id === id))
+      )
+
+      const clubsResponse = await clubsService.getAll({ limit: 100 }, { signal })
+      if (signal.aborted) return
+      setClubs(clubsResponse.data || [])
+    } catch (error: any) {
+      if (isRequestAborted(error)) return
+      console.error('Ошибка загрузки пользователей:', error)
+      const errorMessage = error.error || error.message || 'Ошибка загрузки пользователей'
+      setError(errorMessage)
+    } finally {
+      if (!signal.aborted) setLoading(false)
+    }
   }, [])
 
   const loadUsers = async () => {
@@ -82,15 +103,6 @@ export default function UsersPage() {
       alert(errorMessage)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadClubs = async () => {
-    try {
-      const response = await clubsService.getAll({ limit: 100 })
-      setClubs(response.data || [])
-    } catch (error) {
-      console.error('Ошибка загрузки клубов:', error)
     }
   }
 

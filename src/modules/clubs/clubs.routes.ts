@@ -7,6 +7,12 @@ const router = Router();
 const clubsController = new ClubsController();
 
 router.get('/', optionalAuthenticate, clubsController.getAll.bind(clubsController));
+router.get(
+  '/pending-validation',
+  authenticate,
+  authorize(UserRole.SUPER_ADMIN, UserRole.ADMIN),
+  clubsController.getPendingValidation.bind(clubsController)
+);
 router.post('/', authenticate, clubsController.create.bind(clubsController));
 // ВАЖНО: Специфичные маршруты с дополнительными путями должны быть ПЕРЕД общими маршрутами с параметрами
 router.post('/:id/hide', authenticate, clubsController.hide.bind(clubsController));

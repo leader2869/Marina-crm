@@ -204,6 +204,26 @@ export class UsersController {
     }
   }
 
+  /** Список пользователей, ожидающих валидацию */
+  async getPendingValidation(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (req.userRole !== UserRole.SUPER_ADMIN && req.userRole !== UserRole.ADMIN) {
+        throw new AppError('Недостаточно прав доступа', 403);
+      }
+
+      const userRepository = AppDataSource.getRepository(User);
+      const users = await userRepository.find({
+        where: { role: UserRole.PENDING_VALIDATION },
+        select: ['id', 'firstName', 'lastName', 'email', 'phone', 'role', 'createdAt', 'isValidated'],
+        order: { createdAt: 'DESC' },
+      });
+
+      res.json({ data: users });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /** Лёгкий счётчик для бейджа в меню — без загрузки 1000 пользователей и клубов */
   async getPendingValidationCount(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -214,15 +234,13 @@ export class UsersController {
       const userRepository = AppDataSource.getRepository(User);
       const clubRepository = AppDataSource.getRepository(Club);
 
-      const [pendingUsers, pendingClubs] = await Promise.all([
-        userRepository.count({ where: { role: UserRole.PENDING_VALIDATION } }),
-        clubRepository
-          .createQueryBuilder('club')
-          .where('club.isSubmittedForValidation = :submitted', { submitted: true })
-          .andWhere('club.isValidated = :validated', { validated: false })
-          .andWhere('(club.rejectionComment IS NULL OR club.rejectionComment = :empty)', { empty: '' })
-          .getCount(),
-      ]);
+      const pendingUsers = await userRepository.count({ where: { role: UserRole.PENDING_VALIDATION } });
+      const pendingClubs = await clubRepository
+        .createQueryBuilder('club')
+        .where('club.isSubmittedForValidation = :submitted', { submitted: true })
+        .andWhere('club.isValidated = :validated', { validated: false })
+        .andWhere('(club.rejectionComment IS NULL OR club.rejectionComment = :empty)', { empty: '' })
+        .getCount();
 
       res.json({ count: pendingUsers + pendingClubs });
     } catch (error) {

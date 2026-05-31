@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from 'react'
-import { activityLogsService } from '../services/api'
+import { useState, useRef } from 'react'
+import { activityLogsService, isRequestAborted } from '../services/api'
 import { FileText, Filter, Download } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 
@@ -65,18 +66,13 @@ export default function ActivityLogs() {
     endDate: '',
   })
 
-  useEffect(() => {
-    loadLogs()
-  }, [page])
-
-  useEffect(() => {
-    // Прокручиваем страницу вверх при изменении страницы
+  useCancellableEffect(async (signal) => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    // Обновляем значение в поле ввода
     setPageInput(page.toString())
+    await loadLogs(signal)
   }, [page])
 
-  const loadLogs = async () => {
+  const loadLogs = async (signal?: AbortSignal) => {
     try {
       setLoading(true)
       const params: any = {
@@ -90,9 +86,8 @@ export default function ActivityLogs() {
       if (filters.startDate) params.startDate = filters.startDate
       if (filters.endDate) params.endDate = filters.endDate
 
-      const response: any = await activityLogsService.getAll(params)
-      console.log('Ответ от API логов:', response)
-      
+      const response: any = await activityLogsService.getAll(params, { signal })
+      if (signal?.aborted) return
       // API interceptor уже возвращает response.data, поэтому обращаемся напрямую к полям
       const logsData = response?.logs || []
       const totalPagesData = response?.totalPages || 1
@@ -104,10 +99,11 @@ export default function ActivityLogs() {
       setTotalPages(totalPagesData)
       setTotal(totalData)
     } catch (error) {
+      if (isRequestAborted(error)) return
       console.error('Ошибка загрузки логов:', error)
       setError('Ошибка загрузки логов. Проверьте консоль для деталей.')
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }
 

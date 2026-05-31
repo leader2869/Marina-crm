@@ -250,74 +250,54 @@ export default function Layout() {
     })
   }, [location.pathname, navigation])
 
-  // Загружаем счетчик новых гостей для суперадминистратора
+  // Счётчики для суперадмина — отложенно и последовательно, чтобы не забивать пул БД при загрузке страницы
   useEffect(() => {
-    const loadNewGuestsCount = async () => {
-      if (user?.role === UserRole.SUPER_ADMIN) {
-        try {
-          // Получаем timestamp последнего просмотра из localStorage
-          const lastViewed = localStorage.getItem('guests_last_viewed')
-          const afterDate = lastViewed ? new Date(lastViewed).toISOString() : null
+    if (user?.role !== UserRole.SUPER_ADMIN) return
 
-          if (afterDate) {
-            const response = await usersService.getGuests({ 
-              countOnly: 'true',
-              afterDate 
-            })
-            const data = response.data || response
-            setNewGuestsCount(data?.count || 0)
-          } else {
-            // Если никогда не просматривали, показываем общее количество
-            const response = await usersService.getGuests({ 
-              countOnly: 'true'
-            })
-            const data = response.data || response
-            setNewGuestsCount(data?.count || 0)
-          }
-        } catch (error) {
-          if (!isRequestAborted(error)) {
-            console.error('Ошибка загрузки счетчика новых гостей:', error)
-          }
+    let cancelled = false
+    const controller = new AbortController()
+
+    const loadCounts = async () => {
+      try {
+        const lastViewed = localStorage.getItem('guests_last_viewed')
+        const afterDate = lastViewed ? new Date(lastViewed).toISOString() : null
+
+        const guestsResponse = await usersService.getGuests(
+          afterDate ? { countOnly: 'true', afterDate } : { countOnly: 'true' },
+          { signal: controller.signal }
+        )
+        if (cancelled) return
+        const guestsData = guestsResponse.data || guestsResponse
+        setNewGuestsCount(guestsData?.count || 0)
+
+        const validationData = await usersService.getPendingValidationCount({ signal: controller.signal })
+        if (cancelled) return
+        setPendingValidationCount(validationData?.count || 0)
+      } catch (error) {
+        if (!isRequestAborted(error)) {
+          console.error('Ошибка загрузки счётчиков меню:', error)
         }
       }
     }
 
-    loadNewGuestsCount()
+    const initialTimer = setTimeout(loadCounts, 5000)
+    const interval = setInterval(loadCounts, 120000)
 
-    const interval = setInterval(loadNewGuestsCount, 60000)
-
-    return () => clearInterval(interval)
+    return () => {
+      cancelled = true
+      controller.abort()
+      clearTimeout(initialTimer)
+      clearInterval(interval)
+    }
   }, [user])
 
   // Обновляем счетчик при посещении страницы новых гостей
   useEffect(() => {
     if (location.pathname === '/new-guests' && user?.role === UserRole.SUPER_ADMIN) {
-      // Сохраняем текущее время как время последнего просмотра
       localStorage.setItem('guests_last_viewed', new Date().toISOString())
       setNewGuestsCount(0)
     }
   }, [location.pathname, user])
-
-  // Загружаем счетчик ожидающих валидацию для суперадминистратора
-  useEffect(() => {
-    const loadPendingValidationCount = async () => {
-      if (user?.role === UserRole.SUPER_ADMIN) {
-        try {
-          const data = await usersService.getPendingValidationCount()
-          setPendingValidationCount(data?.count || 0)
-        } catch (error) {
-          console.error('Ошибка загрузки счетчика ожидающих валидацию:', error)
-        }
-      }
-    }
-
-    loadPendingValidationCount()
-    
-    // Обновляем счетчик каждые 5 минут (раньше — 30 сек + 2000 записей)
-    const interval = setInterval(loadPendingValidationCount, 300000)
-
-    return () => clearInterval(interval)
-  }, [user, location.pathname])
 
   // Обновляем счетчик при посещении страницы валидации
   useEffect(() => {

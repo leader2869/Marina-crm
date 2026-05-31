@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import BackButton from '../components/BackButton'
-import { clubsService, clubFinanceService } from '../services/api'
+import { clubsService, clubFinanceService, isRequestAborted } from '../services/api'
 import { Club, ClubExpectedIncomeItem, ClubExpectedIncomesResponse, PaymentStatus } from '../types'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function ClubExpectedIncomes() {
   const [clubs, setClubs] = useState<Club[]>([])
@@ -13,44 +14,42 @@ export default function ClubExpectedIncomes() {
 
   const formatAmount = (amount: number) => Number(amount).toLocaleString('ru-RU')
 
-  const loadClubs = async () => {
+  useCancellableEffect(async (signal) => {
     try {
       setLoading(true)
-      const response = await clubsService.getAll({ limit: 200 })
+      const response = await clubsService.getAll({ limit: 200 }, { signal })
+      if (signal.aborted) return
       const allClubs = response.data || []
       setClubs(allClubs)
       if (allClubs.length > 0) {
         setSelectedClubId(allClubs[0].id)
       }
     } catch (e: any) {
-      setError(e?.error || e?.message || 'Ошибка загрузки клубов')
+      if (!isRequestAborted(e)) {
+        setError(e?.error || e?.message || 'Ошибка загрузки клубов')
+      }
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }
+  }, [])
 
-  const loadExpectedIncomes = async (clubId: number) => {
+  useCancellableEffect(async (signal) => {
+    if (!selectedClubId) return
+    setSelectedMonthKey('all')
     try {
       setLoading(true)
       setError('')
-      const response = (await clubFinanceService.getExpectedIncomes(clubId)) as unknown as ClubExpectedIncomesResponse
+      const response = (await clubFinanceService.getExpectedIncomes(selectedClubId, { signal })) as unknown as ClubExpectedIncomesResponse
+      if (signal.aborted) return
       setItems(response.items || [])
     } catch (e: any) {
-      setError(e?.error || e?.message || 'Ошибка загрузки ожидаемых приходов')
+      if (!isRequestAborted(e)) {
+        setError(e?.error || e?.message || 'Ошибка загрузки ожидаемых приходов')
+      }
       setItems([])
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadClubs()
-  }, [])
-
-  useEffect(() => {
-    if (!selectedClubId) return
-    setSelectedMonthKey('all')
-    loadExpectedIncomes(selectedClubId)
   }, [selectedClubId])
 
   const monthOptions = useMemo(() => {
