@@ -31,10 +31,19 @@ dotenv.config();
 
 const isPersistentServer = !process.env.VERCEL && !process.env.VERCEL_ENV;
 
-// Supabase Pro + один PM2-процесс: 15 соединений (настраивается PG_POOL_MAX).
-const pgPoolMax = parseInt(process.env.PG_POOL_MAX || '', 10) || (isPersistentServer ? 15 : 2);
+const databaseUrl = process.env.DATABASE_URL || '';
+const dbPort = parseInt(process.env.DB_PORT || '', 10);
+const isTransactionPooler =
+  dbPort === 6543 ||
+  databaseUrl.includes(':6543/') ||
+  process.env.SUPABASE_POOL_MODE === 'transaction';
 
-const pgPoolExtra = {
+// Session pooler (:5432): лимит pool_size ~15. Transaction pooler (:6543): много клиентов.
+const pgPoolMax =
+  parseInt(process.env.PG_POOL_MAX || '', 10) ||
+  (isPersistentServer ? (isTransactionPooler ? 10 : 6) : 2);
+
+const pgPoolExtra: Record<string, unknown> = {
   connectionTimeoutMillis: 45000,
   query_timeout: isPersistentServer ? 120000 : 60000,
   statement_timeout: isPersistentServer ? 120000 : 60000,
@@ -43,6 +52,11 @@ const pgPoolExtra = {
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 };
+
+// PgBouncer/Supavisor transaction mode не поддерживает prepared statements
+if (isTransactionPooler) {
+  pgPoolExtra.prepareThreshold = 0;
+}
 
 // Поддержка connection string для Supabase и других облачных провайдеров
 const getDatabaseConfig = () => {
