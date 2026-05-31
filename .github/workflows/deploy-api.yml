@@ -31,5 +31,5 @@ jobs:
             elif [[ -d "$APP_DIR/repo/.git" && -f "$APP_DIR/repo/scripts/vps/repair-and-deploy.sh" ]]; then
               bash "$APP_DIR/repo/scripts/vps/repair-and-deploy.sh"
             else
-              curl -fsSL "https://raw.githubusercontent.com/leader2869/Marina-crm/main/scripts/vps/repair-and-deploy.sh" | bash
+              curl -fsSL "https://raw.githubusercontent.com/leader2869/Marina-crm/main/scripts/vps/repair-and-deploy.sh" | sed 's/\r$//' | bash
             fi
