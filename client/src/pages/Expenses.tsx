@@ -8,7 +8,8 @@ import {
   VesselOwnerExpenseCategory, 
   CashTransaction,
   CashTransactionType,
-  CashPaymentMethod
+  CashPaymentMethod,
+  VesselOwnerCash,
 } from '../types'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { format } from 'date-fns'
@@ -80,30 +81,32 @@ export default function Expenses() {
       setTransactionsLoading(true)
       // Загружаем все кассы пользователя
       const cashesResponse = await vesselOwnerCashesService.getAll({ limit: 100 })
-      const cashes = cashesResponse.data || []
-      
-      // Загружаем все транзакции типа EXPENSE из всех касс
-      const allTransactions: CashTransaction[] = []
-      for (const cash of cashes) {
-        try {
-          const params: any = {
-            limit: 1000,
-            transactionType: CashTransactionType.EXPENSE,
+      const cashes: VesselOwnerCash[] = cashesResponse.data || []
+
+      const transactionGroups = await Promise.all(
+        cashes.map(async (cash: VesselOwnerCash) => {
+          try {
+            const params: any = {
+              limit: 1000,
+              transactionType: CashTransactionType.EXPENSE,
+            }
+            if (selectedCategory) params.expenseCategoryId = selectedCategory
+            if (dateFrom) params.startDate = dateFrom
+            if (dateTo) params.endDate = dateTo
+
+            const transactionsResponse = await vesselOwnerCashesService.getTransactions(
+              cash.id,
+              params
+            )
+            return transactionsResponse.data || []
+          } catch (error) {
+            console.error(`Ошибка загрузки транзакций для кассы ${cash.id}:`, error)
+            return []
           }
-          if (selectedCategory) params.expenseCategoryId = selectedCategory
-          if (dateFrom) params.startDate = dateFrom
-          if (dateTo) params.endDate = dateTo
-          
-          const transactionsResponse = await vesselOwnerCashesService.getTransactions(
-            cash.id,
-            params
-          )
-          const cashTransactions = transactionsResponse.data || []
-          allTransactions.push(...cashTransactions)
-        } catch (error) {
-          console.error(`Ошибка загрузки транзакций для кассы ${cash.id}:`, error)
-        }
-      }
+        })
+      )
+
+      const allTransactions: CashTransaction[] = transactionGroups.flat()
       
       // Сортируем по дате (новые сначала)
       allTransactions.sort((a, b) => {

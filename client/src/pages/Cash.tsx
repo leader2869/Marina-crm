@@ -55,9 +55,7 @@ export default function Cash() {
   })
 
   useEffect(() => {
-    loadVessels()
-    loadIncomeCategories()
-    loadExpenseCategories()
+    void Promise.all([loadVessels(), loadIncomeCategories(), loadExpenseCategories()])
   }, [searchParams])
 
   useEffect(() => {
@@ -79,8 +77,7 @@ export default function Cash() {
 
   useEffect(() => {
     if (selectedCash) {
-      loadTransactions()
-      loadBalance()
+      void Promise.all([loadTransactions(), loadBalance()])
     }
   }, [selectedCash, filterType, filterPaymentMethod, dateFrom, dateTo])
 
@@ -91,22 +88,23 @@ export default function Cash() {
         limit: 100, 
         vesselId: vesselId 
       })
-      const vesselCashes = cashesResponse.data || []
-      
-      // Загружаем баланс для каждой кассы и суммируем
-      let totalBalance = 0
-      for (const cash of vesselCashes) {
-        try {
-          const balanceResponse: any = await vesselOwnerCashesService.getBalance(cash.id)
-          if (balanceResponse && typeof balanceResponse.balance === 'number') {
-            totalBalance += balanceResponse.balance
+      const vesselCashes: VesselOwnerCash[] = cashesResponse.data || []
+
+      const cashBalances = await Promise.all(
+        vesselCashes.map(async (cash: VesselOwnerCash) => {
+          try {
+            const balanceResponse: any = await vesselOwnerCashesService.getBalance(cash.id)
+            if (balanceResponse && typeof balanceResponse.balance === 'number') {
+              return balanceResponse.balance
+            }
+          } catch (error) {
+            console.error(`Ошибка загрузки баланса кассы ${cash.id}:`, error)
           }
-        } catch (error) {
-          console.error(`Ошибка загрузки баланса кассы ${cash.id}:`, error)
-        }
-      }
-      
-      return totalBalance
+          return 0
+        })
+      )
+
+      return cashBalances.reduce((sum, balance) => sum + balance, 0)
     } catch (error) {
       console.error(`Ошибка загрузки баланса катера ${vesselId}:`, error)
       return 0
@@ -122,12 +120,13 @@ export default function Cash() {
       const userVessels = vesselsData.filter((vessel: Vessel) => vessel.ownerId === user?.id)
       setVessels(userVessels)
       
-      // Загружаем балансы для всех катеров
-      const balances: Record<number, number> = {}
-      for (const vessel of userVessels) {
-        balances[vessel.id] = await loadVesselBalance(vessel.id)
-      }
-      setVesselBalances(balances)
+      const balanceEntries = await Promise.all(
+        userVessels.map(async (vessel: Vessel) => {
+          const balance = await loadVesselBalance(vessel.id)
+          return [vessel.id, balance] as const
+        })
+      )
+      setVesselBalances(Object.fromEntries(balanceEntries))
       
       // Проверяем, есть ли vesselId в URL параметрах
       const vesselIdParam = searchParams.get('vesselId')

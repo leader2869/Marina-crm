@@ -9,57 +9,39 @@ import * as XLSX from 'xlsx'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
 
-// Компонент для подсчета свободных мест с учетом бронирований
-function FreeBerthsCount({ club, user }: { club: Club; user: any }) {
-  const [count, setCount] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
+const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'confirmed', 'active'])
 
-  useEffect(() => {
-    const calculateFreeBerths = async () => {
+function calculateFreeBerths(club: Club, clubBookings: Booking[]): number {
+  const occupiedBerthIds = new Set(
+    clubBookings
+      .filter((booking) => ACTIVE_BOOKING_STATUSES.has(booking.status))
+      .map((booking) => booking.berthId)
+  )
+  return Math.max(0, Number(club.totalBerths || 0) - occupiedBerthIds.size)
+}
+
+async function loadFreeBerthsCounts(clubsToLoad: Club[]): Promise<Record<number, number>> {
+  const entries = await Promise.all(
+    clubsToLoad.map(async (club) => {
       try {
-        let clubBookings: Booking[] = []
-
         const response = await bookingsService.getByClub(club.id)
-        clubBookings = (response as any)?.data || response || []
-        if (!Array.isArray(clubBookings)) {
-          clubBookings = []
-        }
-
-        const occupiedBerthIds = new Set(
-          clubBookings
-            .filter((booking: Booking) =>
-              booking.status === 'pending' ||
-              booking.status === 'confirmed' ||
-              booking.status === 'active'
-            )
-            .map((booking: Booking) => booking.berthId)
-        )
-
-        const totalBerths = Number(club.totalBerths || 0)
-        const freeBerths = Math.max(0, totalBerths - occupiedBerthIds.size)
-        setCount(freeBerths)
+        const clubBookings = (response as any)?.data || response || []
+        const bookings = Array.isArray(clubBookings) ? clubBookings : []
+        return [club.id, calculateFreeBerths(club, bookings)] as const
       } catch (error) {
-        console.error('Ошибка подсчета свободных мест:', error)
-        setCount(Number(club.totalBerths || 0))
-      } finally {
-        setLoading(false)
+        console.error(`Ошибка подсчета свободных мест для клуба ${club.id}:`, error)
+        return [club.id, Number(club.totalBerths || 0)] as const
       }
-    }
-
-    calculateFreeBerths()
-  }, [club, user])
-
-  if (loading) {
-    return <span>-</span>
-  }
-
-  return <span>{count ?? 0}</span>
+    })
+  )
+  return Object.fromEntries(entries)
 }
 
 export default function Clubs() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [clubs, setClubs] = useState<Club[]>([])
+  const [freeBerthsByClubId, setFreeBerthsByClubId] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -121,6 +103,8 @@ export default function Clubs() {
       }
       
       setClubs(filteredClubs)
+      setFreeBerthsByClubId({})
+      void loadFreeBerthsCounts(filteredClubs).then(setFreeBerthsByClubId)
     } catch (error) {
       console.error('Ошибка загрузки клубов:', error)
     } finally {
@@ -656,7 +640,7 @@ export default function Clubs() {
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-gray-600">Свободных мест:</span>
                   <span className="font-semibold text-green-600">
-                    <FreeBerthsCount club={club} user={user} />
+                    {freeBerthsByClubId[club.id] ?? '—'}
                   </span>
                 </div>
                 {/* Кнопка "Опубликовать" для владельца клуба, если клуб еще не отправлен или был отклонен */}

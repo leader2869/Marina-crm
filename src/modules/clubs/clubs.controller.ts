@@ -100,6 +100,25 @@ export class ClubsController {
     }
   }
 
+  private isHeavyInlineImage(value: string): boolean {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return false;
+    }
+    if (trimmed.startsWith('data:image')) {
+      return true;
+    }
+    // Base64-фото в списках раздувают ответ до сотен KB на клуб.
+    return trimmed.length > 500;
+  }
+
+  private sanitizeListLogo(value: string | null | undefined): string | null {
+    if (!value || typeof value !== 'string') {
+      return null;
+    }
+    return this.isHeavyInlineImage(value) ? null : value;
+  }
+
   private toListLogo(rawLogo: unknown): string | null {
     if (!rawLogo || typeof rawLogo !== 'string') {
       return null;
@@ -109,11 +128,11 @@ export class ClubsController {
       const parsed = JSON.parse(rawLogo);
       if (Array.isArray(parsed)) {
         const firstPhoto = parsed.find((item) => typeof item === 'string' && item.trim().length > 0);
-        return typeof firstPhoto === 'string' ? firstPhoto : null;
+        return typeof firstPhoto === 'string' ? this.sanitizeListLogo(firstPhoto) : null;
       }
-      return rawLogo;
+      return this.sanitizeListLogo(rawLogo);
     } catch {
-      return rawLogo;
+      return this.sanitizeListLogo(rawLogo);
     }
   }
 
