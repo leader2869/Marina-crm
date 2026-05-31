@@ -46,8 +46,33 @@ mkdir -p "$APP_DIR/uploads"
 chmod 755 "$APP_DIR/uploads"
 
 if [[ ! -d "$APP_DIR/.git" ]]; then
-  echo "==> Клонирование репозитория..."
-  git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+  if [[ -f "$APP_DIR/.env" ]]; then
+    echo "==> Каталог без git, но есть .env — клонируем через repair-and-deploy..."
+    if [[ -f "$APP_DIR/scripts/vps/repair-and-deploy.sh" ]]; then
+      bash "$APP_DIR/scripts/vps/repair-and-deploy.sh"
+      exit 0
+    fi
+    ENV_BACKUP="$(mktemp)"
+    cp "$APP_DIR/.env" "$ENV_BACKUP"
+    UPLOADS_DIR=""
+    if [[ -d "$APP_DIR/uploads" ]]; then
+      UPLOADS_DIR="$(mktemp -d)"
+      cp -a "$APP_DIR/uploads/." "$UPLOADS_DIR/" 2>/dev/null || true
+    fi
+    rm -rf "$APP_DIR"
+    git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+    cp "$ENV_BACKUP" "$APP_DIR/.env"
+    chmod 600 "$APP_DIR/.env"
+    rm -f "$ENV_BACKUP"
+    if [[ -n "$UPLOADS_DIR" ]]; then
+      mkdir -p "$APP_DIR/uploads"
+      cp -a "$UPLOADS_DIR/." "$APP_DIR/uploads/" 2>/dev/null || true
+      rm -rf "$UPLOADS_DIR"
+    fi
+  else
+    echo "==> Клонирование репозитория..."
+    git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+  fi
 else
   echo "==> Обновление репозитория..."
   git -C "$APP_DIR" fetch origin

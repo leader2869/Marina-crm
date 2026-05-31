@@ -26,23 +26,10 @@ jobs:
           script: |
             set -euo pipefail
             APP_DIR="${APP_DIR:-/var/www/marina-crm}"
-            cd "$APP_DIR"
-            git fetch origin main
-            git checkout main
-            git pull origin main
-            export APP_VERSION="$(git rev-parse --short HEAD)"
-            if grep -q '^APP_VERSION=' .env; then
-              sed -i "s/^APP_VERSION=.*/APP_VERSION=${APP_VERSION}/" .env
+            if [[ -d "$APP_DIR/.git" && -f "$APP_DIR/scripts/vps/repair-and-deploy.sh" ]]; then
+              bash "$APP_DIR/scripts/vps/repair-and-deploy.sh"
+            elif [[ -d "$APP_DIR/repo/.git" && -f "$APP_DIR/repo/scripts/vps/repair-and-deploy.sh" ]]; then
+              bash "$APP_DIR/repo/scripts/vps/repair-and-deploy.sh"
             else
-              echo "APP_VERSION=${APP_VERSION}" >> .env
+              curl -fsSL "https://raw.githubusercontent.com/leader2869/Marina-crm/main/scripts/vps/repair-and-deploy.sh" | bash
             fi
-            npm ci
-            npm run build:server
-            if pm2 describe marina-crm-api >/dev/null 2>&1; then
-              APP_VERSION="$APP_VERSION" pm2 restart marina-crm-api --update-env
-            else
-              APP_VERSION="$APP_VERSION" pm2 start dist/server.js --name marina-crm-api
-            fi
-            pm2 save
-            sleep 2
-            curl -sf "http://127.0.0.1:3001/health"
