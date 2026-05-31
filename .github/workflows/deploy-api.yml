@@ -10,26 +10,56 @@ on:
       - 'package-lock.json'
       - 'tsconfig.json'
       - 'scripts/vps/**'
+      - '.github/workflows/deploy-api.yml'
   workflow_dispatch:
 
 jobs:
   deploy-api:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate VPS secrets
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -eu
+          if [ -z "${{ secrets.VPS_HOST }}" ]; then
+            echo "::error::Нет secret VPS_HOST. Пример: 185.46.11.187"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VPS_USER }}" ]; then
+            echo "::error::Нет secret VPS_USER. Обычно: root"
+            exit 1
+          fi
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "::error::Нет secret VPS_SSH_KEY."
+            echo "С Mac выполните: cat ~/.ssh/marina_vps"
+            echo "Скопируйте ВЕСЬ вывод (BEGIN…END), вставьте в GitHub → Settings → Secrets → VPS_SSH_KEY"
+            echo "НЕ используйте marina_vps.pub — только приватный ключ!"
+            exit 1
+          fi
+          if ! printf '%s\n' "$VPS_SSH_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            echo "::error::VPS_SSH_KEY не похож на приватный ключ OpenSSH."
+            echo "Скорее всего вставлен публичный ключ (.pub). Нужен ~/.ssh/marina_vps"
+            exit 1
+          fi
+          printf '%s\n' "$VPS_SSH_KEY" > /tmp/vps_deploy_key
+          chmod 600 /tmp/vps_deploy_key
+          if ! ssh-keygen -y -f /tmp/vps_deploy_key >/dev/null 2>&1; then
+            echo "::error::VPS_SSH_KEY не парсится. Скопируйте ключ целиком, с переносами строк."
+            exit 1
+          fi
+          rm -f /tmp/vps_deploy_key
+          echo "VPS secrets: OK"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          timeout: 120s
+          command_timeout: 15m
           script_stop: true
           script: |
-            set -euo pipefail
-            APP_DIR="${APP_DIR:-/var/www/marina-crm}"
-            if [[ -d "$APP_DIR/.git" && -f "$APP_DIR/scripts/vps/repair-and-deploy.sh" ]]; then
-              bash "$APP_DIR/scripts/vps/repair-and-deploy.sh"
-            elif [[ -d "$APP_DIR/repo/.git" && -f "$APP_DIR/repo/scripts/vps/repair-and-deploy.sh" ]]; then
-              bash "$APP_DIR/repo/scripts/vps/repair-and-deploy.sh"
-            else
-              curl -fsSL "https://raw.githubusercontent.com/leader2869/Marina-crm/main/scripts/vps/repair-and-deploy.sh" | sed 's/\r$//' | bash
-            fi
+            curl -fsSL "https://raw.githubusercontent.com/leader2869/Marina-crm/main/scripts/vps/repair-and-deploy.sh" | sed 's/\r$//' | bash
