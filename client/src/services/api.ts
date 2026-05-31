@@ -176,7 +176,8 @@ export const vesselsService = {
 
 export const bookingsService = {
   getAll: (params?: any) => api.get('/bookings', { params }),
-  getByClub: (clubId: number) => api.get(`/bookings/club/${clubId}`),
+  getByClub: (clubId: number, params?: { page?: number; limit?: number }) =>
+    api.get(`/bookings/club/${clubId}`, { params }),
   getById: (id: number) => api.get(`/bookings/${id}`),
   create: (data: any) => api.post('/bookings', data),
   update: (id: number, data: any) => api.put(`/bookings/${id}`, data),

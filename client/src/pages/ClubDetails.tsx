@@ -161,7 +161,7 @@ export default function ClubDetails() {
       
       if (user?.role === UserRole.GUEST || user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.PENDING_VALIDATION || !user) {
         try {
-          const response = await bookingsService.getByClub(club.id)
+          const response = await bookingsService.getByClub(club.id, { limit: 500 })
           allBookings = (response as any)?.data || response || []
         } catch (error) {
           console.error('Ошибка загрузки бронирований:', error)
@@ -169,7 +169,7 @@ export default function ClubDetails() {
         }
       } else {
         try {
-          const response = await bookingsService.getByClub(club.id)
+          const response = await bookingsService.getByClub(club.id, { limit: 500 })
           allBookings = (response as any)?.data || response || []
         } catch (error) {
           console.error('Ошибка загрузки бронирований:', error)

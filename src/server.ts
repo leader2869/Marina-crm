@@ -132,7 +132,11 @@ if (process.env.NODE_ENV === 'production') {
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: process.env.APP_VERSION || 'unknown',
+  });
 });
 
 // API Routes

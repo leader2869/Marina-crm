@@ -52,6 +52,34 @@ export class BookingsController {
       ]);
   }
 
+  /** COUNT без JOIN — getManyAndCount с join'ами на Supabase даёт 60s+ таймаут */
+  private async fetchBookingListPage(
+    applyFilters: (queryBuilder: SelectQueryBuilder<Booking>) => void,
+    page: number,
+    limit: number
+  ) {
+    const bookingRepository = AppDataSource.getRepository(Booking);
+
+    const countQuery = bookingRepository.createQueryBuilder('booking');
+    applyFilters(countQuery);
+    const total = await countQuery.getCount();
+
+    const dataQuery = this.applyBookingListJoins(
+      bookingRepository.createQueryBuilder('booking')
+    );
+    applyFilters(dataQuery);
+    const bookings = await dataQuery
+      .orderBy('booking.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return {
+      items: bookings.map(mapBookingListItem),
+      total,
+    };
+  }
+
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { page, limit } = getPaginationParams(
@@ -59,16 +87,10 @@ export class BookingsController {
         parseInt(req.query.limit as string)
       );
 
-      const bookingRepository = AppDataSource.getRepository(Booking);
-      const queryBuilder = this.applyBookingListJoins(
-        bookingRepository.createQueryBuilder('booking')
-      );
+      let applyFilters: ((queryBuilder: SelectQueryBuilder<Booking>) => void) | null = null;
 
-      // Фильтрация по ролям
-      console.log(`[Bookings] Getting bookings for user ID ${req.userId} with role ${req.userRole}`);
-      
       if (req.userRole === 'vessel_owner') {
-        queryBuilder.where('booking.vesselOwnerId = :userId', { userId: req.userId });
+        applyFilters = (qb) => qb.where('booking.vesselOwnerId = :userId', { userId: req.userId });
       } else if (req.userRole === 'club_staff' && req.userId) {
         const clubIds = await getClubIdsForStaffUser(req.userId);
         const allowedClubIds: number[] = [];
@@ -81,48 +103,32 @@ export class BookingsController {
           res.json(createPaginatedResponse([], 0, page, limit));
           return;
         }
-        queryBuilder.where('booking.clubId IN (:...clubIds)', { clubIds: allowedClubIds });
+        applyFilters = (qb) => qb.where('booking.clubId IN (:...clubIds)', { clubIds: allowedClubIds });
       } else if (req.userRole === 'club_owner') {
-        // Владелец клуба видит только бронирования своих клубов
-        // Получаем ID всех клубов, принадлежащих пользователю
         const clubRepository = AppDataSource.getRepository(Club);
         const userClubs = await clubRepository.find({
           where: { ownerId: req.userId },
           select: ['id'],
         });
-        
-        console.log(`[Bookings] User ID ${req.userId} (club_owner) has ${userClubs.length} clubs:`, userClubs.map(c => c.id));
-        
+
         if (userClubs.length === 0) {
-          // Если у пользователя нет клубов, возвращаем пустой результат
-          console.log(`[Bookings] User ID ${req.userId} (club_owner) has no clubs, returning empty result`);
           res.json(createPaginatedResponse([], 0, page, limit));
           return;
         }
-        
-        const clubIds = userClubs.map(club => club.id);
-        console.log(`[Bookings] Filtering bookings for club_owner ${req.userId} by clubIds:`, clubIds);
-        queryBuilder.where('booking.clubId IN (:...clubIds)', { clubIds });
+
+        const clubIds = userClubs.map((club) => club.id);
+        applyFilters = (qb) => qb.where('booking.clubId IN (:...clubIds)', { clubIds });
       } else if (req.userRole === 'guest') {
-        // Гость видит только свои бронирования
-        queryBuilder.where('booking.vesselOwnerId = :userId', { userId: req.userId });
+        applyFilters = (qb) => qb.where('booking.vesselOwnerId = :userId', { userId: req.userId });
       } else if (req.userRole === 'super_admin' || req.userRole === 'admin') {
-        // Суперадминистратор и администратор видят все бронирования
-        // Не применяем фильтрацию
+        applyFilters = () => undefined;
       } else {
-        // Для других ролей или неизвестных ролей - возвращаем пустой результат
         res.json(createPaginatedResponse([], 0, page, limit));
         return;
       }
 
-      const [bookings, total] = await queryBuilder
-        .skip((page - 1) * limit)
-        .take(limit)
-        .orderBy('booking.createdAt', 'DESC')
-        .getManyAndCount();
-
-      const listItems = bookings.map(mapBookingListItem);
-      res.json(createPaginatedResponse(listItems, total, page, limit));
+      const { items, total } = await this.fetchBookingListPage(applyFilters, page, limit);
+      res.json(createPaginatedResponse(items, total, page, limit));
     } catch (error) {
       next(error);
     }
@@ -137,28 +143,21 @@ export class BookingsController {
         throw new AppError('ID клуба обязателен', 400);
       }
 
-      const { page, limit } = getPaginationParams(
-        parseInt(req.query.page as string),
-        parseInt(req.query.limit as string)
-      );
+      const pageNum =
+        parseInt(req.query.page as string) > 0 ? parseInt(req.query.page as string) : 1;
+      const rawLimit = parseInt(req.query.limit as string);
+      const limitNum = rawLimit > 0 && rawLimit <= 500 ? rawLimit : 100;
+      const clubIdNum = parseInt(clubId);
+      const applyFilters = (queryBuilder: SelectQueryBuilder<Booking>) => {
+        queryBuilder
+          .where('booking.clubId = :clubId', { clubId: clubIdNum })
+          .andWhere('booking.status IN (:...statuses)', {
+            statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+          });
+      };
 
-      const bookingRepository = AppDataSource.getRepository(Booking);
-      const queryBuilder = this.applyBookingListJoins(
-        bookingRepository.createQueryBuilder('booking')
-      )
-        .where('booking.clubId = :clubId', { clubId: parseInt(clubId) })
-        .andWhere('booking.status IN (:...statuses)', {
-          statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
-        })
-        .orderBy('booking.createdAt', 'DESC');
-
-      const [bookings, total] = await queryBuilder
-        .skip((page - 1) * limit)
-        .take(limit)
-        .getManyAndCount();
-
-      const listItems = bookings.map(mapBookingListItem);
-      res.json(createPaginatedResponse(listItems, total, page, limit));
+      const { items, total } = await this.fetchBookingListPage(applyFilters, pageNum, limitNum);
+      res.json(createPaginatedResponse(items, total, pageNum, limitNum));
     } catch (error) {
       next(error);
     }

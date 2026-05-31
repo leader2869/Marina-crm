@@ -1,0 +1,48 @@
+name: Deploy API to VPS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'scripts/vps/**'
+  workflow_dispatch:
+
+jobs:
+  deploy-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            APP_DIR="${APP_DIR:-/var/www/marina-crm}"
+            cd "$APP_DIR"
+            git fetch origin main
+            git checkout main
+            git pull origin main
+            export APP_VERSION="$(git rev-parse --short HEAD)"
+            if grep -q '^APP_VERSION=' .env; then
+              sed -i "s/^APP_VERSION=.*/APP_VERSION=${APP_VERSION}/" .env
+            else
+              echo "APP_VERSION=${APP_VERSION}" >> .env
+            fi
+            npm ci
+            npm run build:server
+            if pm2 describe marina-crm-api >/dev/null 2>&1; then
+              APP_VERSION="$APP_VERSION" pm2 restart marina-crm-api --update-env
+            else
+              APP_VERSION="$APP_VERSION" pm2 start dist/server.js --name marina-crm-api
+            fi
+            pm2 save
+            sleep 2
+            curl -sf "http://127.0.0.1:3001/health"
