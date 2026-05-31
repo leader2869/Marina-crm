@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { clubsService, bookingsService, clubFinanceService, vesselsService, vesselOwnerCashesService } from '../services/api'
-import { ClubDashboardSummary, UserRole, BookingStatus, Vessel } from '../types'
+import { ClubDashboardSummary, UserRole, BookingStatus, Vessel, VesselOwnerCash } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet, Receipt } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { staffHasAnyClubAccess, staffHasPermission } from '../utils/clubStaffAccess'
@@ -33,10 +33,10 @@ export default function Dashboard() {
         limit: 100, 
         vesselId: vesselId 
       })
-      const vesselCashes = cashesResponse.data || []
+      const vesselCashes: VesselOwnerCash[] = cashesResponse.data || []
       
       const cashBalances = await Promise.all(
-        vesselCashes.map(async (cash) => {
+        vesselCashes.map(async (cash: VesselOwnerCash) => {
           try {
             const balanceResponse: any = await vesselOwnerCashesService.getBalance(cash.id)
             if (balanceResponse && typeof balanceResponse.balance === 'number') {
