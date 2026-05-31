@@ -6,11 +6,13 @@ VPS_IP="${VPS_IP:-185.46.11.187}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/marina_vps}"
 REPO="${REPO:-leader2869/Marina-crm}"
 
-echo "==> Проверка SSH..."
-if ! ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 "root@${VPS_IP}" 'echo SSH_OK'; then
+echo "==> Проверка SSH (может запросить пароль root один раз)..."
+if ! ssh -i "$SSH_KEY" -o ConnectTimeout=15 "root@${VPS_IP}" 'echo SSH_OK'; then
   echo ""
-  echo "SSH не работает. Сначала на VPS (консоль reg.ru) выполните:"
-  echo "  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/vps/bootstrap-on-vps-console.sh | bash"
+  echo "SSH не удался. Попробуйте установить ключ так:"
+  echo "  ssh-copy-id -i ~/.ssh/marina_vps.pub root@${VPS_IP}"
+  echo "или на VPS проверьте:"
+  echo "  chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
   exit 1
 fi
 

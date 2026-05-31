@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Первичная настройка VPS для Marina CRM API (Ubuntu 22.04/24.04/26.04).
 # Запуск на сервере: bash setup-server.sh
-set -euo pipefail
+set -eu
 
 APP_DIR="${APP_DIR:-/var/www/marina-crm}"
 APP_USER="${APP_USER:-root}"
