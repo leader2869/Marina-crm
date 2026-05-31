@@ -13,6 +13,8 @@ on:
       - '.github/workflows/deploy-api.yml'
   workflow_dispatch:
 
+# Ручной и push-деплой API на VPS (secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY)
+
 jobs:
   deploy-api:
     runs-on: ubuntu-latest
