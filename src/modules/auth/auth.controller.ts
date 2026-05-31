@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../../config/database';
 import { User } from '../../entities/User';
+import { Club } from '../../entities/Club';
 import { hashPassword, comparePassword } from '../../utils/password';
 import { generateToken } from '../../utils/jwt';
 import { AppError } from '../../middleware/errorHandler';
@@ -836,17 +837,50 @@ export class AuthController {
         });
         throw new AppError(`Ошибка доступа к базе данных: ${repoError.message}`, 500);
       }
-      
-      // Для профиля не загружаем тяжелые связи (особенно vessels),
-      // чтобы избежать таймаутов БД на production.
+
+      const clubRepository = AppDataSource.getRepository(Club);
+      const clubListFields: (keyof Club)[] = [
+        'id',
+        'name',
+        'address',
+        'isActive',
+        'isValidated',
+        'isSubmittedForValidation',
+        'ownerId',
+      ];
+
       const user = await userRepository.findOne({
         where: { id: req.userId },
-        relations: ['ownedClubs', 'managedClub'],
+        select: [
+          'id',
+          'email',
+          'firstName',
+          'lastName',
+          'phone',
+          'role',
+          'avatar',
+          'isValidated',
+          'createdAt',
+          'managedClubId',
+        ],
       });
 
       if (!user) {
         throw new AppError('Пользователь не найден', 404);
       }
+
+      const [ownedClubs, managedClub] = await Promise.all([
+        clubRepository.find({
+          where: { ownerId: req.userId },
+          select: clubListFields,
+        }),
+        user.managedClubId
+          ? clubRepository.findOne({
+              where: { id: user.managedClubId },
+              select: clubListFields,
+            })
+          : Promise.resolve(null),
+      ]);
 
       const profile: Record<string, unknown> = {
         id: user.id,
@@ -857,9 +891,9 @@ export class AuthController {
         role: user.role,
         avatar: user.avatar,
         isValidated: user.isValidated,
-        ownedClubs: user.ownedClubs,
+        ownedClubs,
         vessels: [],
-        managedClub: user.managedClub,
+        managedClub,
         createdAt: user.createdAt,
       };
 

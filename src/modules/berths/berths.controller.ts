@@ -8,6 +8,48 @@ import { AppError } from '../../middleware/errorHandler';
 import { UserRole, BookingStatus, PaymentStatus } from '../../types';
 
 export class BerthsController {
+  /** Только ID занятых мест — без загрузки всех бронирований в память */
+  private async getOccupiedBerthIds(
+    clubId: number,
+    dateRange?: { start: Date; end: Date }
+  ): Promise<Set<number>> {
+    const bookingRepository = AppDataSource.getRepository(Booking);
+    const queryBuilder = bookingRepository
+      .createQueryBuilder('booking')
+      .select('DISTINCT booking.berthId', 'berthId')
+      .where('booking.clubId = :clubId', { clubId })
+      .andWhere('booking.berthId IS NOT NULL')
+      .andWhere(
+        `(
+          booking.status IN (:...statuses)
+          OR EXISTS (
+            SELECT 1
+            FROM payments p
+            WHERE p."bookingId" = booking.id
+              AND p.status IN (:...blockingPaymentStatuses)
+          )
+        )`,
+        {
+          statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+          blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+        }
+      );
+
+    if (dateRange) {
+      queryBuilder.andWhere(
+        '(booking.startDate <= :endDate AND booking.endDate >= :startDate)',
+        { startDate: dateRange.start, endDate: dateRange.end }
+      );
+    }
+
+    const rows = await queryBuilder.getRawMany<{ berthId: string }>();
+    return new Set(
+      rows
+        .map((row) => Number(row.berthId))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    );
+  }
+
   // Получить все места клуба
   async getByClub(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -273,6 +315,7 @@ export class BerthsController {
       const clubRepository = AppDataSource.getRepository(Club);
       const club = await clubRepository.findOne({
         where: { id: parseInt(clubId) },
+        select: ['id', 'isActive', 'season'],
       });
 
       if (!club) {
@@ -328,71 +371,17 @@ export class BerthsController {
 
       // Если указаны даты, проверяем конфликты с бронированиями
       if (startDate && endDate) {
-        const bookingRepository = AppDataSource.getRepository(Booking);
         const start = new Date(startDate as string);
         const end = new Date(endDate as string);
+        const occupiedBerthIds = await this.getOccupiedBerthIds(club.id, { start, end });
 
-        // Получаем все конфликтующие бронирования
-        // Включаем PENDING, CONFIRMED и ACTIVE - эти статусы блокируют место
-        const conflictingBookings = await bookingRepository
-          .createQueryBuilder('booking')
-          .where('booking.clubId = :clubId', { clubId: club.id })
-          .andWhere(
-            `(
-              booking.status IN (:...statuses)
-              OR EXISTS (
-                SELECT 1
-                FROM payments p
-                WHERE p."bookingId" = booking.id
-                  AND p.status IN (:...blockingPaymentStatuses)
-              )
-            )`,
-            {
-              statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
-              blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
-            }
-          )
-          .andWhere(
-            '(booking.startDate <= :endDate AND booking.endDate >= :startDate)',
-            { startDate: start, endDate: end }
-          )
-          .getMany();
-
-        // Получаем ID занятых мест
-        const occupiedBerthIds = new Set(
-          conflictingBookings.map((booking) => booking.berthId)
-        );
-
-        // Фильтруем доступные места
         const availableBerths = allBerths.filter(
           (berth) => !occupiedBerthIds.has(berth.id)
         );
 
         res.json(availableBerths);
       } else {
-        // Если даты не указаны, все равно фильтруем места с учетом всех активных бронирований
-        const bookingRepository = AppDataSource.getRepository(Booking);
-        const activeBookings = await bookingRepository
-          .createQueryBuilder('booking')
-          .where('booking.clubId = :clubId', { clubId: club.id })
-          .andWhere(
-            `(
-              booking.status IN (:...statuses)
-              OR EXISTS (
-                SELECT 1
-                FROM payments p
-                WHERE p."bookingId" = booking.id
-                  AND p.status IN (:...blockingPaymentStatuses)
-              )
-            )`,
-            {
-              statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
-              blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
-            }
-          )
-          .getMany();
-
-        const occupiedBerthIds = new Set(activeBookings.map((booking) => booking.berthId));
+        const occupiedBerthIds = await this.getOccupiedBerthIds(club.id);
         const availableBerths = allBerths.filter((berth) => !occupiedBerthIds.has(berth.id));
         res.json(availableBerths);
       }
