@@ -172,62 +172,63 @@ export class DashboardService {
     const bookingRepository = AppDataSource.getRepository(Booking);
     const transactionRepository = AppDataSource.getRepository(CashTransaction);
 
-    const [vessels, bookingStats, balanceRows, totals] = await Promise.all([
-      vesselRepository.find({
-        where: { ownerId: userId, isActive: true },
-        select: ['id', 'name', 'type'],
-        order: { sortOrder: 'ASC', name: 'ASC' },
-      }),
-      bookingRepository
-        .createQueryBuilder('booking')
-        .select('COUNT(DISTINCT booking.clubId)', 'clubsCount')
-        .where('booking.vesselOwnerId = :userId', { userId })
-        .andWhere('booking.status != :cancelled', { cancelled: BookingStatus.CANCELLED })
-        .getRawOne<{ clubsCount: string }>(),
-      transactionRepository
-        .createQueryBuilder('transaction')
-        .innerJoin('transaction.cash', 'cash')
-        .select('cash.vesselId', 'vesselId')
-        .addSelect(
-          `SUM(CASE
+    const vessels = await vesselRepository.find({
+      where: { ownerId: userId, isActive: true },
+      select: ['id', 'name', 'type'],
+      order: { sortOrder: 'ASC', name: 'ASC' },
+    });
+
+    const bookingStats = await bookingRepository
+      .createQueryBuilder('booking')
+      .select('COUNT(DISTINCT booking.clubId)', 'clubsCount')
+      .where('booking.vesselOwnerId = :userId', { userId })
+      .andWhere('booking.status != :cancelled', { cancelled: BookingStatus.CANCELLED })
+      .getRawOne<{ clubsCount: string }>();
+
+    const balanceRows = await transactionRepository
+      .createQueryBuilder('transaction')
+      .innerJoin('transaction.cash', 'cash')
+      .select('cash.vesselId', 'vesselId')
+      .addSelect(
+        `SUM(CASE
             WHEN transaction.transactionType = :incomeType THEN transaction.amount
             WHEN transaction.transactionType = :expenseType THEN -transaction.amount
             ELSE 0
           END)`,
-          'balance'
-        )
-        .where('cash.vesselOwnerId = :userId', { userId })
-        .andWhere('cash.isActive = :isActive', { isActive: true })
-        .andWhere('cash.vesselId IS NOT NULL')
-        .groupBy('cash.vesselId')
-        .setParameters({
-          incomeType: CashTransactionType.INCOME,
-          expenseType: CashTransactionType.EXPENSE,
-          userId,
-          isActive: true,
-        })
-        .getRawMany<{ vesselId: string; balance: string }>(),
-      transactionRepository
-        .createQueryBuilder('transaction')
-        .innerJoin('transaction.cash', 'cash')
-        .select(
-          `SUM(CASE WHEN transaction.transactionType = :incomeType THEN transaction.amount ELSE 0 END)`,
-          'totalIncome'
-        )
-        .addSelect(
-          `SUM(CASE WHEN transaction.transactionType = :expenseType THEN transaction.amount ELSE 0 END)`,
-          'totalExpense'
-        )
-        .where('cash.vesselOwnerId = :userId', { userId })
-        .andWhere('cash.isActive = :isActive', { isActive: true })
-        .setParameters({
-          incomeType: CashTransactionType.INCOME,
-          expenseType: CashTransactionType.EXPENSE,
-          userId,
-          isActive: true,
-        })
-        .getRawOne<{ totalIncome: string | null; totalExpense: string | null }>(),
-    ]);
+        'balance'
+      )
+      .where('cash.vesselOwnerId = :userId', { userId })
+      .andWhere('cash.isActive = :isActive', { isActive: true })
+      .andWhere('cash.vesselId IS NOT NULL')
+      .groupBy('cash.vesselId')
+      .setParameters({
+        incomeType: CashTransactionType.INCOME,
+        expenseType: CashTransactionType.EXPENSE,
+        userId,
+        isActive: true,
+      })
+      .getRawMany<{ vesselId: string; balance: string }>();
+
+    const totals = await transactionRepository
+      .createQueryBuilder('transaction')
+      .innerJoin('transaction.cash', 'cash')
+      .select(
+        `SUM(CASE WHEN transaction.transactionType = :incomeType THEN transaction.amount ELSE 0 END)`,
+        'totalIncome'
+      )
+      .addSelect(
+        `SUM(CASE WHEN transaction.transactionType = :expenseType THEN transaction.amount ELSE 0 END)`,
+        'totalExpense'
+      )
+      .where('cash.vesselOwnerId = :userId', { userId })
+      .andWhere('cash.isActive = :isActive', { isActive: true })
+      .setParameters({
+        incomeType: CashTransactionType.INCOME,
+        expenseType: CashTransactionType.EXPENSE,
+        userId,
+        isActive: true,
+      })
+      .getRawOne<{ totalIncome: string | null; totalExpense: string | null }>();
 
     const vesselBalances: Record<number, number> = {};
     for (const row of balanceRows) {
@@ -263,10 +264,8 @@ export class DashboardService {
     let vessels: DashboardVesselItem[] = [];
     let vesselBalances: Record<number, number> = {};
 
-    const [clubList, bookingsCount] = await Promise.all([
-      this.getClubList(req),
-      this.countBookings(req),
-    ]);
+    const clubList = await this.getClubList(req);
+    const bookingsCount = await this.countBookings(req);
 
     stats.bookings = bookingsCount;
 
@@ -280,12 +279,8 @@ export class DashboardService {
       vesselBalances = vesselOwnerData.vesselBalances;
     } else if (req.userRole === UserRole.SUPER_ADMIN || req.userRole === UserRole.ADMIN) {
       const vesselRepository = AppDataSource.getRepository(Vessel);
-      const [clubsCount, vesselsCount] = await Promise.all([
-        this.countPublishedClubs(),
-        vesselRepository.count(),
-      ]);
-      stats.clubs = clubsCount;
-      stats.vessels = vesselsCount;
+      stats.clubs = await this.countPublishedClubs();
+      stats.vessels = await vesselRepository.count();
     } else if (req.userRole === UserRole.CLUB_OWNER || req.userRole === UserRole.CLUB_STAFF) {
       stats.clubs = clubList.length;
     }

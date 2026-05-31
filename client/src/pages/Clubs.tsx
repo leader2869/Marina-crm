@@ -45,7 +45,7 @@ export default function Clubs() {
       setLoading(true)
       const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
       const isClubOwner = user?.role === UserRole.CLUB_OWNER
-      const params: any = { limit: 100, includeFreeBerths: 'true', includeLogo: 'true' }
+      const params: any = { limit: 100, includeFreeBerths: 'true' }
       if (showHidden && isSuperAdmin) {
         params.showHidden = 'true'
       }

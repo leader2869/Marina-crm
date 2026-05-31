@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [clubSettlements, setClubSettlements] = useState<any[]>([])
   const [settlementsLoadedClubId, setSettlementsLoadedClubId] = useState<number | null>(null)
   const [settlementsLoading, setSettlementsLoading] = useState(false)
+  const [settlementsRequested, setSettlementsRequested] = useState(false)
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
@@ -72,16 +73,15 @@ export default function Dashboard() {
     (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements'))
 
   useCancellableEffect(async (signal) => {
-    if (!selectedClubId || !canViewClubSettlements) return
+    if (!settlementsRequested || !selectedClubId || !canViewClubSettlements) return
     if (selectedClubId === settlementsLoadedClubId) return
 
-    // Откладываем загрузку — даём stats/summary освободить слот пула БД
     await new Promise<void>((resolve) => {
       if (signal.aborted) {
         resolve()
         return
       }
-      const timer = setTimeout(resolve, 400)
+      const timer = setTimeout(resolve, 800)
       signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
     })
     if (signal.aborted) return
@@ -101,7 +101,7 @@ export default function Dashboard() {
     } finally {
       if (!signal.aborted) setSettlementsLoading(false)
     }
-  }, [selectedClubId, canViewClubSettlements, settlementsLoadedClubId])
+  }, [settlementsRequested, selectedClubId, canViewClubSettlements, settlementsLoadedClubId])
 
   const statCards = [
     ...(user?.role !== UserRole.CLUB_OWNER ? [{
@@ -249,9 +249,24 @@ export default function Dashboard() {
               )}
             </div>
 
+            {!settlementsRequested && !settlementsLoading && (
+              <button
+                type="button"
+                className="text-sm text-primary-600 hover:text-primary-800 mb-4"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSettlementsRequested(true)
+                }}
+              >
+                Загрузить взаиморасчёты
+              </button>
+            )}
+
             <div className="overflow-x-auto">
               {settlementsLoading ? (
                 <p className="text-sm text-gray-500 py-4">Загрузка взаиморасчётов…</p>
+              ) : !settlementsRequested ? (
+                <p className="text-sm text-gray-500 py-4">Нажмите «Загрузить взаиморасчёты» для просмотра таблицы</p>
               ) : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">

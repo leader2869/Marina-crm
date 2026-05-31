@@ -820,86 +820,77 @@ export class ClubFinanceController {
       today.setHours(0, 0, 0, 0);
       const todayIso = today.toISOString().slice(0, 10);
 
-      const [totalsRow, partnerIncomeRows, partners] = await Promise.all([
-          txRepository
-            .createQueryBuilder('tx')
-            .select(
-              `COALESCE(SUM(CASE WHEN tx.transactionType = :incomeType THEN tx.amount ELSE 0 END), 0)`,
-              'totalIncome'
-            )
-            .addSelect(
-              `COALESCE(SUM(CASE WHEN tx.transactionType = :expenseType THEN tx.amount ELSE 0 END), 0)`,
-              'totalExpense'
-            )
-            .where('tx.clubId IN (:...clubIds)', { clubIds })
-            .setParameters({
-              incomeType: CashTransactionType.INCOME,
-              expenseType: CashTransactionType.EXPENSE,
-            })
-            .getRawOne<{ totalIncome: string; totalExpense: string }>(),
-          txRepository
-            .createQueryBuilder('tx')
-            .select('tx.acceptedByPartnerId', 'partnerId')
-            .addSelect('SUM(tx.amount)', 'incomeAmount')
-            .where('tx.clubId IN (:...clubIds)', { clubIds })
-            .andWhere('tx.transactionType = :incomeType', { incomeType: CashTransactionType.INCOME })
-            .andWhere('tx.acceptedByPartnerId IS NOT NULL')
-            .groupBy('tx.acceptedByPartnerId')
-            .getRawMany<{ partnerId: string; incomeAmount: string }>(),
-          partnerRepository.find({
-            where: { clubId: In(clubIds), isActive: true },
-          }),
-        ]);
+      // Последовательно — не больше 1 SQL одновременно (пул PG_POOL_MAX=5)
+      const totalsRow = await txRepository
+        .createQueryBuilder('tx')
+        .select(
+          `COALESCE(SUM(CASE WHEN tx.transactionType = :incomeType THEN tx.amount ELSE 0 END), 0)`,
+          'totalIncome'
+        )
+        .addSelect(
+          `COALESCE(SUM(CASE WHEN tx.transactionType = :expenseType THEN tx.amount ELSE 0 END), 0)`,
+          'totalExpense'
+        )
+        .where('tx.clubId IN (:...clubIds)', { clubIds })
+        .setParameters({
+          incomeType: CashTransactionType.INCOME,
+          expenseType: CashTransactionType.EXPENSE,
+        })
+        .getRawOne<{ totalIncome: string; totalExpense: string }>();
 
-      const [paymentTotals, availableBerths, occupiedBerthRows] = await Promise.all([
-          paymentRepository
-            .createQueryBuilder('payment')
-            .innerJoin('payment.booking', 'booking')
-            .select('COALESCE(SUM(payment.amount), 0)', 'expectedIncomeAmount')
-            .addSelect(
-              `COALESCE(SUM(CASE
+      const partnerIncomeRows = await txRepository
+        .createQueryBuilder('tx')
+        .select('tx.acceptedByPartnerId', 'partnerId')
+        .addSelect('SUM(tx.amount)', 'incomeAmount')
+        .where('tx.clubId IN (:...clubIds)', { clubIds })
+        .andWhere('tx.transactionType = :incomeType', { incomeType: CashTransactionType.INCOME })
+        .andWhere('tx.acceptedByPartnerId IS NOT NULL')
+        .groupBy('tx.acceptedByPartnerId')
+        .getRawMany<{ partnerId: string; incomeAmount: string }>();
+
+      const partners = await partnerRepository.find({
+        where: { clubId: In(clubIds), isActive: true },
+        select: ['id', 'name', 'clubId'],
+      });
+
+      const paymentTotals = await paymentRepository
+        .createQueryBuilder('payment')
+        .innerJoin('payment.booking', 'booking')
+        .select('COALESCE(SUM(payment.amount), 0)', 'expectedIncomeAmount')
+        .addSelect(
+          `COALESCE(SUM(CASE
                 WHEN payment.status = :overdueStatus OR payment.dueDate < :today
                 THEN payment.amount ELSE 0 END), 0)`,
-              'receivablesAmount'
-            )
-            .where('booking.clubId IN (:...clubIds)', { clubIds })
-            .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
-            .andWhere('payment.status IN (:...paymentStatuses)', {
-              paymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
-            })
-            .setParameters({
-              overdueStatus: PaymentStatus.OVERDUE,
-              today: todayIso,
-            })
-            .getRawOne<{ expectedIncomeAmount: string; receivablesAmount: string }>(),
-          berthRepository.count({
-            where: {
-              clubId: In(clubIds),
-              isAvailable: true,
-            },
-          }),
-          bookingRepository
-            .createQueryBuilder('booking')
-            .select('booking.berthId', 'berthId')
-            .where('booking.clubId IN (:...clubIds)', { clubIds })
-            .andWhere(
-              `(
-            booking.status IN (:...statuses)
-            OR EXISTS (
-              SELECT 1
-              FROM payments p
-              WHERE p."bookingId" = booking.id
-                AND p.status IN (:...blockingPaymentStatuses)
-            )
-          )`,
-              {
-                statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
-                blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
-              }
-            )
-            .groupBy('booking.berthId')
-            .getRawMany(),
-        ]);
+          'receivablesAmount'
+        )
+        .where('booking.clubId IN (:...clubIds)', { clubIds })
+        .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
+        .andWhere('payment.status IN (:...paymentStatuses)', {
+          paymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
+        })
+        .setParameters({
+          overdueStatus: PaymentStatus.OVERDUE,
+          today: todayIso,
+        })
+        .getRawOne<{ expectedIncomeAmount: string; receivablesAmount: string }>();
+
+      const availableBerths = await berthRepository.count({
+        where: {
+          clubId: In(clubIds),
+          isAvailable: true,
+        },
+      });
+
+      const occupiedBerthRows = await bookingRepository
+        .createQueryBuilder('booking')
+        .select('booking.berthId', 'berthId')
+        .where('booking.clubId IN (:...clubIds)', { clubIds })
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+        })
+        .andWhere('booking.berthId IS NOT NULL')
+        .groupBy('booking.berthId')
+        .getRawMany();
 
       const totalIncome = parseFloat(totalsRow?.totalIncome || '0');
       const totalExpense = parseFloat(totalsRow?.totalExpense || '0');
