@@ -29,11 +29,17 @@ import { ClubPartnerManager } from '../entities/ClubPartnerManager';
 // Загружаем переменные окружения из .env файла
 dotenv.config();
 
-const pgNetworkTimeouts = {
-  connectionTimeoutMillis: 10000,
-  query_timeout: 60000,
-  statement_timeout: 60000,
+const isPersistentServer = !process.env.VERCEL && !process.env.VERCEL_ENV;
+
+// VPS: меньше соединений в пуле — Supabase лимитирует; Vercel: 2.
+const pgPoolExtra = {
+  connectionTimeoutMillis: 20000,
+  query_timeout: isPersistentServer ? 120000 : 60000,
+  statement_timeout: isPersistentServer ? 120000 : 60000,
   idle_in_transaction_session_timeout: 30000,
+  max: isPersistentServer ? 5 : 2,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 };
 
 // Поддержка connection string для Supabase и других облачных провайдеров
@@ -52,7 +58,7 @@ const getDatabaseConfig = () => {
       ssl: isSupabase || process.env.NODE_ENV === 'production' ? {
         rejectUnauthorized: false
       } : false,
-      extra: pgNetworkTimeouts,
+      extra: pgPoolExtra,
     };
   }
 
@@ -73,7 +79,7 @@ const getDatabaseConfig = () => {
     ssl: isSupabaseHost || process.env.NODE_ENV === 'production' ? {
       rejectUnauthorized: false
     } : false,
-    extra: pgNetworkTimeouts,
+    extra: pgPoolExtra,
   };
 };
 
@@ -93,6 +99,7 @@ const shouldSynchronize = process.env.NODE_ENV === 'development' && !process.env
 
 export const AppDataSource = new DataSource({
   ...getDatabaseConfig(),
+  poolSize: isPersistentServer ? 5 : 2,
   synchronize: shouldSynchronize,
   logging: process.env.NODE_ENV === 'development',
   entities: [
