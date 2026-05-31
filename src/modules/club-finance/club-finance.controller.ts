@@ -1166,81 +1166,87 @@ export class ClubFinanceController {
       const clubId = parseInt(req.params.clubId);
       await this.ensureClubStaffPermission(req, clubId, 'club_settlements');
 
-      const txRepository = AppDataSource.getRepository(ClubCashTransaction);
-
-      const [totalsRow, partnerRows] = await Promise.all([
-        txRepository
-          .createQueryBuilder('tx')
-          .select(
-            `COALESCE(SUM(CASE WHEN tx.transactionType = :incomeType THEN tx.amount ELSE 0 END), 0)`,
-            'totalIncome'
-          )
-          .addSelect(
-            `COALESCE(SUM(CASE WHEN tx.transactionType = :expenseType THEN tx.amount ELSE 0 END), 0)`,
-            'totalExpense'
-          )
-          .where('tx.clubId = :clubId', { clubId })
-          .setParameters({
-            incomeType: CashTransactionType.INCOME,
-            expenseType: CashTransactionType.EXPENSE,
-          })
-          .getRawOne<{ totalIncome: string; totalExpense: string }>(),
-        AppDataSource.query(
-          `
-          WITH club_tx AS (
-            SELECT "transactionType", amount, "acceptedByPartnerId", "paidByPartnerId"
-            FROM club_cash_transactions
-            WHERE "clubId" = $1
-          )
+      const rows = (await AppDataSource.query(
+        `
+        WITH club_tx AS (
+          SELECT "transactionType", amount, "acceptedByPartnerId", "paidByPartnerId"
+          FROM club_cash_transactions
+          WHERE "clubId" = $1
+        ),
+        totals AS (
           SELECT
-            p.id AS "partnerId",
-            p.name AS "partnerName",
-            p."sharePercent" AS "sharePercent",
-            p."previousSeasonBalance" AS "previousSeasonBalance",
-            COALESCE(SUM(CASE
-              WHEN t."transactionType" = $2 AND t."acceptedByPartnerId" = p.id
-              THEN t.amount ELSE 0 END), 0) AS "incomeAccepted",
-            COALESCE(SUM(CASE
-              WHEN t."transactionType" = $3 AND t."paidByPartnerId" = p.id
-              THEN t.amount ELSE 0 END), 0) AS "expensesPaid",
-            COALESCE(SUM(CASE
-              WHEN t."transactionType" = $4 AND t."acceptedByPartnerId" = p.id
-              THEN t.amount ELSE 0 END), 0) AS "transferredIn",
-            COALESCE(SUM(CASE
-              WHEN t."transactionType" = $4 AND t."paidByPartnerId" = p.id
-              THEN t.amount ELSE 0 END), 0) AS "transferredOut"
-          FROM club_partners p
-          LEFT JOIN club_tx t
-            ON t."acceptedByPartnerId" = p.id OR t."paidByPartnerId" = p.id
-          WHERE p."clubId" = $1 AND p."isActive" = true
-          GROUP BY p.id, p.name, p."sharePercent", p."previousSeasonBalance"
-          ORDER BY p.name ASC
-          `,
-          [
-            clubId,
-            CashTransactionType.INCOME,
-            CashTransactionType.EXPENSE,
-            CashTransactionType.TRANSFER,
-          ]
-        ) as Promise<
-          Array<{
-            partnerId: number;
-            partnerName: string;
-            sharePercent: string;
-            previousSeasonBalance: string;
-            incomeAccepted: string;
-            expensesPaid: string;
-            transferredIn: string;
-            transferredOut: string;
-          }>
-        >,
-      ]);
+            COALESCE(SUM(CASE WHEN "transactionType" = $2 THEN amount ELSE 0 END), 0) AS "totalIncome",
+            COALESCE(SUM(CASE WHEN "transactionType" = $3 THEN amount ELSE 0 END), 0) AS "totalExpense"
+          FROM club_tx
+        ),
+        income_by_partner AS (
+          SELECT "acceptedByPartnerId" AS partner_id, COALESCE(SUM(amount), 0) AS amount
+          FROM club_tx
+          WHERE "transactionType" = $2 AND "acceptedByPartnerId" IS NOT NULL
+          GROUP BY "acceptedByPartnerId"
+        ),
+        expense_by_partner AS (
+          SELECT "paidByPartnerId" AS partner_id, COALESCE(SUM(amount), 0) AS amount
+          FROM club_tx
+          WHERE "transactionType" = $3 AND "paidByPartnerId" IS NOT NULL
+          GROUP BY "paidByPartnerId"
+        ),
+        transfer_in AS (
+          SELECT "acceptedByPartnerId" AS partner_id, COALESCE(SUM(amount), 0) AS amount
+          FROM club_tx
+          WHERE "transactionType" = $4 AND "acceptedByPartnerId" IS NOT NULL
+          GROUP BY "acceptedByPartnerId"
+        ),
+        transfer_out AS (
+          SELECT "paidByPartnerId" AS partner_id, COALESCE(SUM(amount), 0) AS amount
+          FROM club_tx
+          WHERE "transactionType" = $4 AND "paidByPartnerId" IS NOT NULL
+          GROUP BY "paidByPartnerId"
+        )
+        SELECT
+          p.id AS "partnerId",
+          p.name AS "partnerName",
+          p."sharePercent" AS "sharePercent",
+          p."previousSeasonBalance" AS "previousSeasonBalance",
+          COALESCE(i.amount, 0) AS "incomeAccepted",
+          COALESCE(e.amount, 0) AS "expensesPaid",
+          COALESCE(ti.amount, 0) AS "transferredIn",
+          COALESCE(tout.amount, 0) AS "transferredOut",
+          t."totalIncome",
+          t."totalExpense"
+        FROM club_partners p
+        CROSS JOIN totals t
+        LEFT JOIN income_by_partner i ON i.partner_id = p.id
+        LEFT JOIN expense_by_partner e ON e.partner_id = p.id
+        LEFT JOIN transfer_in ti ON ti.partner_id = p.id
+        LEFT JOIN transfer_out tout ON tout.partner_id = p.id
+        WHERE p."clubId" = $1 AND p."isActive" = true
+        ORDER BY p.name ASC
+        `,
+        [
+          clubId,
+          CashTransactionType.INCOME,
+          CashTransactionType.EXPENSE,
+          CashTransactionType.TRANSFER,
+        ]
+      )) as Array<{
+        partnerId: number;
+        partnerName: string;
+        sharePercent: string;
+        previousSeasonBalance: string;
+        incomeAccepted: string;
+        expensesPaid: string;
+        transferredIn: string;
+        transferredOut: string;
+        totalIncome: string;
+        totalExpense: string;
+      }>;
 
-      const totalIncome = parseFloat(totalsRow?.totalIncome || '0');
-      const totalExpense = parseFloat(totalsRow?.totalExpense || '0');
+      const totalIncome = parseFloat(rows[0]?.totalIncome || '0');
+      const totalExpense = parseFloat(rows[0]?.totalExpense || '0');
       const netProfit = totalIncome - totalExpense;
 
-      const settlements = partnerRows.map((row) => {
+      const settlements = rows.map((row) => {
         const incomeAccepted = parseFloat(row.incomeAccepted || '0');
         const expensesPaid = parseFloat(row.expensesPaid || '0');
         const transferredIn = parseFloat(row.transferredIn || '0');

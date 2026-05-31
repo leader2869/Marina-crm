@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [clubSettlements, setClubSettlements] = useState<any[]>([])
   const [settlementsLoadedClubId, setSettlementsLoadedClubId] = useState<number | null>(null)
+  const [settlementsLoading, setSettlementsLoading] = useState(false)
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
@@ -55,26 +56,6 @@ export default function Dashboard() {
           }
         }
       }
-
-      if (
-        clubId &&
-        (user?.role === UserRole.CLUB_OWNER ||
-          user?.role === UserRole.SUPER_ADMIN ||
-          user?.role === UserRole.ADMIN ||
-          (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements')))
-      ) {
-        try {
-          const response = await clubFinanceService.getSettlements(clubId, { signal })
-          if (!signal.aborted) {
-            setClubSettlements((response as any)?.settlements || [])
-            setSettlementsLoadedClubId(clubId)
-          }
-        } catch (error) {
-          if (!isRequestAborted(error)) {
-            console.error('Ошибка загрузки взаиморасчетов для дашборда:', error)
-          }
-        }
-      }
     } catch (error) {
       if (!isRequestAborted(error)) {
         console.error('Ошибка загрузки статистики:', error)
@@ -93,6 +74,19 @@ export default function Dashboard() {
   useCancellableEffect(async (signal) => {
     if (!selectedClubId || !canViewClubSettlements) return
     if (selectedClubId === settlementsLoadedClubId) return
+
+    // Откладываем загрузку — даём stats/summary освободить слот пула БД
+    await new Promise<void>((resolve) => {
+      if (signal.aborted) {
+        resolve()
+        return
+      }
+      const timer = setTimeout(resolve, 400)
+      signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
+    })
+    if (signal.aborted) return
+
+    setSettlementsLoading(true)
     try {
       const response = await clubFinanceService.getSettlements(selectedClubId, { signal })
       if (signal.aborted) return
@@ -104,6 +98,8 @@ export default function Dashboard() {
         console.error('Ошибка загрузки взаиморасчетов для дашборда:', error)
         setClubSettlements([])
       }
+    } finally {
+      if (!signal.aborted) setSettlementsLoading(false)
     }
   }, [selectedClubId, canViewClubSettlements, settlementsLoadedClubId])
 
@@ -238,7 +234,11 @@ export default function Dashboard() {
                 <select
                   className="border rounded px-2 py-1.5 text-sm"
                   value={selectedClubId || ''}
-                  onChange={(e) => setSelectedClubId(Number(e.target.value))}
+                  onChange={(e) => {
+                    setSettlementsLoadedClubId(null)
+                    setClubSettlements([])
+                    setSelectedClubId(Number(e.target.value))
+                  }}
                 >
                   {clubList.map((club) => (
                     <option key={club.id} value={club.id}>
@@ -250,6 +250,9 @@ export default function Dashboard() {
             </div>
 
             <div className="overflow-x-auto">
+              {settlementsLoading ? (
+                <p className="text-sm text-gray-500 py-4">Загрузка взаиморасчётов…</p>
+              ) : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -293,6 +296,7 @@ export default function Dashboard() {
                   )}
                 </tbody>
               </table>
+              )}
             </div>
           </div>
           )}
