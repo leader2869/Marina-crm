@@ -17,14 +17,18 @@ if ! ssh -i "$SSH_KEY" -o ConnectTimeout=15 "root@${VPS_IP}" 'echo SSH_OK'; then
 fi
 
 echo ""
-echo "==> GitHub secret VPS_SSH_KEY (скопируйте в GitHub → Settings → Secrets):"
-echo "---BEGIN VPS_SSH_KEY---"
-cat "$SSH_KEY"
-echo "---END VPS_SSH_KEY---"
+echo "==> GitHub Secrets (Settings → Secrets → Actions)"
 echo ""
-echo "Также нужны secrets:"
 echo "  VPS_HOST = ${VPS_IP}"
 echo "  VPS_USER = root"
+echo ""
+echo "  VPS_SSH_KEY_B64  ← рекомендуется (одна строка, GitHub не ломает):"
+echo "---BEGIN VPS_SSH_KEY_B64---"
+base64 < "$SSH_KEY" | tr -d '\n'
+echo ""
+echo "---END VPS_SSH_KEY_B64---"
+echo ""
+echo "  (опционально VPS_SSH_KEY — многострочный, часто ломается в GitHub UI)"
 echo ""
 echo "Проверка формата ключа:"
 ssh-keygen -y -f "$SSH_KEY" >/dev/null && echo "  формат OK"

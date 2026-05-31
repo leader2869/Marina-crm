@@ -13,52 +13,70 @@ on:
       - '.github/workflows/deploy-api.yml'
   workflow_dispatch:
 
-# Ручной и push-деплой API на VPS (secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY)
+# Secrets: VPS_HOST, VPS_USER, и один из:
+#   VPS_SSH_KEY_B64  — рекомендуется (base64 одной строкой)
+#   VPS_SSH_KEY      — многострочный приватный ключ OpenSSH
 
 jobs:
   deploy-api:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate VPS secrets
+      - name: Prepare SSH key
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
         run: |
           set -eu
+          KEY_FILE=/tmp/vps_deploy_key
+
           if [ -z "${{ secrets.VPS_HOST }}" ]; then
-            echo "::error::Нет secret VPS_HOST. Пример: 185.46.11.187"
+            echo "::error::Нет secret VPS_HOST (185.46.11.187)"
             exit 1
           fi
           if [ -z "${{ secrets.VPS_USER }}" ]; then
-            echo "::error::Нет secret VPS_USER. Обычно: root"
+            echo "::error::Нет secret VPS_USER (root)"
             exit 1
           fi
-          if [ -z "$VPS_SSH_KEY" ]; then
-            echo "::error::Нет secret VPS_SSH_KEY."
-            echo "С Mac выполните: cat ~/.ssh/marina_vps"
-            echo "Скопируйте ВЕСЬ вывод (BEGIN…END), вставьте в GitHub → Settings → Secrets → VPS_SSH_KEY"
-            echo "НЕ используйте marina_vps.pub — только приватный ключ!"
+
+          rm -f "$KEY_FILE"
+
+          if [ -n "$VPS_SSH_KEY_B64" ]; then
+            echo "Используем VPS_SSH_KEY_B64"
+            printf '%s' "$VPS_SSH_KEY_B64" | tr -d '\n\r\t ' | base64 -d > "$KEY_FILE"
+          elif [ -n "$VPS_SSH_KEY" ]; then
+            echo "Используем VPS_SSH_KEY"
+            printf '%s' "$VPS_SSH_KEY" > "$KEY_FILE"
+          else
+            echo "::error::Нет VPS_SSH_KEY_B64 и VPS_SSH_KEY"
+            echo "На Mac выполните:"
+            echo "  base64 < ~/.ssh/marina_vps | tr -d '\\n' | pbcopy"
+            echo "GitHub → Secrets → New → VPS_SSH_KEY_B64 → вставить"
             exit 1
           fi
-          if ! printf '%s\n' "$VPS_SSH_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
-            echo "::error::VPS_SSH_KEY не похож на приватный ключ OpenSSH."
-            echo "Скорее всего вставлен публичный ключ (.pub). Нужен ~/.ssh/marina_vps"
+
+          chmod 600 "$KEY_FILE"
+
+          if ! grep -q "BEGIN.*PRIVATE KEY" "$KEY_FILE"; then
+            echo "::error::Ключ не содержит BEGIN PRIVATE KEY."
+            echo "Не вставляйте marina_vps.pub — нужен приватный ключ."
+            echo "Проще: secret VPS_SSH_KEY_B64 (base64 одной строкой):"
+            echo "  base64 < ~/.ssh/marina_vps | tr -d '\\n' | pbcopy"
             exit 1
           fi
-          printf '%s\n' "$VPS_SSH_KEY" > /tmp/vps_deploy_key
-          chmod 600 /tmp/vps_deploy_key
-          if ! ssh-keygen -y -f /tmp/vps_deploy_key >/dev/null 2>&1; then
-            echo "::error::VPS_SSH_KEY не парсится. Скопируйте ключ целиком, с переносами строк."
+
+          if ! ssh-keygen -y -f "$KEY_FILE" >/dev/null 2>&1; then
+            echo "::error::Ключ не парсится. Используйте VPS_SSH_KEY_B64 вместо многострочного VPS_SSH_KEY."
             exit 1
           fi
-          rm -f /tmp/vps_deploy_key
-          echo "VPS secrets: OK"
+
+          echo "SSH key: OK"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          key_path: /tmp/vps_deploy_key
           port: 22
           timeout: 120s
           command_timeout: 15m
