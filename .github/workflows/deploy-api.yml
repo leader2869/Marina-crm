@@ -13,73 +13,61 @@ on:
       - '.github/workflows/deploy-api.yml'
   workflow_dispatch:
 
-# Secrets: VPS_HOST, VPS_USER, и один из:
-#   VPS_SSH_KEY_B64  — рекомендуется (base64 одной строкой)
-#   VPS_SSH_KEY      — многострочный приватный ключ OpenSSH
+# Secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY_B64 (рекомендуется) или VPS_SSH_KEY
 
 jobs:
   deploy-api:
     runs-on: ubuntu-latest
     steps:
-      - name: Prepare SSH key
+      - name: Deploy via SSH
         env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
         run: |
           set -eu
           KEY_FILE=/tmp/vps_deploy_key
 
-          if [ -z "${{ secrets.VPS_HOST }}" ]; then
-            echo "::error::Нет secret VPS_HOST (185.46.11.187)"
+          if [ -z "$VPS_HOST" ]; then
+            echo "::error::Нет secret VPS_HOST"
             exit 1
           fi
-          if [ -z "${{ secrets.VPS_USER }}" ]; then
-            echo "::error::Нет secret VPS_USER (root)"
+          if [ -z "$VPS_USER" ]; then
+            echo "::error::Нет secret VPS_USER"
             exit 1
           fi
 
           rm -f "$KEY_FILE"
 
           if [ -n "$VPS_SSH_KEY_B64" ]; then
-            echo "Используем VPS_SSH_KEY_B64"
+            echo "Декодируем VPS_SSH_KEY_B64..."
             printf '%s' "$VPS_SSH_KEY_B64" | tr -d '\n\r\t ' | base64 -d > "$KEY_FILE"
           elif [ -n "$VPS_SSH_KEY" ]; then
-            echo "Используем VPS_SSH_KEY"
+            echo "Используем VPS_SSH_KEY..."
             printf '%s' "$VPS_SSH_KEY" > "$KEY_FILE"
           else
-            echo "::error::Нет VPS_SSH_KEY_B64 и VPS_SSH_KEY"
-            echo "На Mac выполните:"
-            echo "  base64 < ~/.ssh/marina_vps | tr -d '\\n' | pbcopy"
-            echo "GitHub → Secrets → New → VPS_SSH_KEY_B64 → вставить"
+            echo "::error::Нет VPS_SSH_KEY_B64 / VPS_SSH_KEY"
+            echo "Mac: base64 < ~/.ssh/marina_vps | tr -d '\\n' | pbcopy → secret VPS_SSH_KEY_B64"
             exit 1
           fi
 
           chmod 600 "$KEY_FILE"
 
           if ! grep -q "BEGIN.*PRIVATE KEY" "$KEY_FILE"; then
-            echo "::error::Ключ не содержит BEGIN PRIVATE KEY."
-            echo "Не вставляйте marina_vps.pub — нужен приватный ключ."
-            echo "Проще: secret VPS_SSH_KEY_B64 (base64 одной строкой):"
-            echo "  base64 < ~/.ssh/marina_vps | tr -d '\\n' | pbcopy"
+            echo "::error::Не приватный ключ OpenSSH. Нужен marina_vps, не .pub"
             exit 1
           fi
 
-          if ! ssh-keygen -y -f "$KEY_FILE" >/dev/null 2>&1; then
-            echo "::error::Ключ не парсится. Используйте VPS_SSH_KEY_B64 вместо многострочного VPS_SSH_KEY."
-            exit 1
-          fi
+          PUB=$(ssh-keygen -y -f "$KEY_FILE")
+          echo "Публичный ключ из secret: ${PUB}"
 
-          echo "SSH key: OK"
+          ssh -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=accept-new \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            "${VPS_USER}@${VPS_HOST}" \
+            'curl -fsSL "https://raw.githubusercontent.com/leader2869/Marina-crm/main/scripts/vps/repair-and-deploy.sh" | sed "s/\r$//" | bash'
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key_path: /tmp/vps_deploy_key
-          port: 22
-          timeout: 120s
-          command_timeout: 15m
-          script_stop: true
-          script: |
-            curl -fsSL "https://raw.githubusercontent.com/leader2869/Marina-crm/main/scripts/vps/repair-and-deploy.sh" | sed 's/\r$//' | bash
+          rm -f "$KEY_FILE"
+          echo "Deploy OK"
