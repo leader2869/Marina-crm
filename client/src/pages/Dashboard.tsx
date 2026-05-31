@@ -35,20 +35,21 @@ export default function Dashboard() {
       })
       const vesselCashes = cashesResponse.data || []
       
-      // Загружаем баланс для каждой кассы и суммируем
-      let totalBalance = 0
-      for (const cash of vesselCashes) {
-        try {
-          const balanceResponse: any = await vesselOwnerCashesService.getBalance(cash.id)
-          if (balanceResponse && typeof balanceResponse.balance === 'number') {
-            totalBalance += balanceResponse.balance
+      const cashBalances = await Promise.all(
+        vesselCashes.map(async (cash) => {
+          try {
+            const balanceResponse: any = await vesselOwnerCashesService.getBalance(cash.id)
+            if (balanceResponse && typeof balanceResponse.balance === 'number') {
+              return balanceResponse.balance
+            }
+          } catch (error) {
+            console.error(`Ошибка загрузки баланса кассы ${cash.id}:`, error)
           }
-        } catch (error) {
-          console.error(`Ошибка загрузки баланса кассы ${cash.id}:`, error)
-        }
-      }
-      
-      return totalBalance
+          return 0
+        })
+      )
+
+      return cashBalances.reduce((sum, balance) => sum + balance, 0)
     } catch (error) {
       console.error(`Ошибка загрузки баланса катера ${vesselId}:`, error)
       return 0
@@ -99,12 +100,13 @@ export default function Dashboard() {
             setVessels(userVessels)
             vesselsCount = userVessels.length
             
-            // Загружаем балансы для всех катеров
-            const balances: Record<number, number> = {}
-            for (const vessel of userVessels) {
-              balances[vessel.id] = await loadVesselBalance(vessel.id)
-            }
-            setVesselBalances(balances)
+            const balanceEntries = await Promise.all(
+              userVessels.map(async (vessel) => {
+                const balance = await loadVesselBalance(vessel.id)
+                return [vessel.id, balance] as const
+              })
+            )
+            setVesselBalances(Object.fromEntries(balanceEntries))
           } else {
             vesselsCount = user?.vessels?.length || 0
           }
