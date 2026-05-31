@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { clubsService } from '../services/api'
+import { clubsService, isRequestAborted } from '../services/api'
 import { Club, UserRole } from '../types'
 import { Anchor, MapPin, Phone, Mail, Globe, Plus, Trash2, Download, X, EyeOff, Eye, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function Clubs() {
   const { user } = useAuth()
@@ -36,11 +37,7 @@ export default function Clubs() {
     rentalMonths: [] as number[],
   })
 
-  useEffect(() => {
-    loadClubs()
-  }, [showHidden])
-
-  const loadClubs = async () => {
+  const loadClubs = async (signal?: AbortSignal) => {
     try {
       setLoading(true)
       const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN
@@ -49,37 +46,37 @@ export default function Clubs() {
       if (showHidden && isSuperAdmin) {
         params.showHidden = 'true'
       }
-      const response = await clubsService.getAll(params)
+      const response = await clubsService.getAll(params, { signal })
+      if (signal?.aborted) return
       const clubsData = response.data || []
-      
-      // Бэкенд уже фильтрует клубы для владельца клуба (только его клубы)
-      // Для суперадмина с флагом showHidden показываем все, иначе только активные и валидированные
-      // Для остальных ролей (VESSEL_OWNER, GUEST и т.д.) всегда показываем только активные и валидированные
-      // Для владельца клуба бэкенд уже вернул только его клубы, но для безопасности проверяем еще раз
+
       let filteredClubs = clubsData
-      
+
       if (showHidden && isSuperAdmin) {
-        // Суперадмин видит все клубы
         filteredClubs = clubsData
       } else if (isClubOwner) {
-        // Для владельца клуба показываем только его клубы (бэкенд уже отфильтровал, но проверяем для безопасности)
         filteredClubs = clubsData.filter((club: Club) => club.ownerId === user?.id)
       } else {
-        // Для остальных - только активные, валидированные и отправленные на валидацию
-        filteredClubs = clubsData.filter((club: Club) => 
-          club.isActive === true && 
-          club.isValidated === true && 
+        filteredClubs = clubsData.filter((club: Club) =>
+          club.isActive === true &&
+          club.isValidated === true &&
           club.isSubmittedForValidation === true
         )
       }
-      
+
       setClubs(filteredClubs)
     } catch (error) {
-      console.error('Ошибка загрузки клубов:', error)
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки клубов:', error)
+      }
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }
+
+  useCancellableEffect(async (signal) => {
+    await loadClubs(signal)
+  }, [showHidden, user])
 
 
 

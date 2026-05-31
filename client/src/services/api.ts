@@ -331,7 +331,10 @@ export const clubFinanceService = {
   deletePartnerManager: (clubId: number, managerId: number) =>
     api.delete(`/club-finance/clubs/${clubId}/partner-managers/${managerId}`),
 
-  getCashTransactions: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/cash-transactions`),
+  getCashTransactions: (clubId: number, options?: RequestOptions) =>
+    api.get(`/club-finance/clubs/${clubId}/cash-transactions`, { signal: options?.signal }),
+  getCashDesk: (clubId: number, options?: RequestOptions) =>
+    api.get(`/club-finance/clubs/${clubId}/cash-desk`, { signal: options?.signal }),
   getExpectedIncomes: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/expected-incomes`),
   getTenantReport: (clubId: number, options?: RequestOptions) =>
     api.get(`/club-finance/clubs/${clubId}/tenant-report`, { signal: options?.signal }),

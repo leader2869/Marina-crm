@@ -14,6 +14,31 @@ export interface StaffClubAccess {
   permissions: ClubStaffPermission[];
 }
 
+const STAFF_ACCESS_CACHE_TTL_MS = 60_000;
+const staffAccessCache = new Map<string, { value: StaffClubAccess | null; expiresAt: number }>();
+const allStaffAccessCache = new Map<number, { value: StaffClubAccess[]; expiresAt: number }>();
+
+function staffAccessCacheKey(userId: number, clubId: number): string {
+  return `${userId}:${clubId}`;
+}
+
+export function invalidateStaffAccessCache(userId?: number, clubId?: number): void {
+  if (userId === undefined && clubId === undefined) {
+    staffAccessCache.clear();
+    allStaffAccessCache.clear();
+    return;
+  }
+  if (userId !== undefined) {
+    allStaffAccessCache.delete(userId);
+  }
+  for (const key of staffAccessCache.keys()) {
+    const [u, c] = key.split(':').map(Number);
+    if ((userId === undefined || u === userId) && (clubId === undefined || c === clubId)) {
+      staffAccessCache.delete(key);
+    }
+  }
+}
+
 async function findOrCreateUserClubLink(userId: number, clubId: number): Promise<UserClub | null> {
   const userClubRepository = AppDataSource.getRepository(UserClub);
   let link = await userClubRepository.findOne({ where: { userId, clubId } });
@@ -34,17 +59,33 @@ async function findOrCreateUserClubLink(userId: number, clubId: number): Promise
 }
 
 export async function getStaffClubAccess(userId: number, clubId: number): Promise<StaffClubAccess | null> {
-  const link = await findOrCreateUserClubLink(userId, clubId);
-  if (!link) return null;
+  const key = staffAccessCacheKey(userId, clubId);
+  const cached = staffAccessCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
 
-  return {
+  const link = await findOrCreateUserClubLink(userId, clubId);
+  if (!link) {
+    staffAccessCache.set(key, { value: null, expiresAt: Date.now() + STAFF_ACCESS_CACHE_TTL_MS });
+    return null;
+  }
+
+  const access: StaffClubAccess = {
     clubId,
     accessEnabled: link.accessEnabled !== false,
     permissions: normalizeStaffPermissions(link.permissions),
   };
+  staffAccessCache.set(key, { value: access, expiresAt: Date.now() + STAFF_ACCESS_CACHE_TTL_MS });
+  return access;
 }
 
 export async function getAllStaffClubAccesses(userId: number): Promise<StaffClubAccess[]> {
+  const cached = allStaffAccessCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
   const userClubRepository = AppDataSource.getRepository(UserClub);
   const links = await userClubRepository.find({ where: { userId } });
   const result: StaffClubAccess[] = links.map((link) => ({
@@ -58,6 +99,14 @@ export async function getAllStaffClubAccesses(userId: number): Promise<StaffClub
   if (user?.managedClubId && !result.some((r) => r.clubId === user.managedClubId)) {
     const legacy = await getStaffClubAccess(userId, user.managedClubId);
     if (legacy) result.push(legacy);
+  }
+
+  allStaffAccessCache.set(userId, { value: result, expiresAt: Date.now() + STAFF_ACCESS_CACHE_TTL_MS });
+  for (const access of result) {
+    staffAccessCache.set(staffAccessCacheKey(userId, access.clubId), {
+      value: access,
+      expiresAt: Date.now() + STAFF_ACCESS_CACHE_TTL_MS,
+    });
   }
 
   return result;

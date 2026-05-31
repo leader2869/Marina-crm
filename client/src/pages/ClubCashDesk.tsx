@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { clubsService, clubFinanceService } from '../services/api'
+import { clubsService, clubFinanceService, isRequestAborted } from '../services/api'
 import { CashPaymentMethod, CashTransactionType, Club, ClubCashTransaction, ClubPartner, ClubPartnerManager, UserRole } from '../types'
 import BackButton from '../components/BackButton'
 import { useAuth } from '../contexts/AuthContext'
 import { staffHasPermission } from '../utils/clubStaffAccess'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function ClubCashDesk() {
   const { user } = useAuth()
@@ -27,6 +28,7 @@ export default function ClubCashDesk() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(false)
   const [savingCashSetting, setSavingCashSetting] = useState(false)
 
   const selectedClub = useMemo(
@@ -69,41 +71,53 @@ export default function ClubCashDesk() {
     bookingId: '',
   })
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const response = await clubsService.getAll({ limit: 200 })
-        const allClubs = response.data || []
-        setClubs(allClubs)
-        if (allClubs.length > 0) setSelectedClubId(allClubs[0].id)
-      } catch (e: any) {
-        setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки клубов'))
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
-
-  useEffect(() => {
-    if (!selectedClubId) return
-    loadData(selectedClubId)
-  }, [selectedClubId])
-
-  const loadData = async (clubId: number) => {
+  useCancellableEffect(async (signal) => {
+    setLoading(true)
+    setError('')
     try {
-      const [partnersRes, txRes] = await Promise.all([
-        clubFinanceService.getPartners(clubId),
-        clubFinanceService.getCashTransactions(clubId),
-      ])
-      const managersRes = await clubFinanceService.getPartnerManagers(clubId)
-      setPartners(Array.isArray(partnersRes) ? partnersRes : partnersRes.data || [])
-      setTransactions(Array.isArray(txRes) ? txRes : txRes.data || [])
-      setPartnerManagers(Array.isArray(managersRes) ? managersRes : managersRes.data || [])
+      const response = await clubsService.getAll({ limit: 50 }, { signal })
+      if (signal.aborted) return
+      const allClubs = response.data || []
+      setClubs(allClubs)
+      if (allClubs.length > 0) setSelectedClubId(allClubs[0].id)
     } catch (e: any) {
-      setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки данных кассы'))
+      if (!isRequestAborted(e)) {
+        setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки клубов'))
+      }
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
-  }
+  }, [user])
+
+  useCancellableEffect(async (signal) => {
+    if (!selectedClubId) return
+    setDataLoading(true)
+    setError('')
+    try {
+      const desk = await clubFinanceService.getCashDesk(selectedClubId, { signal })
+      if (signal.aborted) return
+      const payload = desk as {
+        partners?: ClubPartner[]
+        partnerManagers?: ClubPartnerManager[]
+        transactions?: ClubCashTransaction[]
+        data?: {
+          partners?: ClubPartner[]
+          partnerManagers?: ClubPartnerManager[]
+          transactions?: ClubCashTransaction[]
+        }
+      }
+      const data = payload.data ?? payload
+      setPartners(Array.isArray(data.partners) ? data.partners : [])
+      setPartnerManagers(Array.isArray(data.partnerManagers) ? data.partnerManagers : [])
+      setTransactions(Array.isArray(data.transactions) ? data.transactions : [])
+    } catch (e: any) {
+      if (!isRequestAborted(e)) {
+        setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки данных кассы'))
+      }
+    } finally {
+      if (!signal.aborted) setDataLoading(false)
+    }
+  }, [selectedClubId])
 
   const totalIncome = useMemo(
     () =>
@@ -178,6 +192,22 @@ export default function ClubCashDesk() {
     }
   }, [filteredTransactions])
 
+  const reloadCashDesk = async (clubId: number) => {
+    setDataLoading(true)
+    try {
+      const desk = await clubFinanceService.getCashDesk(clubId)
+      const payload = desk as any
+      const data = payload.data ?? payload
+      setPartners(Array.isArray(data.partners) ? data.partners : [])
+      setPartnerManagers(Array.isArray(data.partnerManagers) ? data.partnerManagers : [])
+      setTransactions(Array.isArray(data.transactions) ? data.transactions : [])
+    } catch (e: any) {
+      setError(toErrorText(e?.error || e?.message || e, 'Ошибка загрузки данных кассы'))
+    } finally {
+      setDataLoading(false)
+    }
+  }
+
   const handleCreate = async () => {
     if (!selectedClubId || !cashPaymentsOpen) return
     try {
@@ -217,7 +247,7 @@ export default function ClubCashDesk() {
         paidByManagerId: '',
         bookingId: '',
       })
-      await loadData(selectedClubId)
+      await reloadCashDesk(selectedClubId)
     } catch (e: any) {
       setError(toErrorText(e?.error || e?.message || e, 'Ошибка создания операции'))
     }
@@ -319,11 +349,11 @@ export default function ClubCashDesk() {
           >
             <option value={CashTransactionType.INCOME}>Приход</option>
             <option value={CashTransactionType.EXPENSE}>Расход</option>
-            <option value={CashTransactionType.TRANSFER}>Перевод между партнерами</option>
+            <option value={CashTransactionType.TRANSFER}>Перевод</option>
           </select>
           <input
-            type="number"
             className="border rounded px-3 py-2"
+            type="number"
             placeholder="Сумма"
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value })}
@@ -334,11 +364,11 @@ export default function ClubCashDesk() {
             onChange={(e) => setForm({ ...form, paymentMethod: e.target.value as CashPaymentMethod })}
           >
             <option value={CashPaymentMethod.CASH}>Наличные</option>
-            <option value={CashPaymentMethod.NON_CASH}>Безналичные</option>
+            <option value={CashPaymentMethod.NON_CASH}>Безнал</option>
           </select>
           <input
-            type="date"
             className="border rounded px-3 py-2"
+            type="date"
             value={form.date}
             onChange={(e) => setForm({ ...form, date: e.target.value })}
           />
@@ -395,7 +425,6 @@ export default function ClubCashDesk() {
                 </option>
               ))}
             </select>
-            
           ) : (
             <select
               className="border rounded px-3 py-2"
@@ -522,6 +551,9 @@ export default function ClubCashDesk() {
           </div>
         </div>
 
+        {dataLoading ? (
+          <p className="p-6 text-sm text-gray-500">Загрузка операций…</p>
+        ) : (
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -620,8 +652,8 @@ export default function ClubCashDesk() {
             </tr>
           </tfoot>
         </table>
+        )}
       </div>
     </div>
   )
 }
-

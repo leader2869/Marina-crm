@@ -24,6 +24,7 @@ import {
   assertStaffHasPermission,
   getAllStaffClubAccesses,
   getStaffClubAccess,
+  invalidateStaffAccessCache,
   staffHasAnyPermission,
 } from '../../utils/clubStaffPermissions';
 import { assertClubCashPaymentsEnabled } from '../../utils/clubCashSettings';
@@ -35,23 +36,49 @@ export class ClubFinanceController {
     }
 
     const clubRepository = AppDataSource.getRepository(Club);
-    const club = await clubRepository.findOne({ where: { id: clubId } });
-    if (!club) {
-      throw new AppError('Яхт-клуб не найден', 404);
+    const isAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === UserRole.ADMIN;
+
+    if (isAdmin) {
+      const club = await clubRepository.findOne({ where: { id: clubId } });
+      if (!club) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
+      return club;
     }
 
-    const isAdmin = req.userRole === UserRole.SUPER_ADMIN || req.userRole === UserRole.ADMIN;
-    if (isAdmin) {
+    if (req.userRole === UserRole.CLUB_OWNER) {
+      const club = await clubRepository.findOne({ where: { id: clubId, ownerId: req.userId } });
+      if (!club) {
+        throw new AppError('Доступ запрещен', 403);
+      }
       return club;
     }
-    if (club.ownerId === req.userId) {
-      return club;
-    }
+
     if (req.userRole === UserRole.CLUB_STAFF && (await userHasAccessToClub(req.userId, clubId))) {
+      const club = await clubRepository.findOne({ where: { id: clubId } });
+      if (!club) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
       return club;
     }
 
     throw new AppError('Доступ запрещен', 403);
+  }
+
+  private async fetchCashTransactions(clubId: number): Promise<ClubCashTransaction[]> {
+    const txRepository = AppDataSource.getRepository(ClubCashTransaction);
+    return txRepository
+      .createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.acceptedByPartner', 'acceptedByPartner')
+      .leftJoinAndSelect('tx.paidByPartner', 'paidByPartner')
+      .leftJoinAndSelect('tx.acceptedByManager', 'acceptedByManager')
+      .leftJoinAndSelect('acceptedByManager.user', 'acceptedByManagerUser')
+      .leftJoinAndSelect('tx.paidByManager', 'paidByManager')
+      .leftJoinAndSelect('paidByManager.user', 'paidByManagerUser')
+      .where('tx.clubId = :clubId', { clubId })
+      .orderBy('tx.date', 'DESC')
+      .addOrderBy('tx.createdAt', 'DESC')
+      .getMany();
   }
 
   private async ensureClubStaffPermission(
@@ -356,6 +383,7 @@ export class ClubFinanceController {
       }
 
       await userClubRepository.save(link);
+      invalidateStaffAccessCache(staffUserId, clubId);
 
       const access = await getStaffClubAccess(staffUserId, clubId);
       res.json({
@@ -564,15 +592,36 @@ export class ClubFinanceController {
     try {
       const clubId = parseInt(req.params.clubId);
       await this.ensureClubStaffPermission(req, clubId, 'club_cash');
+      const transactions = await this.fetchCashTransactions(clubId);
+      res.json(transactions);
+    } catch (error) {
+      next(error);
+    }
+  }
 
-      const txRepository = AppDataSource.getRepository(ClubCashTransaction);
-      const transactions = await txRepository.find({
-        where: { clubId },
-        relations: ['acceptedByPartner', 'acceptedByManager', 'acceptedByManager.user', 'paidByPartner', 'paidByManager', 'paidByManager.user', 'createdBy'],
-        order: { date: 'DESC', createdAt: 'DESC' },
+  /** Один запрос вместо 3 параллельных — меньше нагрузка на пул БД */
+  async getCashDesk(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.clubId);
+      await this.ensureClubStaffPermission(req, clubId, 'club_cash');
+
+      const partnerRepository = AppDataSource.getRepository(ClubPartner);
+      const managerRepository = AppDataSource.getRepository(ClubPartnerManager);
+
+      const partners = await partnerRepository.find({
+        where: { clubId, isActive: true },
+        order: { createdAt: 'ASC' },
       });
 
-      res.json(transactions);
+      const partnerManagers = await managerRepository.find({
+        where: { clubId, isActive: true },
+        relations: ['partner', 'user'],
+        order: { createdAt: 'ASC' },
+      });
+
+      const transactions = await this.fetchCashTransactions(clubId);
+
+      res.json({ partners, partnerManagers, transactions });
     } catch (error) {
       next(error);
     }
