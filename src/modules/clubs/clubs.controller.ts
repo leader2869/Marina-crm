@@ -27,6 +27,7 @@ import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
 import { getAllStaffClubAccesses } from '../../utils/clubStaffPermissions';
 import { getFreeBerthsCountsByClubIds } from '../../utils/freeBerths';
+import { getActiveBerthBookingSummaries, getOccupiedBerthIds } from '../../utils/berthOccupancy';
 
 export class ClubsController {
   private async resolveClubColumnName(queryRunner: QueryRunner, tableName: string): Promise<string | null> {
@@ -441,7 +442,18 @@ export class ClubsController {
       // Добавляем отсортированные места к клубу
       club.berths = berths;
 
-      res.json(club);
+      const occupiedBerthIds = await getOccupiedBerthIds(club.id);
+      const availableBerthIds = berths
+        .filter((berth) => berth.isAvailable && !occupiedBerthIds.has(berth.id))
+        .map((berth) => berth.id);
+
+      const activeBerthBookings = await getActiveBerthBookingSummaries(club.id);
+
+      res.json({
+        ...club,
+        availableBerthIds,
+        activeBerthBookings,
+      });
     } catch (error) {
       next(error);
     }

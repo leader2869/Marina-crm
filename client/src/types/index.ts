@@ -146,6 +146,24 @@ export interface Club {
   ownerId: number
   owner?: User
   berths?: Berth[]
+  /** Заполняется GET /clubs/:id — ID мест доступных для бронирования */
+  availableBerthIds?: number[]
+  /** Активные брони по местам (лёгкая сводка, без отдельного запроса) */
+  activeBerthBookings?: Array<{
+    id: number
+    berthId: number
+    status: string
+    clubId: number
+    totalPrice?: string | number
+    notes?: string | null
+    vesselOwner?: {
+      id: number
+      firstName?: string | null
+      lastName?: string | null
+      email?: string | null
+      phone?: string | null
+    } | null
+  }>
   season?: number
   rentalMonths?: number[] | null // месяцы, в которые можно арендовать место (1-12)
   bookingRules?: string | null // правила бронирования

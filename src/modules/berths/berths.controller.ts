@@ -6,49 +6,10 @@ import { Booking } from '../../entities/Booking';
 import { AuthRequest } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import { UserRole, BookingStatus, PaymentStatus } from '../../types';
+import { getOccupiedBerthIds } from '../../utils/berthOccupancy';
 
 export class BerthsController {
-  /** Только ID занятых мест — без загрузки всех бронирований в память */
-  private async getOccupiedBerthIds(
-    clubId: number,
-    dateRange?: { start: Date; end: Date }
-  ): Promise<Set<number>> {
-    const bookingRepository = AppDataSource.getRepository(Booking);
-    const queryBuilder = bookingRepository
-      .createQueryBuilder('booking')
-      .select('DISTINCT booking.berthId', 'berthId')
-      .where('booking.clubId = :clubId', { clubId })
-      .andWhere('booking.berthId IS NOT NULL')
-      .andWhere(
-        `(
-          booking.status IN (:...statuses)
-          OR EXISTS (
-            SELECT 1
-            FROM payments p
-            WHERE p."bookingId" = booking.id
-              AND p.status IN (:...blockingPaymentStatuses)
-          )
-        )`,
-        {
-          statuses: [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
-          blockingPaymentStatuses: [PaymentStatus.PENDING, PaymentStatus.OVERDUE],
-        }
-      );
-
-    if (dateRange) {
-      queryBuilder.andWhere(
-        '(booking.startDate <= :endDate AND booking.endDate >= :startDate)',
-        { startDate: dateRange.start, endDate: dateRange.end }
-      );
-    }
-
-    const rows = await queryBuilder.getRawMany<{ berthId: string }>();
-    return new Set(
-      rows
-        .map((row) => Number(row.berthId))
-        .filter((id) => Number.isFinite(id) && id > 0)
-    );
-  }
+  private getOccupiedBerthIds = getOccupiedBerthIds;
 
   // Получить все места клуба
   async getByClub(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {

@@ -185,7 +185,7 @@ export const clubsService = {
 }
 
 export const vesselsService = {
-  getAll: (params?: any) => api.get('/vessels', { params }),
+  getAll: (params?: any, options?: RequestOptions) => api.get('/vessels', { params, signal: options?.signal }),
   getById: (id: number) => api.get(`/vessels/${id}`),
   create: (data: any) => api.post('/vessels', data),
   update: (id: number, data: any) => api.put(`/vessels/${id}`, data),

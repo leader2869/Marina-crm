@@ -91,24 +91,20 @@ export default function ClubDetails() {
   useCancellableEffect(async (signal) => {
     if (!id) return
     await loadClub(signal)
-    if (signal.aborted) return
-    await loadAvailableBerths(signal)
   }, [id])
 
   useCancellableEffect(async (signal) => {
     if (!club?.id) return
-    await loadBerthBookings(signal)
-    if (signal.aborted) return
     const canLoadTenantReport =
       user?.role === UserRole.SUPER_ADMIN ||
       user?.role === UserRole.ADMIN ||
       user?.role === UserRole.CLUB_OWNER ||
       user?.role === UserRole.CLUB_STAFF
-    if (canLoadTenantReport) {
-      await loadTenantReport(club.id, signal)
-    } else {
+    if (!canLoadTenantReport) {
       setTenantReport(null)
+      return
     }
+    await loadTenantReport(club.id, signal)
   }, [club?.id, user?.role])
 
   useCancellableEffect(async (signal) => {
@@ -122,9 +118,22 @@ export default function ClubDetails() {
     return () => clearTimeout(timeout)
   }, [infoMessage])
 
+  const applyClubDerivedState = (data: Club) => {
+    const availableIds = new Set(data.availableBerthIds || [])
+    setAvailableBerths((data.berths || []).filter((berth) => availableIds.has(berth.id)))
+
+    const bookingsMap = new Map<number, any[]>()
+    for (const booking of data.activeBerthBookings || []) {
+      const list = bookingsMap.get(booking.berthId) || []
+      list.push(booking)
+      bookingsMap.set(booking.berthId, list)
+    }
+    setBerthBookings(bookingsMap)
+  }
+
   const loadUserVessels = async (signal?: AbortSignal) => {
     try {
-      const response = await vesselsService.getAll({ limit: 100 })
+      const response = await vesselsService.getAll({ limit: 100 }, { signal })
       if (signal?.aborted) return
       const vessels = response.data || []
       // Фильтруем только суда текущего пользователя
@@ -146,61 +155,6 @@ export default function ClubDetails() {
       if (!isRequestAborted(error)) {
         console.error('Ошибка загрузки доступных мест:', error)
         setAvailableBerths([])
-      }
-    }
-  }
-
-  const loadBerthBookings = async (signal?: AbortSignal) => {
-    if (!club || !club.berths) return
-    
-    try {
-      // Используем узкий endpoint по клубу, чтобы не тянуть тяжелые выборки getAll(limit=1000)
-      // и не провоцировать таймауты на production.
-      let allBookings: any[] = []
-      
-      if (user?.role === UserRole.GUEST || user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.PENDING_VALIDATION || !user) {
-        try {
-          const response = await bookingsService.getByClub(club.id, { limit: 100 }, { signal })
-          if (signal?.aborted) return
-          allBookings = (response as any)?.data || response || []
-        } catch (error) {
-          if (!isRequestAborted(error)) {
-            console.error('Ошибка загрузки бронирований:', error)
-          }
-          allBookings = []
-        }
-      } else {
-        try {
-          const response = await bookingsService.getByClub(club.id, { limit: 100 }, { signal })
-          if (signal?.aborted) return
-          allBookings = (response as any)?.data || response || []
-        } catch (error) {
-          if (!isRequestAborted(error)) {
-            console.error('Ошибка загрузки бронирований:', error)
-          }
-          allBookings = []
-        }
-      }
-      
-      // Фильтруем бронирования для мест этого клуба
-      const bookingsMap = new Map<number, any[]>()
-      
-      club.berths.forEach((berth) => {
-        const berthBookings = allBookings.filter((booking: any) => 
-          booking.berthId === berth.id && 
-          booking.clubId === club.id &&
-          (booking.status === 'pending' || booking.status === 'confirmed' || booking.status === 'active')
-        )
-        if (berthBookings.length > 0) {
-          bookingsMap.set(berth.id, berthBookings)
-        }
-      })
-      
-      if (signal?.aborted) return
-      setBerthBookings(bookingsMap)
-    } catch (error) {
-      if (!isRequestAborted(error)) {
-        console.error('Ошибка загрузки бронирований мест:', error)
       }
     }
   }
@@ -504,8 +458,6 @@ export default function ClubDetails() {
       await bookingsService.create(payload)
 
       await loadClub()
-      await loadBerthBookings()
-      await loadAvailableBerths()
       handleCloseBookingModal()
       alert('Бронирование успешно создано!')
     } catch (err: any) {
@@ -520,6 +472,7 @@ export default function ClubDetails() {
       const data = (await clubsService.getById(parseInt(id!), { signal })) as unknown as Club
       if (signal?.aborted) return
       setClub(data)
+      applyClubDerivedState(data)
       if (data) {
         let parsedPhotos: string[] = []
         if (data.logo) {
