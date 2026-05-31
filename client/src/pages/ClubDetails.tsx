@@ -7,12 +7,14 @@ import {
   bookingsService,
   bookingRulesService,
   clubFinanceService,
+  isRequestAborted,
 } from '../services/api'
 import { Club, Berth, Vessel, ClubTenantReportResponse } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '../types'
 import { MapPin, Phone, Mail, Globe, Anchor, Edit2, X, Plus, Trash2, UserPlus, ShieldCheck } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 import BackButton from '../components/BackButton'
 
 export default function ClubDetails() {
@@ -86,29 +88,33 @@ export default function ClubDetails() {
   const availableBerthIds = new Set(availableBerths.map((b) => b.id))
   const freeBerthsCount = (club?.berths || []).filter((berth) => availableBerthIds.has(berth.id)).length
 
-  useEffect(() => {
-    if (id) {
-      loadClub()
-      loadAvailableBerths()
-    }
+  useCancellableEffect(async (signal) => {
+    if (!id) return
+    await loadClub(signal)
+    if (signal.aborted) return
+    await loadAvailableBerths(signal)
   }, [id])
 
-  useEffect(() => {
-    if (club?.id) {
-      void loadBerthBookings().then(() => {
-        const canLoadTenantReport =
-          user?.role === UserRole.SUPER_ADMIN ||
-          user?.role === UserRole.ADMIN ||
-          user?.role === UserRole.CLUB_OWNER ||
-          user?.role === UserRole.CLUB_STAFF
-        if (canLoadTenantReport) {
-          loadTenantReport(club.id)
-        } else {
-          setTenantReport(null)
-        }
-      })
+  useCancellableEffect(async (signal) => {
+    if (!club?.id) return
+    await loadBerthBookings(signal)
+    if (signal.aborted) return
+    const canLoadTenantReport =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.role === UserRole.ADMIN ||
+      user?.role === UserRole.CLUB_OWNER ||
+      user?.role === UserRole.CLUB_STAFF
+    if (canLoadTenantReport) {
+      await loadTenantReport(club.id, signal)
+    } else {
+      setTenantReport(null)
     }
   }, [club?.id, user?.role])
+
+  useCancellableEffect(async (signal) => {
+    if (user?.role !== UserRole.VESSEL_OWNER || !user.id) return
+    await loadUserVessels(signal)
+  }, [user?.id, user?.role])
 
   useEffect(() => {
     if (!infoMessage) return
@@ -116,16 +122,10 @@ export default function ClubDetails() {
     return () => clearTimeout(timeout)
   }, [infoMessage])
 
-  useEffect(() => {
-    // Загружаем суда пользователя, если он судовладелец
-    if (user?.role === UserRole.VESSEL_OWNER && user.id) {
-      loadUserVessels()
-    }
-  }, [user])
-
-  const loadUserVessels = async () => {
+  const loadUserVessels = async (signal?: AbortSignal) => {
     try {
       const response = await vesselsService.getAll({ limit: 100 })
+      if (signal?.aborted) return
       const vessels = response.data || []
       // Фильтруем только суда текущего пользователя
       const userVesselsList = vessels.filter((vessel: Vessel) => vessel.ownerId === user?.id)
@@ -135,19 +135,22 @@ export default function ClubDetails() {
     }
   }
 
-  const loadAvailableBerths = async () => {
+  const loadAvailableBerths = async (signal?: AbortSignal) => {
     if (!id) return
-    
+
     try {
-      const response = await berthsService.getAvailableByClub(parseInt(id))
+      const response = await berthsService.getAvailableByClub(parseInt(id), undefined, { signal })
+      if (signal?.aborted) return
       setAvailableBerths((response as any).data || response || [])
     } catch (error) {
-      console.error('Ошибка загрузки доступных мест:', error)
-      setAvailableBerths([])
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки доступных мест:', error)
+        setAvailableBerths([])
+      }
     }
   }
 
-  const loadBerthBookings = async () => {
+  const loadBerthBookings = async (signal?: AbortSignal) => {
     if (!club || !club.berths) return
     
     try {
@@ -157,18 +160,24 @@ export default function ClubDetails() {
       
       if (user?.role === UserRole.GUEST || user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.PENDING_VALIDATION || !user) {
         try {
-          const response = await bookingsService.getByClub(club.id, { limit: 100 })
+          const response = await bookingsService.getByClub(club.id, { limit: 100 }, { signal })
+          if (signal?.aborted) return
           allBookings = (response as any)?.data || response || []
         } catch (error) {
-          console.error('Ошибка загрузки бронирований:', error)
+          if (!isRequestAborted(error)) {
+            console.error('Ошибка загрузки бронирований:', error)
+          }
           allBookings = []
         }
       } else {
         try {
-          const response = await bookingsService.getByClub(club.id, { limit: 100 })
+          const response = await bookingsService.getByClub(club.id, { limit: 100 }, { signal })
+          if (signal?.aborted) return
           allBookings = (response as any)?.data || response || []
         } catch (error) {
-          console.error('Ошибка загрузки бронирований:', error)
+          if (!isRequestAborted(error)) {
+            console.error('Ошибка загрузки бронирований:', error)
+          }
           allBookings = []
         }
       }
@@ -187,19 +196,25 @@ export default function ClubDetails() {
         }
       })
       
+      if (signal?.aborted) return
       setBerthBookings(bookingsMap)
     } catch (error) {
-      console.error('Ошибка загрузки бронирований мест:', error)
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки бронирований мест:', error)
+      }
     }
   }
 
-  const loadTenantReport = async (clubId: number) => {
+  const loadTenantReport = async (clubId: number, signal?: AbortSignal) => {
     try {
-      const response = await clubFinanceService.getTenantReport(clubId)
+      const response = await clubFinanceService.getTenantReport(clubId, { signal })
+      if (signal?.aborted) return
       setTenantReport(response as unknown as ClubTenantReportResponse)
     } catch (error) {
-      console.error('Ошибка загрузки отчета по арендаторам:', error)
-      setTenantReport(null)
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки отчета по арендаторам:', error)
+        setTenantReport(null)
+      }
     }
   }
 
@@ -500,9 +515,10 @@ export default function ClubDetails() {
     }
   }
 
-  const loadClub = async () => {
+  const loadClub = async (signal?: AbortSignal) => {
     try {
-      const data = (await clubsService.getById(parseInt(id!))) as unknown as Club
+      const data = (await clubsService.getById(parseInt(id!), { signal })) as unknown as Club
+      if (signal?.aborted) return
       setClub(data)
       if (data) {
         let parsedPhotos: string[] = []
@@ -541,9 +557,11 @@ export default function ClubDetails() {
         // Места загружаются с isAvailable = true, но могут иметь активные бронирования
       }
     } catch (error) {
-      console.error('Ошибка загрузки клуба:', error)
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки клуба:', error)
+      }
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }
 

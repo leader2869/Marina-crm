@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
-import { clubsService, berthsService, tariffsService } from '../services/api'
+import { useState } from 'react'
+import { clubsService, berthsService, tariffsService, isRequestAborted } from '../services/api'
 import { Club, Berth, Tariff, TariffType } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { Anchor, Edit2, Plus, Trash2 } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import BackButton from '../components/BackButton'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function Tariffs() {
   const { user } = useAuth()
@@ -28,56 +29,55 @@ export default function Tariffs() {
   })
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    loadClubs()
-  }, [])
-
-  useEffect(() => {
-    if (selectedClub) {
-      void (async () => {
-        await loadBerths(selectedClub.id)
-        await loadTariffs(selectedClub.id)
-      })()
-    }
-  }, [selectedClub])
-
-  const loadClubs = async () => {
+  useCancellableEffect(async (signal) => {
     try {
       setLoading(true)
       setError('')
-      const response = await clubsService.getAll({ limit: 100 })
+      const response = await clubsService.getAll({ limit: 100 }, { signal })
+      if (signal.aborted) return
       const clubsData = response.data || []
-      // Фильтруем только клубы текущего владельца
       const ownerClubs = clubsData.filter((club: Club) => club.ownerId === user?.id)
       setClubs(ownerClubs)
-      
-      // Если есть клубы, выбираем первый по умолчанию
+
       if (ownerClubs.length > 0 && !selectedClub) {
         setSelectedClub(ownerClubs[0])
       }
     } catch (err: any) {
-      console.error('Ошибка загрузки клубов:', err)
-      setError(err.error || err.message || 'Ошибка загрузки клубов')
+      if (!isRequestAborted(err)) {
+        console.error('Ошибка загрузки клубов:', err)
+        setError(err.error || err.message || 'Ошибка загрузки клубов')
+      }
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }
+  }, [user?.id])
 
-  const loadBerths = async (clubId: number) => {
+  useCancellableEffect(async (signal) => {
+    if (!selectedClub) return
+    await loadBerths(selectedClub.id, signal)
+    if (signal.aborted) return
+    await loadTariffs(selectedClub.id, signal)
+  }, [selectedClub?.id])
+
+  const loadBerths = async (clubId: number, signal?: AbortSignal) => {
     try {
-      const response = await berthsService.getByClub(clubId)
+      const response = await berthsService.getByClub(clubId, { signal })
+      if (signal?.aborted) return
       const berthsData = (response as any)?.data || response || []
       setBerths(Array.isArray(berthsData) ? berthsData : [])
     } catch (err: any) {
-      console.error('Ошибка загрузки мест:', err)
-      setError(err.error || err.message || 'Ошибка загрузки мест')
+      if (!isRequestAborted(err)) {
+        console.error('Ошибка загрузки мест:', err)
+        setError(err.error || err.message || 'Ошибка загрузки мест')
+      }
     }
   }
 
-  const loadTariffs = async (clubId: number) => {
+  const loadTariffs = async (clubId: number, signal?: AbortSignal) => {
     try {
       setError('')
-      const response = await tariffsService.getByClub(clubId)
+      const response = await tariffsService.getByClub(clubId, { signal })
+      if (signal?.aborted) return
       // Axios interceptor уже разворачивает response.data, поэтому response - это уже данные
       const tariffsData = Array.isArray(response) ? response : (response?.data || [])
       // Обеспечиваем, что monthlyAmounts всегда определен для каждого тарифа
@@ -87,9 +87,11 @@ export default function Tariffs() {
       }))
       setTariffs(normalizedTariffs)
     } catch (err: any) {
-      console.error('Ошибка загрузки тарифов:', err)
-      setError(err.error || err.message || 'Ошибка загрузки тарифов')
-      setTariffs([])
+      if (!isRequestAborted(err)) {
+        console.error('Ошибка загрузки тарифов:', err)
+        setError(err.error || err.message || 'Ошибка загрузки тарифов')
+        setTariffs([])
+      }
     }
   }
 

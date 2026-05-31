@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Settings, Users, X } from 'lucide-react'
 import BackButton from '../components/BackButton'
 import { LoadingAnimation } from '../components/LoadingAnimation'
-import { clubsService, clubFinanceService } from '../services/api'
+import { clubsService, clubFinanceService, isRequestAborted } from '../services/api'
 import {
   CLUB_STAFF_PERMISSION_KEYS,
   CLUB_STAFF_PERMISSION_LABELS,
   DEFAULT_CLUB_STAFF_PERMISSIONS,
 } from '../constants/clubStaffPermissions'
 import { Club, ClubStaffMember, ClubStaffPermission } from '../types'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function ClubEmployees() {
   const [clubs, setClubs] = useState<Club[]>([])
@@ -25,46 +26,49 @@ export default function ClubEmployees() {
     ...DEFAULT_CLUB_STAFF_PERMISSIONS,
   ])
 
-  const loadStaff = async (clubId: number) => {
+  const loadStaff = async (clubId: number, signal?: AbortSignal) => {
     try {
       setLoadingStaff(true)
       setError('')
-      const response = await clubFinanceService.getClubStaff(clubId)
+      const response = await clubFinanceService.getClubStaff(clubId, { signal })
+      if (signal?.aborted) return
       const list = (Array.isArray(response) ? response : response.data || []) as ClubStaffMember[]
       setEmployees(list)
     } catch (e: unknown) {
-      const err = e as { error?: string; message?: string }
-      setError(err?.error || err?.message || 'Ошибка загрузки сотрудников')
-      setEmployees([])
+      if (!isRequestAborted(e)) {
+        const err = e as { error?: string; message?: string }
+        setError(err?.error || err?.message || 'Ошибка загрузки сотрудников')
+        setEmployees([])
+      }
     } finally {
-      setLoadingStaff(false)
+      if (!signal?.aborted) setLoadingStaff(false)
     }
   }
 
-  useEffect(() => {
-    const loadClubs = async () => {
-      try {
-        setLoading(true)
-        setError('')
-        const response = await clubsService.getAll({ limit: 200 })
-        const allClubs = (response.data || []) as Club[]
-        setClubs(allClubs)
-        if (allClubs.length > 0) {
-          setSelectedClubId(allClubs[0].id)
-        }
-      } catch (e: unknown) {
+  useCancellableEffect(async (signal) => {
+    try {
+      setLoading(true)
+      setError('')
+      const response = await clubsService.getAll({ limit: 200 }, { signal })
+      if (signal.aborted) return
+      const allClubs = (response.data || []) as Club[]
+      setClubs(allClubs)
+      if (allClubs.length > 0) {
+        setSelectedClubId(allClubs[0].id)
+      }
+    } catch (e: unknown) {
+      if (!isRequestAborted(e)) {
         const err = e as { error?: string; message?: string }
         setError(err?.error || err?.message || 'Ошибка загрузки клубов')
-      } finally {
-        setLoading(false)
       }
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
-    void loadClubs()
   }, [])
 
-  useEffect(() => {
+  useCancellableEffect(async (signal) => {
     if (!selectedClubId) return
-    void loadStaff(selectedClubId)
+    await loadStaff(selectedClubId, signal)
   }, [selectedClubId])
 
   const sortedEmployees = useMemo(() => {

@@ -1,5 +1,9 @@
 import axios from 'axios'
 import type { DashboardStatsResponse } from '../types'
+import { isRequestAborted, type RequestOptions } from '../utils/request'
+
+export type { RequestOptions } from '../utils/request'
+export { isRequestAborted } from '../utils/request'
 
 // Определяем URL API: если VITE_API_URL не установлен, используем относительный путь для production
 // или localhost для development
@@ -51,6 +55,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    if (isRequestAborted(error)) {
+      return Promise.reject(error)
+    }
+
     // Логируем детали ошибки для отладки
     const baseURL = error.config?.baseURL || API_URL
     const url = error.config?.url || ''
@@ -154,8 +162,8 @@ export const authService = {
 }
 
 export const clubsService = {
-  getAll: (params?: any) => api.get('/clubs', { params }),
-  getById: (id: number) => api.get(`/clubs/${id}`),
+  getAll: (params?: any, options?: RequestOptions) => api.get('/clubs', { params, signal: options?.signal }),
+  getById: (id: number, options?: RequestOptions) => api.get(`/clubs/${id}`, { signal: options?.signal }),
   create: (data: any) => api.post('/clubs', data),
   update: (id: number, data: any) => api.put(`/clubs/${id}`, data),
   hide: (id: number) => api.post(`/clubs/${id}/hide`),
@@ -176,8 +184,8 @@ export const vesselsService = {
 
 export const bookingsService = {
   getAll: (params?: any) => api.get('/bookings', { params }),
-  getByClub: (clubId: number, params?: { page?: number; limit?: number }) =>
-    api.get(`/bookings/club/${clubId}`, { params }),
+  getByClub: (clubId: number, params?: { page?: number; limit?: number }, options?: RequestOptions) =>
+    api.get(`/bookings/club/${clubId}`, { params, signal: options?.signal }),
   getById: (id: number) => api.get(`/bookings/${id}`),
   create: (data: any) => api.post('/bookings', data),
   update: (id: number, data: any) => api.put(`/bookings/${id}`, data),
@@ -236,16 +244,18 @@ export const usersService = {
 }
 
 export const berthsService = {
-  getByClub: (clubId: number) => api.get(`/berths/club/${clubId}`),
-  getAvailableByClub: (clubId: number, params?: { startDate?: string; endDate?: string }) => 
-    api.get(`/berths/club/${clubId}/available`, { params }),
+  getByClub: (clubId: number, options?: RequestOptions) =>
+    api.get(`/berths/club/${clubId}`, { signal: options?.signal }),
+  getAvailableByClub: (clubId: number, params?: { startDate?: string; endDate?: string }, options?: RequestOptions) =>
+    api.get(`/berths/club/${clubId}/available`, { params, signal: options?.signal }),
   create: (data: any) => api.post('/berths', data),
   update: (id: number, data: any) => api.put(`/berths/${id}`, data),
   delete: (id: number) => api.delete(`/berths/${id}`),
 }
 
 export const tariffsService = {
-  getByClub: (clubId: number) => api.get(`/tariffs/club/${clubId}`),
+  getByClub: (clubId: number, options?: RequestOptions) =>
+    api.get(`/tariffs/club/${clubId}`, { signal: options?.signal }),
   create: (data: any) => api.post('/tariffs', data),
   update: (id: number, data: any) => api.put(`/tariffs/${id}`, data),
   delete: (id: number) => api.delete(`/tariffs/${id}`),
@@ -296,12 +306,13 @@ export const agentOrdersService = {
 }
 
 export const dashboardService = {
-  getStats: (params?: { settlementsClubId?: number }) =>
-    api.get('/dashboard/stats', { params }) as Promise<DashboardStatsResponse>,
+  getStats: (params?: { settlementsClubId?: number }, options?: RequestOptions) =>
+    api.get('/dashboard/stats', { params, signal: options?.signal }) as Promise<DashboardStatsResponse>,
 }
 
 export const clubFinanceService = {
-  getDashboardSummary: () => api.get('/club-finance/dashboard-summary'),
+  getDashboardSummary: (options?: RequestOptions) =>
+    api.get('/club-finance/dashboard-summary', { signal: options?.signal }),
   getPartners: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/partners`),
   createPartner: (clubId: number, data: any) => api.post(`/club-finance/clubs/${clubId}/partners`, data),
   updatePartner: (clubId: number, partnerId: number, data: any) =>
@@ -309,7 +320,8 @@ export const clubFinanceService = {
   deletePartner: (clubId: number, partnerId: number) =>
     api.delete(`/club-finance/clubs/${clubId}/partners/${partnerId}`),
   getClubUsers: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/club-users`),
-  getClubStaff: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/staff`),
+  getClubStaff: (clubId: number, options?: RequestOptions) =>
+    api.get(`/club-finance/clubs/${clubId}/staff`, { signal: options?.signal }),
   updateClubStaffAccess: (clubId: number, userId: number, data: { accessEnabled?: boolean; permissions?: string[] }) =>
     api.put(`/club-finance/clubs/${clubId}/staff/${userId}/access`, data),
   getPartnerManagers: (clubId: number, params?: { partnerId?: number }) =>
@@ -321,7 +333,8 @@ export const clubFinanceService = {
 
   getCashTransactions: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/cash-transactions`),
   getExpectedIncomes: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/expected-incomes`),
-  getTenantReport: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/tenant-report`),
+  getTenantReport: (clubId: number, options?: RequestOptions) =>
+    api.get(`/club-finance/clubs/${clubId}/tenant-report`, { signal: options?.signal }),
   createCashTransaction: (clubId: number, data: any) =>
     api.post(`/club-finance/clubs/${clubId}/cash-transactions`, data),
   updateCashTransaction: (clubId: number, transactionId: number, data: any) =>
@@ -329,7 +342,8 @@ export const clubFinanceService = {
   deleteCashTransaction: (clubId: number, transactionId: number) =>
     api.delete(`/club-finance/clubs/${clubId}/cash-transactions/${transactionId}`),
 
-  getSettlements: (clubId: number) => api.get(`/club-finance/clubs/${clubId}/settlements`),
+  getSettlements: (clubId: number, options?: RequestOptions) =>
+    api.get(`/club-finance/clubs/${clubId}/settlements`, { signal: options?.signal }),
 }
 
 export default api

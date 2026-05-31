@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { dashboardService, clubFinanceService } from '../services/api'
+import { dashboardService, clubFinanceService, isRequestAborted } from '../services/api'
 import { ClubDashboardSummary, UserRole, Vessel } from '../types'
 import { Anchor, Ship, Calendar, DollarSign, TrendingUp, TrendingDown, Wallet, Receipt } from 'lucide-react'
 import { LoadingAnimation } from '../components/LoadingAnimation'
 import { staffHasAnyClubAccess, staffHasPermission } from '../utils/clubStaffAccess'
+import { useCancellableEffect } from '../hooks/useCancellableEffect'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -32,57 +33,54 @@ export default function Dashboard() {
     user?.role === UserRole.SUPER_ADMIN ||
     user?.role === UserRole.ADMIN
 
-  useEffect(() => {
-    let cancelled = false
+  useCancellableEffect(async (signal) => {
+    setLoading(true)
+    try {
+      const data = await dashboardService.getStats(undefined, { signal })
+      if (signal.aborted) return
+      setStats(data.stats)
+      setClubList(data.clubList)
+      const clubId = data.defaultClubId
+      setSelectedClubId(clubId)
+      setVessels(data.vessels as Vessel[])
+      setVesselBalances(data.vesselBalances)
 
-    const loadDashboard = async () => {
-      setLoading(true)
-      try {
-        const data = await dashboardService.getStats()
-        if (cancelled) return
-        setStats(data.stats)
-        setClubList(data.clubList)
-        const clubId = data.defaultClubId
-        setSelectedClubId(clubId)
-        setVessels(data.vessels as Vessel[])
-        setVesselBalances(data.vesselBalances)
-
-        if (isClubDashboardRole) {
-          try {
-            const summary = (await clubFinanceService.getDashboardSummary()) as unknown as ClubDashboardSummary
-            if (!cancelled) setClubDashboard(summary)
-          } catch (error) {
+      if (isClubDashboardRole) {
+        try {
+          const summary = (await clubFinanceService.getDashboardSummary({ signal })) as unknown as ClubDashboardSummary
+          if (!signal.aborted) setClubDashboard(summary)
+        } catch (error) {
+          if (!isRequestAborted(error)) {
             console.error('Ошибка загрузки сводки клуба:', error)
           }
         }
+      }
 
-        if (
-          clubId &&
-          (user?.role === UserRole.CLUB_OWNER ||
-            user?.role === UserRole.SUPER_ADMIN ||
-            user?.role === UserRole.ADMIN ||
-            (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements')))
-        ) {
-          try {
-            const response = await clubFinanceService.getSettlements(clubId)
-            if (!cancelled) {
-              setClubSettlements((response as any)?.settlements || [])
-              setSettlementsLoadedClubId(clubId)
-            }
-          } catch (error) {
+      if (
+        clubId &&
+        (user?.role === UserRole.CLUB_OWNER ||
+          user?.role === UserRole.SUPER_ADMIN ||
+          user?.role === UserRole.ADMIN ||
+          (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements')))
+      ) {
+        try {
+          const response = await clubFinanceService.getSettlements(clubId, { signal })
+          if (!signal.aborted) {
+            setClubSettlements((response as any)?.settlements || [])
+            setSettlementsLoadedClubId(clubId)
+          }
+        } catch (error) {
+          if (!isRequestAborted(error)) {
             console.error('Ошибка загрузки взаиморасчетов для дашборда:', error)
           }
         }
-      } catch (error) {
-        console.error('Ошибка загрузки статистики:', error)
-      } finally {
-        if (!cancelled) setLoading(false)
       }
-    }
-
-    loadDashboard()
-    return () => {
-      cancelled = true
+    } catch (error) {
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки статистики:', error)
+      }
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
   }, [user, isClubDashboardRole])
 
@@ -92,21 +90,21 @@ export default function Dashboard() {
     user?.role === UserRole.ADMIN ||
     (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements'))
 
-  useEffect(() => {
-    const loadSettlements = async () => {
-      if (!selectedClubId || !canViewClubSettlements) return
-      if (selectedClubId === settlementsLoadedClubId) return
-      try {
-        const response = await clubFinanceService.getSettlements(selectedClubId)
-        const data = response as any
-        setClubSettlements(data?.settlements || [])
-        setSettlementsLoadedClubId(selectedClubId)
-      } catch (error) {
+  useCancellableEffect(async (signal) => {
+    if (!selectedClubId || !canViewClubSettlements) return
+    if (selectedClubId === settlementsLoadedClubId) return
+    try {
+      const response = await clubFinanceService.getSettlements(selectedClubId, { signal })
+      if (signal.aborted) return
+      const data = response as any
+      setClubSettlements(data?.settlements || [])
+      setSettlementsLoadedClubId(selectedClubId)
+    } catch (error) {
+      if (!isRequestAborted(error)) {
         console.error('Ошибка загрузки взаиморасчетов для дашборда:', error)
         setClubSettlements([])
       }
     }
-    loadSettlements()
   }, [selectedClubId, canViewClubSettlements, settlementsLoadedClubId])
 
   const statCards = [
