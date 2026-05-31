@@ -1,20 +1,7 @@
 {
   "buildCommand": "npm install && cd client && npm install --include=dev && npm run build",
   "outputDirectory": "client/dist",
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "src/**"
-    }
-  },
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/health",
-      "destination": "/api/index"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
@@ -32,4 +19,3 @@
     }
   ]
 }
-

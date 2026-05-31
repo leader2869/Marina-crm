@@ -46,86 +46,96 @@ export class UsersController {
       const userRepository = AppDataSource.getRepository(User);
       const paymentRepository = AppDataSource.getRepository(Payment);
 
-      // Получаем всех пользователей с их связями
       const [users, total] = await userRepository
         .createQueryBuilder('user')
-        .leftJoinAndSelect('user.ownedClubs', 'ownedClubs')
-        .leftJoinAndSelect('user.managedClub', 'managedClub')
-        .leftJoinAndSelect('user.managedClubs', 'managedClubs')
-        .leftJoinAndSelect('managedClubs.club', 'managedClubDetails')
-        .leftJoinAndSelect('user.vessels', 'vessels')
+        .select([
+          'user.id',
+          'user.firstName',
+          'user.lastName',
+          'user.email',
+          'user.phone',
+          'user.role',
+          'user.avatar',
+          'user.createdAt',
+        ])
+        .leftJoin('user.ownedClubs', 'ownedClubs')
+        .addSelect(['ownedClubs.id', 'ownedClubs.name'])
+        .leftJoin('user.managedClub', 'managedClub')
+        .addSelect(['managedClub.id', 'managedClub.name'])
+        .leftJoin('user.managedClubs', 'managedClubs')
+        .addSelect(['managedClubs.id', 'managedClubs.userId', 'managedClubs.clubId'])
+        .leftJoin('managedClubs.club', 'managedClubDetails')
+        .addSelect(['managedClubDetails.id', 'managedClubDetails.name'])
+        .leftJoin('user.vessels', 'vessels')
+        .addSelect(['vessels.id', 'vessels.name', 'vessels.registrationNumber'])
         .skip((page - 1) * limit)
         .take(limit)
         .orderBy('user.createdAt', 'DESC')
         .getManyAndCount();
 
-      // Для каждого пользователя вычисляем задолженность
-      const usersWithDebt = await Promise.all(
-        users.map(async (user) => {
-          // Находим все неоплаченные платежи пользователя (PENDING или OVERDUE)
-          // или просроченные платежи (PENDING со сроком оплаты в прошлом)
-          const now = new Date();
-          const unpaidPayments = await paymentRepository
-            .createQueryBuilder('payment')
-            .where('payment.payerId = :userId', { userId: user.id })
-            .andWhere(
-              '(payment.status = :overdueStatus OR (payment.status = :pendingStatus AND payment.dueDate < :now))',
-              {
-                overdueStatus: PaymentStatus.OVERDUE,
-                pendingStatus: PaymentStatus.PENDING,
-                now: now,
-              }
-            )
-            .getMany();
+      const userIds = users.map((user) => user.id);
+      const debtsByUserId = new Map<number, number>();
 
-          // Вычисляем общую задолженность (сумма + пеня)
-          const totalDebt = unpaidPayments.reduce((sum, payment) => {
-            const paymentAmount = parseFloat(payment.amount.toString());
-            const penaltyAmount = parseFloat(payment.penalty.toString());
-            return sum + paymentAmount + penaltyAmount;
-          }, 0);
+      if (userIds.length > 0) {
+        const now = new Date();
+        const debtRows = await paymentRepository
+          .createQueryBuilder('payment')
+          .select('payment.payerId', 'payerId')
+          .addSelect('COALESCE(SUM(payment.amount + payment.penalty), 0)', 'totalDebt')
+          .where('payment.payerId IN (:...userIds)', { userIds })
+          .andWhere(
+            '(payment.status = :overdueStatus OR (payment.status = :pendingStatus AND payment.dueDate < :now))',
+            {
+              overdueStatus: PaymentStatus.OVERDUE,
+              pendingStatus: PaymentStatus.PENDING,
+              now,
+            }
+          )
+          .groupBy('payment.payerId')
+          .getRawMany<{ payerId: string; totalDebt: string }>();
 
-          // Определяем к каким клубам привязан пользователь
-          const clubNames: string[] = [];
-          
-          // Добавляем клубы из managedClubs (новая связь многие-ко-многим)
-          if (user.managedClubs && user.managedClubs.length > 0) {
-            user.managedClubs.forEach((uc) => {
-              if (uc.club && !clubNames.includes(uc.club.name)) {
-                clubNames.push(uc.club.name);
-              }
-            });
-          }
-          
-          // Добавляем клуб из старой связи managedClub (для обратной совместимости)
-          if (user.managedClub && !clubNames.includes(user.managedClub.name)) {
-            clubNames.push(user.managedClub.name);
-          }
-          
-          // Добавляем клубы из ownedClubs
-          if (user.ownedClubs && user.ownedClubs.length > 0) {
-            user.ownedClubs.forEach((club) => {
-              if (!clubNames.includes(club.name)) {
-                clubNames.push(club.name);
-              }
-            });
-          }
+        debtRows.forEach((row) => {
+          debtsByUserId.set(Number(row.payerId), parseFloat(row.totalDebt || '0'));
+        });
+      }
 
-          return {
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            phone: user.phone || '-',
-            role: user.role,
-            clubName: clubNames.length > 0 ? clubNames.join(', ') : '-',
-            debt: totalDebt,
-            createdAt: user.createdAt,
-            vessels: user.vessels || [],
-            avatar: user.avatar || undefined,
-          };
-        })
-      );
+      const usersWithDebt = users.map((user) => {
+        const clubNames: string[] = [];
+
+        if (user.managedClubs?.length) {
+          user.managedClubs.forEach((uc) => {
+            if (uc.club && !clubNames.includes(uc.club.name)) {
+              clubNames.push(uc.club.name);
+            }
+          });
+        }
+
+        if (user.managedClub && !clubNames.includes(user.managedClub.name)) {
+          clubNames.push(user.managedClub.name);
+        }
+
+        if (user.ownedClubs?.length) {
+          user.ownedClubs.forEach((club) => {
+            if (!clubNames.includes(club.name)) {
+              clubNames.push(club.name);
+            }
+          });
+        }
+
+        return {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phone: user.phone || '-',
+          role: user.role,
+          clubName: clubNames.length > 0 ? clubNames.join(', ') : '-',
+          debt: debtsByUserId.get(user.id) || 0,
+          createdAt: user.createdAt,
+          vessels: user.vessels || [],
+          avatar: user.avatar || undefined,
+        };
+      });
 
       res.json(createPaginatedResponse(usersWithDebt, total, page, limit));
     } catch (error) {
@@ -167,6 +177,13 @@ export class UsersController {
 
       // Получаем всех пользователей с ролью GUEST, отсортированных по дате создания (новые первыми)
       const [guests, total] = await queryBuilder
+        .select([
+          'user.id',
+          'user.firstName',
+          'user.email',
+          'user.phone',
+          'user.createdAt',
+        ])
         .orderBy('user.createdAt', 'DESC')
         .skip((pageNum - 1) * limitNum)
         .take(limitNum)
@@ -230,6 +247,21 @@ export class UsersController {
       const user = await userRepository.findOne({
         where: { id: parseInt(id) },
         relations: ['ownedClubs', 'managedClub', 'managedClubs', 'managedClubs.club', 'vessels'],
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+          isValidated: true,
+          managedClubId: true,
+          emailVerified: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       });
 
       if (!user) {

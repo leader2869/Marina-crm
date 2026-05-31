@@ -3,6 +3,7 @@ import { verifyToken } from '../utils/jwt';
 import { UserRole } from '../types';
 import { AppDataSource } from '../config/database';
 import { User } from '../entities/User';
+import { USER_SESSION_SELECT } from '../utils/userSafe';
 
 // Расширяем Request из Express, сохраняя все его свойства (body, params, query, headers и т.д.)
 // Используем declaration merging для правильной работы типов
@@ -44,6 +45,7 @@ export const authenticate = async (
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { id: payload.userId, isActive: true },
+      select: USER_SESSION_SELECT,
     });
 
     if (!user) {
@@ -97,6 +99,7 @@ export const optionalAuthenticate = async (
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { id: payload.userId, isActive: true },
+      select: USER_SESSION_SELECT,
     });
 
     if (user) {
