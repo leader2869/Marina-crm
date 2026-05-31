@@ -38,18 +38,18 @@ const isTransactionPooler =
   databaseUrl.includes(':6543/') ||
   process.env.SUPABASE_POOL_MODE === 'transaction';
 
-// Transaction pooler: не больше 5 одновременных запросов — иначе очередь и таймауты.
+// Transaction pooler: 3 слота — меньше конкуренции с зомби-сессиями на Supavisor.
 const pgPoolMax =
   parseInt(process.env.PG_POOL_MAX || '', 10) ||
-  (isPersistentServer ? (isTransactionPooler ? 5 : 4) : 2);
+  (isPersistentServer ? (isTransactionPooler ? 3 : 4) : 2);
 
 const pgPoolExtra: Record<string, unknown> = {
   connectionTimeoutMillis: 15000,
   query_timeout: isPersistentServer ? 30000 : 20000,
   statement_timeout: isPersistentServer ? 30000 : 20000,
   idle_in_transaction_session_timeout: 10000,
-  idleTimeoutMillis: 10000,
-  maxUses: 5000,
+  idleTimeoutMillis: 5000,
+  maxUses: 500,
   max: pgPoolMax,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,

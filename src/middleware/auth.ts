@@ -1,16 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
 import { UserRole } from '../types';
-import { AppDataSource } from '../config/database';
-import { User } from '../entities/User';
-import { USER_SESSION_SELECT } from '../utils/userSafe';
 
-// Расширяем Request из Express, сохраняя все его свойства (body, params, query, headers и т.д.)
-// Используем declaration merging для правильной работы типов
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
       userId?: number;
       userRole?: UserRole;
       file?: Express.Multer.File;
@@ -18,14 +12,18 @@ declare global {
   }
 }
 
-// Для обратной совместимости оставляем интерфейс
 export interface AuthRequest extends Request {
-  user?: User;
+  /** Не загружается из БД на каждый запрос; может быть пустым (логи активности). */
+  user?: { firstName?: string; lastName?: string };
   userId?: number;
   userRole?: UserRole;
   file?: Express.Multer.File;
 }
 
+/**
+ * Аутентификация только по JWT — без запроса в БД на каждый HTTP-вызов.
+ * (Раньше findOne User съедал слот пула Supabase и вызывал deadlock при PG_POOL_MAX=5.)
+ */
 export const authenticate = async (
   req: AuthRequest,
   res: Response,
@@ -33,7 +31,7 @@ export const authenticate = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       res.status(401).json({ error: 'Требуется аутентификация' });
       return;
@@ -42,22 +40,10 @@ export const authenticate = async (
     const token = authHeader.substring(7);
     const payload = verifyToken(token);
 
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: payload.userId, isActive: true },
-      select: USER_SESSION_SELECT,
-    });
-
-    if (!user) {
-      res.status(401).json({ error: 'Пользователь не найден' });
-      return;
-    }
-
-    req.user = user;
-    req.userId = user.id;
-    req.userRole = user.role;
+    req.userId = payload.userId;
+    req.userRole = payload.role;
     next();
-  } catch (error) {
+  } catch {
     res.status(401).json({ error: 'Недействительный токен' });
   }
 };
@@ -78,7 +64,6 @@ export const authorize = (...roles: UserRole[]) => {
   };
 };
 
-// Опциональная аутентификация - устанавливает userRole если токен есть, но не требует его
 export const optionalAuthenticate = async (
   req: AuthRequest,
   res: Response,
@@ -86,34 +71,18 @@ export const optionalAuthenticate = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // Если токена нет, просто продолжаем без установки userRole
       next();
       return;
     }
 
     const token = authHeader.substring(7);
     const payload = verifyToken(token);
-
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: payload.userId, isActive: true },
-      select: USER_SESSION_SELECT,
-    });
-
-    if (user) {
-      req.user = user;
-      req.userId = user.id;
-      req.userRole = user.role;
-    }
-    
+    req.userId = payload.userId;
+    req.userRole = payload.role;
     next();
-  } catch (error) {
-    // Если токен невалидный, просто продолжаем без установки userRole
+  } catch {
     next();
   }
 };
-
-
-

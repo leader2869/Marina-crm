@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
+  const [summaryRequested, setSummaryRequested] = useState(false)
 
   const isClubDashboardRole =
     user?.role === UserRole.CLUB_OWNER ||
@@ -47,7 +48,7 @@ export default function Dashboard() {
       setVessels(data.vessels as Vessel[])
       setVesselBalances(data.vesselBalances)
 
-      if (isClubDashboardRole) {
+      if (isClubDashboardRole && summaryRequested) {
         try {
           const summary = (await clubFinanceService.getDashboardSummary({ signal })) as unknown as ClubDashboardSummary
           if (!signal.aborted) setClubDashboard(summary)
@@ -64,7 +65,7 @@ export default function Dashboard() {
     } finally {
       if (!signal.aborted) setLoading(false)
     }
-  }, [user, isClubDashboardRole])
+  }, [user, isClubDashboardRole, summaryRequested])
 
   const canViewClubSettlements =
     user?.role === UserRole.CLUB_OWNER ||
@@ -197,6 +198,15 @@ export default function Dashboard() {
         user?.role === UserRole.SUPER_ADMIN ||
         user?.role === UserRole.ADMIN) && (
         <>
+          {!summaryRequested && isClubDashboardRole && (
+            <button
+              type="button"
+              className="mb-4 text-sm text-primary-600 hover:text-primary-800"
+              onClick={() => setSummaryRequested(true)}
+            >
+              Загрузить финансовую сводку клуба
+            </button>
+          )}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
             {clubFinanceCards.map((stat) => {
               const Icon = stat.icon

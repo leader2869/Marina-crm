@@ -265,9 +265,6 @@ export class DashboardService {
     let vesselBalances: Record<number, number> = {};
 
     const clubList = await this.getClubList(req);
-    const bookingsCount = await this.countBookings(req);
-
-    stats.bookings = bookingsCount;
 
     if (req.userRole === UserRole.VESSEL_OWNER) {
       const vesselOwnerData = await this.getVesselOwnerData(req.userId);
@@ -281,8 +278,16 @@ export class DashboardService {
       const vesselRepository = AppDataSource.getRepository(Vessel);
       stats.clubs = await this.countPublishedClubs();
       stats.vessels = await vesselRepository.count();
+      stats.bookings = await AppDataSource.getRepository(Booking).count();
     } else if (req.userRole === UserRole.CLUB_OWNER || req.userRole === UserRole.CLUB_STAFF) {
       stats.clubs = clubList.length;
+      if (clubList.length > 0) {
+        stats.bookings = await AppDataSource.getRepository(Booking).count({
+          where: { clubId: In(clubList.map((c) => c.id)) },
+        });
+      }
+    } else {
+      stats.bookings = await this.countBookings(req);
     }
 
     const defaultClubId = clubList.length > 0 ? clubList[0].id : null;
