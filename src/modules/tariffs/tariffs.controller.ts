@@ -27,6 +27,7 @@ export class TariffsController {
       const clubRepository = AppDataSource.getRepository(Club);
       const club = await clubRepository.findOne({
         where: { id: parseInt(clubId) },
+        select: ['id', 'ownerId'],
       });
 
       if (!club) {
@@ -39,20 +40,16 @@ export class TariffsController {
       }
 
       const tariffRepository = AppDataSource.getRepository(Tariff);
-      const tariffs = await tariffRepository
-        .createQueryBuilder('tariff')
-        .leftJoinAndSelect('tariff.tariffBerths', 'tariffBerth')
-        .leftJoin('tariffBerth.berth', 'berth')
-        .addSelect(['berth.id', 'berth.number', 'berth.clubId', 'berth.isAvailable'])
-        .where('tariff.clubId = :clubId', { clubId: parseInt(clubId) })
-        .orderBy('tariff.createdAt', 'DESC')
-        .getMany();
+      const tariffs = await tariffRepository.find({
+        where: { clubId: parseInt(clubId) },
+        relations: ['tariffBerths'],
+        order: { createdAt: 'DESC' },
+      });
 
-      // Преобразуем данные для удобства
       const tariffsWithBerths = tariffs.map((tariff) => ({
         ...tariff,
-        berths: tariff.tariffBerths?.map((tb) => tb.berth) || [],
-        monthlyAmounts: tariff.monthlyAmounts || null, // Обеспечиваем, что monthlyAmounts всегда определен
+        berths: tariff.tariffBerths?.map((tb) => ({ id: tb.berthId })) || [],
+        monthlyAmounts: tariff.monthlyAmounts || null,
       }));
 
       res.json(tariffsWithBerths);

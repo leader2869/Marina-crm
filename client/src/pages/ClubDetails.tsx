@@ -94,23 +94,19 @@ export default function ClubDetails() {
   }, [id])
 
   useEffect(() => {
-    if (club && club.berths) {
-      loadBerthBookings()
-    }
-  }, [club])
-
-  useEffect(() => {
     if (club?.id) {
-      const canLoadTenantReport =
-        user?.role === UserRole.SUPER_ADMIN ||
-        user?.role === UserRole.ADMIN ||
-        user?.role === UserRole.CLUB_OWNER ||
-        user?.role === UserRole.CLUB_STAFF
-      if (canLoadTenantReport) {
-        loadTenantReport(club.id)
-      } else {
-        setTenantReport(null)
-      }
+      void loadBerthBookings().then(() => {
+        const canLoadTenantReport =
+          user?.role === UserRole.SUPER_ADMIN ||
+          user?.role === UserRole.ADMIN ||
+          user?.role === UserRole.CLUB_OWNER ||
+          user?.role === UserRole.CLUB_STAFF
+        if (canLoadTenantReport) {
+          loadTenantReport(club.id)
+        } else {
+          setTenantReport(null)
+        }
+      })
     }
   }, [club?.id, user?.role])
 
@@ -161,7 +157,7 @@ export default function ClubDetails() {
       
       if (user?.role === UserRole.GUEST || user?.role === UserRole.VESSEL_OWNER || user?.role === UserRole.PENDING_VALIDATION || !user) {
         try {
-          const response = await bookingsService.getByClub(club.id, { limit: 500 })
+          const response = await bookingsService.getByClub(club.id, { limit: 100 })
           allBookings = (response as any)?.data || response || []
         } catch (error) {
           console.error('Ошибка загрузки бронирований:', error)
@@ -169,7 +165,7 @@ export default function ClubDetails() {
         }
       } else {
         try {
-          const response = await bookingsService.getByClub(club.id, { limit: 500 })
+          const response = await bookingsService.getByClub(club.id, { limit: 100 })
           allBookings = (response as any)?.data || response || []
         } catch (error) {
           console.error('Ошибка загрузки бронирований:', error)

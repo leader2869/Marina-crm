@@ -34,8 +34,10 @@ export default function Tariffs() {
 
   useEffect(() => {
     if (selectedClub) {
-      loadBerths(selectedClub.id)
-      loadTariffs(selectedClub.id)
+      void (async () => {
+        await loadBerths(selectedClub.id)
+        await loadTariffs(selectedClub.id)
+      })()
     }
   }, [selectedClub])
 

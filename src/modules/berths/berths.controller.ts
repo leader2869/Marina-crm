@@ -62,7 +62,7 @@ export class BerthsController {
       const clubRepository = AppDataSource.getRepository(Club);
       const club = await clubRepository.findOne({
         where: { id: parseInt(clubId) },
-        relations: ['owner'],
+        select: ['id', 'ownerId'],
       });
 
       if (!club) {

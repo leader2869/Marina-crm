@@ -284,22 +284,31 @@ export class ClubFinanceController {
         }
       });
 
-      const result = await Promise.all(
-        Array.from(staffMap.values()).map(async (user) => {
-          const access = await getStaffClubAccess(user.id, clubId);
-          return {
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            phone: user.phone,
-            role: user.role,
-            isActive: user.isActive,
-            accessEnabled: access?.accessEnabled ?? true,
-            permissions: access?.permissions ?? [...DEFAULT_CLUB_STAFF_PERMISSIONS],
-          };
-        })
-      );
+      const staffUserIds = Array.from(staffMap.keys());
+      const links =
+        staffUserIds.length > 0
+          ? await userClubRepository.find({
+              where: { clubId, userId: In(staffUserIds) },
+            })
+          : [];
+      const linkByUserId = new Map(links.map((link) => [link.userId, link]));
+
+      const result = Array.from(staffMap.values()).map((user) => {
+        const link = linkByUserId.get(user.id);
+        return {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          isActive: user.isActive,
+          accessEnabled: link ? link.accessEnabled !== false : true,
+          permissions: normalizeStaffPermissions(
+            link?.permissions ?? [...DEFAULT_CLUB_STAFF_PERMISSIONS]
+          ),
+        };
+      });
 
       result.sort((a, b) =>
         `${a.lastName || ''} ${a.firstName || ''}`.localeCompare(`${b.lastName || ''} ${b.firstName || ''}`)

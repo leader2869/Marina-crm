@@ -26,24 +26,6 @@ export default function Dashboard() {
   const [vesselBalances, setVesselBalances] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const data = await dashboardService.getStats()
-        setStats(data.stats)
-        setClubList(data.clubList)
-        setSelectedClubId(data.defaultClubId)
-        setVessels(data.vessels as Vessel[])
-        setVesselBalances(data.vesselBalances)
-      } catch (error) {
-        console.error('Ошибка загрузки статистики:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadStats()
-  }, [user])
-
   const isClubDashboardRole =
     user?.role === UserRole.CLUB_OWNER ||
     user?.role === UserRole.CLUB_STAFF ||
@@ -51,19 +33,57 @@ export default function Dashboard() {
     user?.role === UserRole.ADMIN
 
   useEffect(() => {
-    const loadClubDashboard = async () => {
-      if (!isClubDashboardRole) {
-        setClubDashboard(null)
-        return
-      }
+    let cancelled = false
+
+    const loadDashboard = async () => {
+      setLoading(true)
       try {
-        const data = (await clubFinanceService.getDashboardSummary()) as unknown as ClubDashboardSummary
-        setClubDashboard(data)
+        const data = await dashboardService.getStats()
+        if (cancelled) return
+        setStats(data.stats)
+        setClubList(data.clubList)
+        const clubId = data.defaultClubId
+        setSelectedClubId(clubId)
+        setVessels(data.vessels as Vessel[])
+        setVesselBalances(data.vesselBalances)
+
+        if (isClubDashboardRole) {
+          try {
+            const summary = (await clubFinanceService.getDashboardSummary()) as unknown as ClubDashboardSummary
+            if (!cancelled) setClubDashboard(summary)
+          } catch (error) {
+            console.error('Ошибка загрузки сводки клуба:', error)
+          }
+        }
+
+        if (
+          clubId &&
+          (user?.role === UserRole.CLUB_OWNER ||
+            user?.role === UserRole.SUPER_ADMIN ||
+            user?.role === UserRole.ADMIN ||
+            (user?.role === UserRole.CLUB_STAFF && staffHasPermission(user, 'club_settlements')))
+        ) {
+          try {
+            const response = await clubFinanceService.getSettlements(clubId)
+            if (!cancelled) {
+              setClubSettlements((response as any)?.settlements || [])
+              setSettlementsLoadedClubId(clubId)
+            }
+          } catch (error) {
+            console.error('Ошибка загрузки взаиморасчетов для дашборда:', error)
+          }
+        }
       } catch (error) {
-        console.error('Ошибка загрузки сводки клуба:', error)
+        console.error('Ошибка загрузки статистики:', error)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
-    loadClubDashboard()
+
+    loadDashboard()
+    return () => {
+      cancelled = true
+    }
   }, [user, isClubDashboardRole])
 
   const canViewClubSettlements =
