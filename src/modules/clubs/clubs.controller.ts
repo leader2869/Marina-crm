@@ -25,8 +25,7 @@ import { UserRole, BookingStatus } from '../../types';
 import { ActivityLogService } from '../../services/activityLog.service';
 import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
-import { getClubIdsForStaffUser } from '../../utils/clubStaffAccess';
-import { staffHasPermission } from '../../utils/clubStaffPermissions';
+import { getAllStaffClubAccesses } from '../../utils/clubStaffPermissions';
 import { getFreeBerthsCountsByClubIds } from '../../utils/freeBerths';
 
 export class ClubsController {
@@ -176,10 +175,10 @@ export class ClubsController {
       );
       const { location, minPrice, maxPrice, available, showHidden } = req.query;
 
+      const includeLogo = req.query.includeLogo === 'true';
+
       const clubRepository = AppDataSource.getRepository(Club);
-      const queryBuilder = clubRepository
-        .createQueryBuilder('club')
-        .select([
+      const selectColumns = [
           'club.id AS id',
           'club.name AS name',
           'club.description AS description',
@@ -189,7 +188,7 @@ export class ClubsController {
           'club.phone AS phone',
           'club.email AS email',
           'club.website AS website',
-          'club.logo AS logo',
+          ...(includeLogo ? ['club.logo AS logo'] : []),
           'club.totalBerths AS "totalBerths"',
           'club.minRentalPeriod AS "minRentalPeriod"',
           'club.maxRentalPeriod AS "maxRentalPeriod"',
@@ -206,7 +205,10 @@ export class ClubsController {
           'club.ownerId AS "ownerId"',
           'club.createdAt AS "createdAt"',
           'club.updatedAt AS "updatedAt"',
-        ]);
+        ];
+      const queryBuilder = clubRepository
+        .createQueryBuilder('club')
+        .select(selectColumns);
       
       // Если суперадмин запрашивает скрытые клубы, показываем все, иначе только активные
       // Проверяем userRole (может быть undefined, если запрос без аутентификации)
@@ -219,13 +221,10 @@ export class ClubsController {
         queryBuilder.where('club.ownerId = :ownerId', { ownerId: req.userId });
         console.log('Владелец клуба запросил свои клубы, userId:', req.userId);
       } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
-        const allStaffClubIds = await getClubIdsForStaffUser(req.userId);
-        staffClubIds = [];
-        for (const cid of allStaffClubIds) {
-          if (await staffHasPermission(req.userId, cid, 'clubs')) {
-            staffClubIds.push(cid);
-          }
-        }
+        const accesses = await getAllStaffClubAccesses(req.userId);
+        staffClubIds = accesses
+          .filter((a) => a.accessEnabled && a.permissions.includes('clubs'))
+          .map((a) => a.clubId);
         if (staffClubIds.length === 0) {
           res.json(createPaginatedResponse([], 0, page, limit));
           return;
@@ -325,6 +324,10 @@ export class ClubsController {
       const club = await clubRepository.findOne({
         where: { id: parseInt(id) },
         relations: ['owner', 'managers'],
+        select: {
+          owner: { id: true, firstName: true, lastName: true, email: true, phone: true },
+          managers: { id: true, firstName: true, lastName: true, email: true, phone: true },
+        },
       });
 
       if (!club) {
@@ -357,8 +360,6 @@ export class ClubsController {
       // Для PENDING_VALIDATION и других ролей показываем все места (включая занятые)
       let berthsQuery = berthRepository
         .createQueryBuilder('berth')
-        .leftJoinAndSelect('berth.tariffBerths', 'tariffBerths')
-        .leftJoinAndSelect('tariffBerths.tariff', 'tariff')
         .where('berth.clubId = :clubId', { clubId: club.id });
       
       if (isGuest) {
@@ -378,10 +379,31 @@ export class ClubsController {
               )
             ELSE 0 
           END`,
-          'ASC' // От меньшего к большему по числовому значению
+          'ASC'
         )
-        .addOrderBy('berth.number', 'ASC') // От меньшего к большему по строке
+        .addOrderBy('berth.number', 'ASC')
         .getMany();
+
+      if (berths.length > 0) {
+        const berthIds = berths.map((b) => b.id);
+        const tariffBerthRepository = AppDataSource.getRepository(TariffBerth);
+        const tariffBerths = await tariffBerthRepository
+          .createQueryBuilder('tb')
+          .innerJoinAndSelect('tb.tariff', 'tariff')
+          .where('tb.berthId IN (:...berthIds)', { berthIds })
+          .getMany();
+
+        const tariffBerthsByBerthId = new Map<number, TariffBerth[]>();
+        for (const tb of tariffBerths) {
+          const list = tariffBerthsByBerthId.get(tb.berthId) ?? [];
+          list.push(tb);
+          tariffBerthsByBerthId.set(tb.berthId, list);
+        }
+
+        for (const berth of berths) {
+          berth.tariffBerths = tariffBerthsByBerthId.get(berth.id) ?? [];
+        }
+      }
 
       // Фильтруем тарифы по сезону клуба и датам действия
       const today = new Date();

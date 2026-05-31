@@ -20,7 +20,7 @@ import { ActivityType, EntityType } from '../../entities/ActivityLog';
 import { generateActivityDescription } from '../../utils/activityLogDescription';
 import { In } from 'typeorm';
 import { getClubIdsForStaffUser, userHasAccessToClub } from '../../utils/clubStaffAccess';
-import { staffHasPermission } from '../../utils/clubStaffPermissions';
+import { getAllStaffClubAccesses } from '../../utils/clubStaffPermissions';
 import { mapBookingListItem } from '../../utils/listResponseMappers';
 import { SelectQueryBuilder } from 'typeorm';
 
@@ -92,13 +92,10 @@ export class BookingsController {
       if (req.userRole === 'vessel_owner') {
         applyFilters = (qb) => qb.where('booking.vesselOwnerId = :userId', { userId: req.userId });
       } else if (req.userRole === 'club_staff' && req.userId) {
-        const clubIds = await getClubIdsForStaffUser(req.userId);
-        const allowedClubIds: number[] = [];
-        for (const cid of clubIds) {
-          if (await staffHasPermission(req.userId, cid, 'bookings')) {
-            allowedClubIds.push(cid);
-          }
-        }
+        const accesses = await getAllStaffClubAccesses(req.userId);
+        const allowedClubIds = accesses
+          .filter((a) => a.accessEnabled && a.permissions.includes('bookings'))
+          .map((a) => a.clubId);
         if (allowedClubIds.length === 0) {
           res.json(createPaginatedResponse([], 0, page, limit));
           return;

@@ -48,6 +48,7 @@ const pgPoolExtra: Record<string, unknown> = {
   query_timeout: isPersistentServer ? 120000 : 60000,
   statement_timeout: isPersistentServer ? 120000 : 60000,
   idle_in_transaction_session_timeout: 30000,
+  idleTimeoutMillis: 20000,
   max: pgPoolMax,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
