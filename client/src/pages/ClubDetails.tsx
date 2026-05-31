@@ -90,8 +90,20 @@ export default function ClubDetails() {
 
   useCancellableEffect(async (signal) => {
     if (!id) return
-    await loadClub(signal)
+    setLoading(true)
+    setError('')
+    setClub(null)
+    try {
+      await loadClub(signal)
+    } finally {
+      setLoading(false)
+    }
   }, [id])
+
+  useCancellableEffect(async (signal) => {
+    if (!club?.id) return
+    await loadClubPhotos(club.id, signal)
+  }, [club?.id])
 
   useCancellableEffect(async (signal) => {
     if (!club?.id) return
@@ -104,6 +116,11 @@ export default function ClubDetails() {
       setTenantReport(null)
       return
     }
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 1200)
+      signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
+    })
+    if (signal.aborted) return
     await loadTenantReport(club.id, signal)
   }, [club?.id, user?.role])
 
@@ -117,6 +134,37 @@ export default function ClubDetails() {
     const timeout = setTimeout(() => setInfoMessage(''), 2500)
     return () => clearTimeout(timeout)
   }, [infoMessage])
+
+  const parseClubPhotos = (logo: string | null | undefined): string[] => {
+    if (!logo) return []
+    try {
+      const parsed = JSON.parse(logo)
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => typeof item === 'string')
+      }
+      return typeof logo === 'string' ? [logo] : []
+    } catch {
+      return [logo]
+    }
+  }
+
+  const applyClubPhotos = (logo: string | null | undefined) => {
+    const parsedPhotos = parseClubPhotos(logo)
+    setClub((prev) => (prev ? { ...prev, logo: logo ?? undefined } : prev))
+    setEditForm((prev) => ({ ...prev, photos: parsedPhotos }))
+  }
+
+  const loadClubPhotos = async (clubId: number, signal?: AbortSignal) => {
+    try {
+      const data = (await clubsService.getMedia(clubId, { signal })) as { logo?: string | null }
+      if (signal?.aborted) return
+      applyClubPhotos(data.logo ?? null)
+    } catch (error) {
+      if (!isRequestAborted(error)) {
+        console.error('Ошибка загрузки фото клуба:', error)
+      }
+    }
+  }
 
   const applyClubDerivedState = (data: Club) => {
     const availableIds = new Set(data.availableBerthIds || [])
@@ -474,20 +522,6 @@ export default function ClubDetails() {
       setClub(data)
       applyClubDerivedState(data)
       if (data) {
-        let parsedPhotos: string[] = []
-        if (data.logo) {
-          try {
-            const parsed = JSON.parse(data.logo)
-            if (Array.isArray(parsed)) {
-              parsedPhotos = parsed.filter((item) => typeof item === 'string')
-            } else if (typeof data.logo === 'string') {
-              parsedPhotos = [data.logo]
-            }
-          } catch {
-            parsedPhotos = [data.logo]
-          }
-        }
-
         setEditForm({
           name: data.name,
           description: data.description || '',
@@ -503,18 +537,15 @@ export default function ClubDetails() {
           minPricePerMonth: data.minPricePerMonth?.toString() || '',
           season: data.season?.toString() || new Date().getFullYear().toString(),
           rentalMonths: data.rentalMonths || [],
-          photos: parsedPhotos,
+          photos: [],
         })
-
-        // Для гостя места уже загружены в getById (включая забронированные)
-        // Места загружаются с isAvailable = true, но могут иметь активные бронирования
       }
     } catch (error) {
       if (!isRequestAborted(error)) {
         console.error('Ошибка загрузки клуба:', error)
+        const err = error as { error?: string; message?: string }
+        setError(err?.error || err?.message || 'Не удалось загрузить клуб')
       }
-    } finally {
-      if (!signal?.aborted) setLoading(false)
     }
   }
 
@@ -877,7 +908,20 @@ export default function ClubDetails() {
   }
 
   if (!club) {
-    return <div className="text-center py-12">Клуб не найден</div>
+    return (
+      <div className="text-center py-12 space-y-3">
+        <p className="text-gray-600">{error || 'Клуб не найден'}</p>
+        {error && (
+          <button
+            type="button"
+            className="text-primary-600 hover:text-primary-800 text-sm"
+            onClick={() => id && void loadClub()}
+          >
+            Повторить загрузку
+          </button>
+        )}
+      </div>
+    )
   }
 
   return (

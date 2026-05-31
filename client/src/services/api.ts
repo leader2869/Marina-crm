@@ -176,7 +176,10 @@ export const authService = {
 
 export const clubsService = {
   getAll: (params?: any, options?: RequestOptions) => api.get('/clubs', { params, signal: options?.signal }),
-  getById: (id: number, options?: RequestOptions) => api.get(`/clubs/${id}`, { signal: options?.signal }),
+  getById: (id: number, options?: RequestOptions) =>
+    api.get(`/clubs/${id}`, { params: options?.params, signal: options?.signal }),
+  getMedia: (id: number, options?: RequestOptions) =>
+    api.get(`/clubs/${id}/media`, { signal: options?.signal }),
   create: (data: any) => api.post('/clubs', data),
   update: (id: number, data: any) => api.put(`/clubs/${id}`, data),
   hide: (id: number) => api.post(`/clubs/${id}/hide`),

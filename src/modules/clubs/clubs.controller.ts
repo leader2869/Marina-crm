@@ -317,6 +317,79 @@ export class ClubsController {
     }
   }
 
+  private mapClubDetailResponse(
+    club: Club,
+    berths: Berth[],
+    availableBerthIds: number[],
+    activeBerthBookings: Awaited<ReturnType<typeof getActiveBerthBookingSummaries>>,
+    includeLogo: boolean
+  ) {
+    return {
+      id: club.id,
+      name: club.name,
+      description: club.description,
+      address: club.address,
+      latitude: club.latitude,
+      longitude: club.longitude,
+      phone: club.phone,
+      email: club.email,
+      website: club.website,
+      logo: includeLogo ? club.logo : null,
+      totalBerths: club.totalBerths,
+      minRentalPeriod: club.minRentalPeriod,
+      maxRentalPeriod: club.maxRentalPeriod,
+      basePrice: club.basePrice,
+      minPricePerMonth: club.minPricePerMonth,
+      season: club.season,
+      rentalMonths: club.rentalMonths,
+      bookingRulesText: club.bookingRulesText,
+      isActive: club.isActive,
+      isValidated: club.isValidated,
+      isSubmittedForValidation: club.isSubmittedForValidation,
+      rejectionComment: club.rejectionComment,
+      cashPaymentsEnabled: club.cashPaymentsEnabled,
+      ownerId: club.ownerId,
+      owner: club.owner,
+      managers: club.managers,
+      createdAt: club.createdAt,
+      updatedAt: club.updatedAt,
+      berths,
+      availableBerthIds,
+      activeBerthBookings,
+    };
+  }
+
+  /** Только logo (тяжёлые base64) — отдельно от основного ответа */
+  async getClubMedia(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const clubId = parseInt(req.params.id);
+      const clubRepository = AppDataSource.getRepository(Club);
+      const club = await clubRepository.findOne({
+        where: { id: clubId },
+        select: ['id', 'logo', 'isActive', 'isValidated', 'isSubmittedForValidation', 'ownerId'],
+      });
+
+      if (!club) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
+
+      const isGuest = !req.userId || req.userRole === UserRole.GUEST;
+      const isPendingValidation = req.userRole === UserRole.PENDING_VALIDATION;
+      const isClubOwner = req.userRole === UserRole.CLUB_OWNER;
+
+      if ((isGuest || isPendingValidation) && (!club.isActive || !club.isValidated || !club.isSubmittedForValidation)) {
+        throw new AppError('Яхт-клуб не найден или неактивен', 404);
+      }
+      if (isClubOwner && req.userId && club.ownerId !== req.userId) {
+        throw new AppError('Яхт-клуб не найден', 404);
+      }
+
+      res.json({ logo: club.logo });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
@@ -449,11 +522,10 @@ export class ClubsController {
 
       const activeBerthBookings = await getActiveBerthBookingSummaries(club.id);
 
-      res.json({
-        ...club,
-        availableBerthIds,
-        activeBerthBookings,
-      });
+      const includeLogo = req.query.includeLogo === 'true';
+      res.json(
+        this.mapClubDetailResponse(club, berths, availableBerthIds, activeBerthBookings, includeLogo)
+      );
     } catch (error) {
       next(error);
     }

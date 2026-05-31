@@ -2,6 +2,7 @@ import axios from 'axios'
 
 export type RequestOptions = {
   signal?: AbortSignal
+  params?: Record<string, string | number | boolean | undefined>
 }
 
 export function isRequestAborted(error: unknown): boolean {
