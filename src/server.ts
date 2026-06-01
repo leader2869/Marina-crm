@@ -5,7 +5,7 @@ import { AppDataSource } from './config/database';
 import { errorHandler } from './middleware/errorHandler';
 import { autoActivityLogger } from './middleware/autoActivityLogger';
 import { requestLifecycle } from './middleware/requestLifecycle';
-import { dbRequestGate, ignoreClientDisconnect } from './middleware/dbRequestGate';
+import { ignoreClientDisconnect } from './middleware/dbRequestGate';
 
 // Routes
 import authRoutes from './modules/auth/auth.routes';
@@ -96,8 +96,6 @@ app.use('/api', (req: Request, _res: Response, next: NextFunction) => {
   }
   next();
 });
-
-app.use('/api', dbRequestGate);
 
 app.use(async (req: Request, res: Response, next: NextFunction) => {
   if (req.path === '/health') {

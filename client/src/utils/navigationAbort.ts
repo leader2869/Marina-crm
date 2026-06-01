@@ -1,17 +1,14 @@
-/** Контроллер отмены всех in-flight HTTP при смене страницы (SPA navigation). */
-import { apiQueue } from './apiQueue'
-
+/** Контроллер отмены in-flight HTTP при смене страницы (SPA navigation). */
 let navigationAbortController = new AbortController()
 
 export function getNavigationAbortSignal(): AbortSignal {
   return navigationAbortController.signal
 }
 
-/** Отменить все запросы текущей страницы и очередь — освобождает слоты пула БД на сервере. */
+/** Отменить запросы без своего signal (страница ушла — освобождаем пул на сервере). */
 export function abortInflightRequests(): void {
   navigationAbortController.abort()
   navigationAbortController = new AbortController()
-  apiQueue.reset()
 }
 
 export function mergeAbortSignals(...signals: Array<AbortSignal | undefined>): AbortSignal {

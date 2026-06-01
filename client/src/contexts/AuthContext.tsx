@@ -29,26 +29,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const initAuth = async () => {
-      if (token) {
-        try {
+      try {
+        if (token) {
           const userData = await authService.getProfile()
           console.log('Profile loaded:', userData)
           console.log('User role from API:', userData.role)
           setUser(userData)
-        } catch (error: any) {
-          console.error('Error loading profile:', error)
-          // Если токен невалидный или истек, очищаем его
-          if (error?.error === 'Недействительный токен' || 
-              error?.error === 'Требуется аутентификация' ||
-              error?.response?.status === 401) {
-            console.log('Token invalid, clearing...')
-            localStorage.removeItem('token')
-            setToken(null)
-            setUser(null)
-          }
         }
+      } catch (error: any) {
+        if (error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') {
+          return
+        }
+        console.error('Error loading profile:', error)
+        if (
+          error?.error === 'Недействительный токен' ||
+          error?.error === 'Требуется аутентификация' ||
+          error?.response?.status === 401
+        ) {
+          localStorage.removeItem('token')
+          setToken(null)
+          setUser(null)
+        }
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     initAuth()
   }, [token])

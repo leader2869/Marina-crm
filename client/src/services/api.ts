@@ -1,8 +1,7 @@
 import axios from 'axios'
 import type { DashboardStatsResponse } from '../types'
 import { isRequestAborted, type RequestOptions } from '../utils/request'
-import { getNavigationAbortSignal, mergeAbortSignals } from '../utils/navigationAbort'
-import { apiQueue } from '../utils/apiQueue'
+import { getNavigationAbortSignal } from '../utils/navigationAbort'
 
 export type { RequestOptions } from '../utils/request'
 export { isRequestAborted } from '../utils/request'
@@ -37,25 +36,16 @@ const api = axios.create({
   timeout: 30000,
 })
 
-type ApiRequestConfig = import('axios').InternalAxiosRequestConfig & {
-  _queueAcquired?: boolean
-}
-
-// Токен + отмена при навигации + очередь (max 2 параллельно)
-api.interceptors.request.use(async (config) => {
+// Токен; nav-abort только без своего signal (auth/login не отменяется при редиректе)
+api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
-
-  const navSignal = getNavigationAbortSignal()
   const requestSignal = config.signal as AbortSignal | undefined
-  const merged = mergeAbortSignals(navSignal, requestSignal)
-  config.signal = merged
-
-  await apiQueue.acquire(merged)
-  ;(config as ApiRequestConfig)._queueAcquired = true
-
+  if (!requestSignal) {
+    config.signal = getNavigationAbortSignal()
+  }
   return config
 })
 
@@ -75,19 +65,8 @@ api.interceptors.request.use((config) => {
 
 // Обработка ошибок
 api.interceptors.response.use(
-  (response) => {
-    const cfg = response.config as ApiRequestConfig
-    if (cfg._queueAcquired) {
-      apiQueue.release()
-    }
-    return response.data
-  },
+  (response) => response.data,
   (error) => {
-    const cfg = error.config as ApiRequestConfig | undefined
-    if (cfg?._queueAcquired) {
-      apiQueue.release()
-    }
-
     if (isRequestAborted(error)) {
       return Promise.reject(error)
     }
