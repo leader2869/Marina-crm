@@ -217,15 +217,42 @@ export class PaymentsController {
       const { id } = req.params;
       const { status, transactionId, paidDate, paidAmount, cashPaymentMethod, acceptedByPartnerId, acceptedByManagerId } = req.body;
 
+      const paymentId = parseInt(id);
       const paymentRepository = AppDataSource.getRepository(Payment);
+      // Без booking.club — logo клуба ~500KB, вызывает таймаут пула
       const payment = await paymentRepository.findOne({
-        where: { id: parseInt(id) },
-        relations: ['booking', 'booking.club'],
+        where: { id: paymentId },
+        relations: ['booking'],
+        select: {
+          id: true,
+          bookingId: true,
+          payerId: true,
+          amount: true,
+          currency: true,
+          method: true,
+          dueDate: true,
+          status: true,
+          paidDate: true,
+          transactionId: true,
+          notes: true,
+          penalty: true,
+          paymentType: true,
+          paymentOrder: true,
+          paymentMonth: true,
+          booking: {
+            id: true,
+            clubId: true,
+            vesselOwnerId: true,
+            status: true,
+          },
+        },
       });
 
-      if (!payment) {
+      if (!payment || !payment.booking) {
         throw new AppError('Платеж не найден', 404);
       }
+
+      const clubId = payment.booking.clubId;
 
       // Проверка прав доступа
       if (req.userRole === UserRole.VESSEL_OWNER) {
@@ -234,8 +261,12 @@ export class PaymentsController {
           throw new AppError('Недостаточно прав для изменения статуса', 403);
         }
       } else if (req.userRole === UserRole.CLUB_OWNER) {
-        // Владелец клуба может изменять статус платежей своих клубов
-        if (payment.booking.club.ownerId !== req.userId) {
+        const clubRepository = AppDataSource.getRepository(Club);
+        const club = await clubRepository.findOne({
+          where: { id: clubId },
+          select: ['id', 'ownerId'],
+        });
+        if (club?.ownerId !== req.userId) {
           throw new AppError('Недостаточно прав для изменения статуса', 403);
         }
       } else if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
@@ -328,9 +359,9 @@ export class PaymentsController {
         (req.userRole === UserRole.CLUB_OWNER || req.userRole === UserRole.CLUB_STAFF)
       ) {
         if (req.userRole === UserRole.CLUB_STAFF && req.userId) {
-          await this.assertClubPaymentAccess(req, payment.booking.clubId);
+          await this.assertClubPaymentAccess(req, clubId);
         }
-        await assertClubCashPaymentsEnabled(payment.booking.clubId);
+        await assertClubCashPaymentsEnabled(clubId);
         const normalizedAcceptedByPartnerId = Number(acceptedByPartnerId);
         if (!Number.isInteger(normalizedAcceptedByPartnerId) || normalizedAcceptedByPartnerId <= 0) {
           throw new AppError('Укажите партнера, который принял оплату', 400);
@@ -347,9 +378,10 @@ export class PaymentsController {
         const acceptedPartner = await partnerRepository.findOne({
           where: {
             id: normalizedAcceptedByPartnerId,
-            clubId: payment.booking.clubId,
+            clubId,
             isActive: true,
           },
+          select: ['id', 'clubId'],
         });
         if (!acceptedPartner) {
           throw new AppError('Партнер, принявший оплату, не найден', 404);
@@ -364,10 +396,11 @@ export class PaymentsController {
         const acceptedManager = await managerRepository.findOne({
           where: {
             id: normalizedAcceptedByManagerId,
-            clubId: payment.booking.clubId,
+            clubId,
             partnerId: normalizedAcceptedByPartnerId,
             isActive: true,
           },
+          select: ['id', 'clubId', 'partnerId'],
         });
         if (!acceptedManager) {
           throw new AppError('Менеджер не найден у выбранного партнера', 404);
@@ -375,7 +408,7 @@ export class PaymentsController {
 
         const cashTxRepository = AppDataSource.getRepository(ClubCashTransaction);
         const cashTx = cashTxRepository.create({
-          clubId: payment.booking.clubId,
+          clubId,
           bookingId: paymentForCashTx.bookingId,
           transactionType: CashTransactionType.INCOME,
           amount: Number(paymentForCashTx.amount),
@@ -411,7 +444,23 @@ export class PaymentsController {
 
       const updatedPayment = await paymentRepository.findOne({
         where: { id: payment.id },
-        relations: ['booking', 'payer'],
+        select: {
+          id: true,
+          bookingId: true,
+          payerId: true,
+          amount: true,
+          currency: true,
+          method: true,
+          dueDate: true,
+          status: true,
+          paidDate: true,
+          transactionId: true,
+          notes: true,
+          penalty: true,
+          paymentType: true,
+          paymentOrder: true,
+          paymentMonth: true,
+        },
       });
 
       res.json(updatedPayment);

@@ -351,33 +351,29 @@ export class PaymentService {
    */
   static async areRequiredPaymentsPaid(bookingId: number): Promise<boolean> {
     const paymentRepository = AppDataSource.getRepository(Payment);
-    const payments = await paymentRepository.find({
-      where: { bookingId },
-    });
+    const rows = await paymentRepository
+      .createQueryBuilder('payment')
+      .select('payment.paymentOrder', 'paymentOrder')
+      .addSelect('payment.status', 'status')
+      .where('payment.bookingId = :bookingId', { bookingId })
+      .andWhere('payment.paymentOrder IN (:...orders)', { orders: [0, 1] })
+      .getRawMany<{ paymentOrder: number; status: PaymentStatus }>();
 
-    // Для подтверждения нужно оплатить:
-    // 1. Залог (если есть) - paymentOrder = 0
-    // 2. Первый основной платеж - paymentOrder = 1
+    const deposit = rows.find((p) => Number(p.paymentOrder) === 0);
+    const firstPayment = rows.find((p) => Number(p.paymentOrder) === 1);
 
-    const deposit = payments.find((p) => p.paymentOrder === 0);
-    const firstPayment = payments.find((p) => p.paymentOrder === 1);
-
-    // Если есть залог, он должен быть оплачен
     if (deposit && deposit.status !== PaymentStatus.PAID) {
       return false;
     }
-
-    // Первый основной платеж должен быть оплачен
     if (firstPayment && firstPayment.status !== PaymentStatus.PAID) {
       return false;
     }
-
-    // Если нет ни залога, ни первого платежа, проверяем любой платеж
     if (!deposit && !firstPayment) {
-      const anyPaid = payments.some((p) => p.status === PaymentStatus.PAID);
-      return anyPaid;
+      const anyPaid = await paymentRepository.count({
+        where: { bookingId, status: PaymentStatus.PAID },
+      });
+      return anyPaid > 0;
     }
-
     return true;
   }
 
