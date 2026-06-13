@@ -852,7 +852,7 @@ export class BookingsController {
 
       const savedBooking = await bookingRepository.findOne({
         where: { id: booking.id },
-        relations: ['club', 'berth', 'vessel', 'vesselOwner', 'payments'],
+        relations: ['berth', 'vessel', 'vesselOwner', 'payments'],
       });
 
       res.status(201).json(savedBooking);

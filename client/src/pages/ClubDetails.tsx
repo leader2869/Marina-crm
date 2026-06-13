@@ -106,7 +106,7 @@ export default function ClubDetails() {
   }, [club?.id])
 
   useCancellableEffect(async (signal) => {
-    if (!club?.id) return
+    if (!club?.id || showBookingModal || creatingBooking) return
     const canLoadTenantReport =
       user?.role === UserRole.SUPER_ADMIN ||
       user?.role === UserRole.ADMIN ||
@@ -117,12 +117,12 @@ export default function ClubDetails() {
       return
     }
     await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, 1200)
+      const timer = setTimeout(resolve, 3000)
       signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
     })
     if (signal.aborted) return
     await loadTenantReport(club.id, signal)
-  }, [club?.id, user?.role])
+  }, [club?.id, user?.role, showBookingModal, creatingBooking])
 
   useCancellableEffect(async (signal) => {
     if (user?.role !== UserRole.VESSEL_OWNER || !user.id) return

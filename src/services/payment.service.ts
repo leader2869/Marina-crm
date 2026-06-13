@@ -121,34 +121,24 @@ export class PaymentService {
       console.log('[PaymentService] Создан стандартный график платежей:', schedule.length, 'платежей');
     }
 
-    // Создаем платежи
-    for (const item of schedule) {
-      console.log('[PaymentService] Создаем платеж:', {
-        type: item.type,
-        amount: item.amount,
-        dueDate: item.dueDate,
-        paymentOrder: item.paymentOrder,
-      });
-      const payment = paymentRepository.create({
-        bookingId: booking.id,
-        payerId,
-        amount: item.amount,
-        currency: Currency.RUB,
-        method: item.method || PaymentMethod.BANK_TRANSFER,
-        status: PaymentStatus.PENDING,
-        dueDate: item.dueDate,
-        paymentType: item.type,
-        paymentOrder: item.paymentOrder,
-        paymentMonth: item.month || null,
-      });
-
-      const savedPayment = await paymentRepository.save(payment);
-      console.log('[PaymentService] Платеж сохранен в БД:', {
-        id: savedPayment.id,
-        dueDate: savedPayment.dueDate,
-        type: savedPayment.paymentType,
-      });
-      payments.push(savedPayment);
+    // Создаем платежи одним batch-insert (не N отдельных save — иначе таймаут пула)
+    if (schedule.length > 0) {
+      const entities = schedule.map((item) =>
+        paymentRepository.create({
+          bookingId: booking.id,
+          payerId,
+          amount: item.amount,
+          currency: Currency.RUB,
+          method: item.method || PaymentMethod.BANK_TRANSFER,
+          status: PaymentStatus.PENDING,
+          dueDate: item.dueDate,
+          paymentType: item.type,
+          paymentOrder: item.paymentOrder,
+          paymentMonth: item.month || null,
+        })
+      );
+      const saved = await paymentRepository.save(entities);
+      payments.push(...saved);
     }
 
     return payments;
